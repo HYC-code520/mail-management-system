@@ -1,4 +1,7 @@
 {
+  "name": "mail-management-system",
+  "version": "0.1.0",
+  "description": "Internal CRM and mail tracking system for managing customer contacts and communications",
   "private": true,
   "scripts": {
     "dev": "next dev --turbo",
