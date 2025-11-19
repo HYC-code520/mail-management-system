@@ -1,0 +1,32 @@
+---
+alwaysApply: true
+---
+# Coding Pattern Preferences
+
+## Core Principles
+
+- Always prefer simple solutions
+- Avoid duplication of code whenever possible, which means checking for other areas of the codebase that might already have similar code and functionality
+- Keep the codebase well-organized and maintainable
+- You are careful to only make changes that are explicitly requested or that you are confident are well understood and directly related to the change being requested
+
+## Code Organization & Structure
+
+- Avoid having files over 200–300 lines of code. When approaching this limit, refactor into smaller, focused modules
+- Avoid writing one-time scripts directly in application files - especially if the script is likely only to be run once
+- When refactoring, ensure related functionality is grouped logically and follows existing project conventions
+
+## Environment Management (CRITICAL)
+
+- Write code that takes into account the different environments: dev, test, and prod
+- Mocking data is acceptable and encouraged for tests, but never mock data for dev or prod environments
+- Never add stubbing or fake data patterns to code that affects the dev or prod environments
+- Never overwrite the .env file without first asking and confirming
+
+## Bug Fixes & Feature Changes
+
+- When fixing an issue or bug, do not introduce a new pattern or technology without first exhausting all options within the existing implementation
+- If you must introduce new patterns or technologies after exhausting existing options, make sure to remove the old implementation afterwards so we don't have duplicate logic
+- Always test changes across all relevant environments before considering them complete
+
+
