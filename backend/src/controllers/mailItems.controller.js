@@ -11,7 +11,16 @@ exports.getMailItems = async (req, res, next) => {
 
     let query = supabase
       .from('mail_items')
-      .select('*')
+      .select(`
+        *,
+        contacts (
+          contact_id,
+          contact_person,
+          company_name,
+          unit_number,
+          mailbox_number
+        )
+      `)
       .order('received_date', { ascending: false });
 
     if (contact_id) {
