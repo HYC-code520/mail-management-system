@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Button from '@/components/ui/Button';
 import type { Contact } from '@/types/mei-way';
+import { api } from '@/utils/api-client';
 
 export default function ContactsPage() {
   const router = useRouter();
@@ -19,22 +20,14 @@ export default function ContactsPage() {
 
   const loadContacts = async () => {
     try {
-      const response = await fetch('/api/contacts');
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Contacts API response:', data); // Debug log
-        // Ensure data is an array
-        setContacts(Array.isArray(data) ? data : []);
-        setError('');
-      } else {
-        const errorText = await response.text();
-        console.error('Failed to load contacts:', response.status, errorText);
-        setError(`Failed to load contacts: ${response.status}`);
-        setContacts([]);
-      }
+      const data = await api.contacts.getAll();
+      console.log('Contacts API response:', data); // Debug log
+      // Ensure data is an array
+      setContacts(Array.isArray(data) ? data : []);
+      setError('');
     } catch (err) {
       console.error('Error loading contacts:', err);
-      setError('Error loading contacts. Please try again.');
+      setError(err instanceof Error ? err.message : 'Error loading contacts. Please try again.');
       setContacts([]);
     } finally {
       setLoading(false);

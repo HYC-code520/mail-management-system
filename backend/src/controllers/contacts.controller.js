@@ -1,8 +1,9 @@
-const { supabase } = require('../services/supabase.service');
+const { getSupabaseClient } = require('../services/supabase.service');
 
 // GET /api/contacts - Get all contacts for authenticated user
 exports.getContacts = async (req, res, next) => {
   try {
+    const supabase = getSupabaseClient(req.user.token);
     const { search, language, service_tier, status } = req.query;
     
     let query = supabase
@@ -42,6 +43,7 @@ exports.getContacts = async (req, res, next) => {
 // POST /api/contacts - Create new contact
 exports.createContact = async (req, res, next) => {
   try {
+    const supabase = getSupabaseClient(req.user.token);
     const contactData = {
       ...req.body,
       user_id: req.user.id,
@@ -65,6 +67,7 @@ exports.createContact = async (req, res, next) => {
 // GET /api/contacts/:id - Get single contact
 exports.getContactById = async (req, res, next) => {
   try {
+    const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
     
     const { data, error } = await supabase
@@ -90,6 +93,7 @@ exports.getContactById = async (req, res, next) => {
 // PUT /api/contacts/:id - Update contact
 exports.updateContact = async (req, res, next) => {
   try {
+    const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
     
     const { data, error } = await supabase
@@ -116,6 +120,7 @@ exports.updateContact = async (req, res, next) => {
 // DELETE /api/contacts/:id - Soft delete contact
 exports.deleteContact = async (req, res, next) => {
   try {
+    const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
     
     // Soft delete by setting status to 'No'
