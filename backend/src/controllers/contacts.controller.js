@@ -44,11 +44,28 @@ exports.getContacts = async (req, res, next) => {
 exports.createContact = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
-    const contactData = {
-      ...req.body,
-      user_id: req.user.id,
-      status: req.body.status || 'PENDING'
+    
+    // Whitelist and map fields to match database schema
+    const allowedFields = {
+      company_name: req.body.company_name,
+      unit_number: req.body.unit_number,
+      contact_person: req.body.contact_person,
+      language_preference: req.body.language_preference,
+      email: req.body.email,
+      phone_number: req.body.phone || req.body.phone_number, // Accept both 'phone' and 'phone_number'
+      service_tier: req.body.service_tier,
+      options: req.body.options,
+      mailbox_number: req.body.mailbox_number,
+      status: req.body.status || 'PENDING',
     };
+    
+    // Remove undefined values
+    const contactData = Object.fromEntries(
+      Object.entries(allowedFields).filter(([_, v]) => v !== undefined)
+    );
+    
+    // Add user_id
+    contactData.user_id = req.user.id;
 
     const { data, error } = await supabase
       .from('contacts')
@@ -96,9 +113,28 @@ exports.updateContact = async (req, res, next) => {
     const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
     
+    // Whitelist and map fields to match database schema
+    const allowedFields = {
+      company_name: req.body.company_name,
+      unit_number: req.body.unit_number,
+      contact_person: req.body.contact_person,
+      language_preference: req.body.language_preference,
+      email: req.body.email,
+      phone_number: req.body.phone || req.body.phone_number,
+      service_tier: req.body.service_tier,
+      options: req.body.options,
+      mailbox_number: req.body.mailbox_number,
+      status: req.body.status,
+    };
+    
+    // Remove undefined values
+    const updateData = Object.fromEntries(
+      Object.entries(allowedFields).filter(([_, v]) => v !== undefined)
+    );
+    
     const { data, error } = await supabase
       .from('contacts')
-      .update(req.body)
+      .update(updateData)
       .eq('contact_id', id)
       .eq('user_id', req.user.id)
       .select()
@@ -139,10 +175,7 @@ exports.deleteContact = async (req, res, next) => {
       throw error;
     }
     
-    res.json({ 
-      message: 'Contact deleted successfully', 
-      data 
-    });
+    res.status(204).send(); // No content on successful deletion
   } catch (error) {
     next(error);
   }

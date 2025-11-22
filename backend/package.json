@@ -5,7 +5,9 @@
   "scripts": {
     "dev": "nodemon src/server.js",
     "start": "node src/server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +22,11 @@
     "helmet": "^8.1.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.11"
+    "@jest/globals": "^30.2.0",
+    "@jest/test-sequencer": "^27.5.1",
+    "husky": "^9.1.7",
+    "jest": "^27.5.1",
+    "nodemon": "^3.1.11",
+    "supertest": "^6.3.4"
   }
 }

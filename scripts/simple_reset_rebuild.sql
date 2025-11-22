@@ -1,27 +1,18 @@
 -- ##############################################################
--- ##           SIMPLE DATABASE RESET AND REBUILD            ##
+-- ##     MAIL MANAGEMENT SYSTEM - DATABASE RESET & REBUILD  ##
 -- ##############################################################
--- This script uses a simpler, more reliable approach to reset and rebuild
+-- Clean, focused schema for mail management (no Stripe bloat)
 
 -- ##############################################################
--- ##                    STEP 1: SIMPLE RESET                ##
+-- ##                    STEP 1: CLEAN RESET                 ##
 -- ##############################################################
 
--- Drop specific tables in reverse dependency order
+-- Drop tables in reverse dependency order
 DROP TABLE IF EXISTS outreach_messages CASCADE;
 DROP TABLE IF EXISTS mail_items CASCADE;
 DROP TABLE IF EXISTS message_templates CASCADE;
 DROP TABLE IF EXISTS contacts CASCADE;
-DROP TABLE IF EXISTS subscriptions CASCADE;
-DROP TABLE IF EXISTS prices CASCADE;
-DROP TABLE IF EXISTS products CASCADE;
-DROP TABLE IF EXISTS customers CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
--- Drop custom types
-DROP TYPE IF EXISTS subscription_status CASCADE;
-DROP TYPE IF EXISTS pricing_plan_interval CASCADE;
-DROP TYPE IF EXISTS pricing_type CASCADE;
 
 -- Drop functions
 DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
@@ -30,15 +21,7 @@ DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;
 DROP PUBLICATION IF EXISTS supabase_realtime;
 
 -- ##############################################################
--- ##                    STEP 2: CREATE TYPES                ##
--- ##############################################################
-
-CREATE TYPE pricing_type AS ENUM ('one_time', 'recurring');
-CREATE TYPE pricing_plan_interval AS ENUM ('day', 'week', 'month', 'year');
-CREATE TYPE subscription_status AS ENUM ('trialing', 'active', 'canceled', 'incomplete', 'incomplete_expired', 'past_due', 'unpaid', 'paused');
-
--- ##############################################################
--- ##                 STEP 3: CREATE FOUNDATION TABLES       ##
+-- ##                 STEP 2: CREATE USER TABLE              ##
 -- ##############################################################
 
 -- Users table (core user profiles)
@@ -46,62 +29,11 @@ CREATE TABLE users (
   id uuid references auth.users not null primary key,
   full_name text,
   avatar_url text,
-  billing_address jsonb,
-  payment_method jsonb
-);
-
--- Customers table (Stripe integration)
-CREATE TABLE customers (
-  id uuid references auth.users not null primary key,
-  stripe_customer_id text
-);
-
--- Products table (Stripe products)
-CREATE TABLE products (
-  id text primary key,
-  active boolean,
-  name text,
-  description text,
-  image text,
-  metadata jsonb
-);
-
--- Prices table (Stripe pricing)
-CREATE TABLE prices (
-  id text primary key,
-  product_id text references products, 
-  active boolean,
-  description text,
-  unit_amount bigint,
-  currency text check (char_length(currency) = 3),
-  type pricing_type,
-  interval pricing_plan_interval,
-  interval_count integer,
-  trial_period_days integer,
-  metadata jsonb
-);
-
--- Subscriptions table (Stripe subscriptions)
-CREATE TABLE subscriptions (
-  id text primary key,
-  user_id uuid references auth.users not null,
-  status subscription_status,
-  metadata jsonb,
-  price_id text references prices,
-  quantity integer,
-  cancel_at_period_end boolean,
-  created timestamp with time zone default timezone('utc'::text, now()) not null,
-  current_period_start timestamp with time zone default timezone('utc'::text, now()) not null,
-  current_period_end timestamp with time zone default timezone('utc'::text, now()) not null,
-  ended_at timestamp with time zone default timezone('utc'::text, now()),
-  cancel_at timestamp with time zone default timezone('utc'::text, now()),
-  canceled_at timestamp with time zone default timezone('utc'::text, now()),
-  trial_start timestamp with time zone default timezone('utc'::text, now()),
-  trial_end timestamp with time zone default timezone('utc'::text, now())
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ##############################################################
--- ##                   STEP 4: CREATE CRM TABLES            ##
+-- ##                   STEP 3: CREATE CRM TABLES            ##
 -- ##############################################################
 
 -- Contacts table (customer/client information)
@@ -163,35 +95,22 @@ CREATE TABLE message_templates (
 );
 
 -- ##############################################################
--- ##                  STEP 5: ENABLE ROW LEVEL SECURITY     ##
+-- ##                  STEP 4: ENABLE ROW LEVEL SECURITY     ##
 -- ##############################################################
 
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE customers ENABLE ROW LEVEL SECURITY;
-ALTER TABLE products ENABLE ROW LEVEL SECURITY;
-ALTER TABLE prices ENABLE ROW LEVEL SECURITY;
-ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mail_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outreach_messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_templates ENABLE ROW LEVEL SECURITY;
 
 -- ##############################################################
--- ##                    STEP 6: CREATE POLICIES             ##
+-- ##                    STEP 5: CREATE POLICIES             ##
 -- ##############################################################
 
 -- Users policies
 CREATE POLICY "Can view own user data." ON users FOR SELECT USING (auth.uid() = id);
 CREATE POLICY "Can update own user data." ON users FOR UPDATE USING (auth.uid() = id);
-
--- Products policies (public read-only for pricing display)
-CREATE POLICY "Allow public read-only access." ON products FOR SELECT USING (true);
-
--- Prices policies (public read-only for pricing display)
-CREATE POLICY "Allow public read-only access." ON prices FOR SELECT USING (true);
-
--- Subscriptions policies
-CREATE POLICY "Can only view own subs data." ON subscriptions FOR SELECT USING (auth.uid() = user_id);
 
 -- Contacts policies (users can only manage their own contacts)
 CREATE POLICY "Users can manage their own contacts." ON contacts
@@ -210,7 +129,7 @@ CREATE POLICY "Users can manage their templates." ON message_templates
     FOR ALL USING (auth.uid() = user_id OR is_default = TRUE);
 
 -- ##############################################################
--- ##                STEP 7: CREATE FUNCTIONS & TRIGGERS     ##
+-- ##                STEP 6: CREATE FUNCTIONS & TRIGGERS     ##
 -- ##############################################################
 
 -- Function to automatically create user profile on signup
@@ -229,32 +148,140 @@ CREATE TRIGGER on_auth_user_created
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
 -- ##############################################################
--- ##               STEP 8: SETUP REALTIME                   ##
+-- ##               STEP 7: SETUP REALTIME                   ##
 -- ##############################################################
 
 -- Create publication for realtime subscriptions (for live updates)
-CREATE PUBLICATION supabase_realtime FOR TABLE products, prices, contacts, mail_items, outreach_messages, message_templates;
+CREATE PUBLICATION supabase_realtime FOR TABLE contacts, mail_items, outreach_messages, message_templates;
 
 -- ##############################################################
--- ##                STEP 9: INSERT DEFAULT DATA             ##
+-- ##                STEP 8: INSERT DEFAULT DATA             ##
 -- ##############################################################
 
--- Insert some default message templates for immediate use
+-- Insert default bilingual message templates
 INSERT INTO message_templates (template_name, template_type, subject_line, message_body, is_default) VALUES
-('Mail Received Notification', 'Initial', 'New Mail Received', 'Hi {{contact_name}}, you have received a {{item_type}} at our facility. Please contact us to arrange pickup.', true),
-('Pickup Reminder', 'Reminder', 'Mail Pickup Reminder', 'Hi {{contact_name}}, you have a {{item_type}} waiting for pickup. Please collect it at your earliest convenience.', true),
-('Pickup Confirmed', 'Confirmation', 'Mail Pickup Confirmed', 'Hi {{contact_name}}, your {{item_type}} has been successfully picked up. Thank you!', true);
+(
+  'New Mail Notification',
+  'Initial',
+  'New Mail Received at Mei Way Mail Plus',
+  'Hello {Name},
+
+You have new mail waiting for you at Mei Way Mail Plus.
+
+Mailbox: {BoxNumber}
+Type: {Type}
+Date Received: {Date}
+
+Please collect at your earliest convenience during business hours.
+
+Best regards,
+Mei Way Mail Plus Team
+
+---
+
+{Name} 您好，
+
+您在美威邮件中心有新邮件等待领取。
+
+邮箱号：{BoxNumber}
+类型：{Type}
+收件日期：{Date}
+
+请在营业时间内尽快领取。
+
+此致
+美威邮件团队',
+  TRUE
+),
+(
+  'Reminder (Uncollected Mail)',
+  'Reminder',
+  'Reminder: Uncollected Mail - Mei Way Mail Plus',
+  'Dear {Name},
+
+This is a friendly reminder that you have uncollected mail at Mei Way Mail Plus.
+
+Mailbox: {BoxNumber}
+Type: {Type}
+Waiting since: {Date}
+
+Please collect your mail during business hours: Mon-Fri 9AM-5PM.
+
+Thank you,
+Mei Way Mail Plus
+
+---
+
+亲爱的 {Name}，
+
+这是一封友好提醒，您在美威邮件中心有未领取的邮件。
+
+邮箱号：{BoxNumber}
+类型：{Type}
+等待领取时间：{Date}
+
+请在营业时间内领取您的邮件：周一至周五 上午9点至下午5点。
+
+谢谢
+美威邮件中心',
+  TRUE
+),
+(
+  'Final Notice (After 1 Week)',
+  'Reminder',
+  'Final Notice: Uncollected Mail - Storage Fee Applies',
+  'FINAL NOTICE
+
+Dear {Name},
+
+Your mail has been waiting at Mei Way Mail Plus for over one week.
+
+Mailbox: {BoxNumber}
+Received: {Date}
+
+Please collect immediately. Uncollected items may be returned to sender or disposed of according to our policy.
+
+Contact us if you need assistance.
+
+Mei Way Mail Plus
+Phone: (555) 123-4567
+
+---
+
+最后通知
+
+{Name} 您好，
+
+您的邮件已在美威邮件中心等待超过一周。
+
+邮箱号：{BoxNumber}
+收件日期：{Date}
+
+请立即领取。根据我们的政策，未领取的物品可能会被退回或处理。
+
+如需帮助，请联系我们。
+
+美威邮件中心
+电话：(555) 123-4567',
+  TRUE
+);
 
 -- ##############################################################
 -- ##                     COMPLETE!                          ##
 -- ##############################################################
 
 -- Database has been completely reset and rebuilt with:
--- ✅ All foundation tables (users, customers, products, prices, subscriptions)
--- ✅ All CRM tables (contacts, mail_items, outreach_messages, message_templates)
+-- ✅ User profiles (linked to Supabase Auth)
+-- ✅ Contacts (customer management)
+-- ✅ Mail Items (package/letter tracking)
+-- ✅ Outreach Messages (communication tracking)
+-- ✅ Message Templates (bilingual notifications)
 -- ✅ Row-level security enabled on all tables
 -- ✅ Proper security policies for multi-tenant data isolation
 -- ✅ Automatic user profile creation on signup
 -- ✅ Realtime subscriptions for live updates
--- ✅ Default message templates ready to use
+-- ✅ 3 default bilingual templates ready to use
 -- ✅ Foreign key relationships and data integrity constraints
+-- 
+-- 🗑️  REMOVED: All Stripe-related tables (products, prices, subscriptions, customers)
+-- 📧 Mail management system is now clean and focused!

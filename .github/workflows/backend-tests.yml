@@ -1,0 +1,59 @@
+name: Backend Tests
+
+on:
+  push:
+    branches: [ main, master, refactor/frontend-improvements ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/backend-tests.yml'
+  pull_request:
+    branches: [ main, master ]
+    paths:
+      - 'backend/**'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x]
+    
+    steps:
+    - name: 📥 Checkout code
+      uses: actions/checkout@v4
+    
+    - name: 🟢 Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: 📦 Install dependencies
+      run: |
+        cd backend
+        npm ci
+    
+    - name: 🧪 Run tests
+      run: |
+        cd backend
+        npm test
+    
+    - name: 📊 Generate coverage report
+      if: matrix.node-version == '20.x'
+      run: |
+        cd backend
+        npm run test:coverage
+    
+    - name: 📈 Upload coverage to Codecov (optional)
+      if: matrix.node-version == '20.x'
+      uses: codecov/codecov-action@v3
+      continue-on-error: true
+      with:
+        directory: ./backend/coverage
+        flags: backend
+        name: backend-coverage
+
+
+

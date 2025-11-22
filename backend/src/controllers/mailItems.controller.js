@@ -11,7 +11,16 @@ exports.getMailItems = async (req, res, next) => {
 
     let query = supabase
       .from('mail_items')
-      .select('*')
+      .select(`
+        *,
+        contacts (
+          contact_id,
+          contact_person,
+          company_name,
+          unit_number,
+          mailbox_number
+        )
+      `)
       .order('received_date', { ascending: false });
 
     if (contact_id) {
@@ -71,23 +80,31 @@ exports.createMailItem = async (req, res, next) => {
 
 /**
  * PUT /api/mail-items/:id
- * Update mail item status
+ * Update mail item (status or full update)
  */
 exports.updateMailItemStatus = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
-    const { status } = req.body;
+    const { status, item_type, description, contact_id } = req.body;
 
-    if (!status) {
-      return res.status(400).json({ error: 'status is required' });
-    }
-
-    const updateData = { status };
+    // Build update data object with only provided fields
+    const updateData = {};
     
-    // If status is 'Picked Up', set pickup_date to now
-    if (status === 'Picked Up') {
-      updateData.pickup_date = new Date().toISOString();
+    if (status !== undefined) {
+      updateData.status = status;
+      // If status is 'Picked Up', set pickup_date to now
+      if (status === 'Picked Up') {
+        updateData.pickup_date = new Date().toISOString();
+      }
+    }
+    
+    if (item_type !== undefined) updateData.item_type = item_type;
+    if (description !== undefined) updateData.description = description;
+    if (contact_id !== undefined) updateData.contact_id = contact_id;
+
+    if (Object.keys(updateData).length === 0) {
+      return res.status(400).json({ error: 'No update fields provided' });
     }
 
     const { data: mailItem, error } = await supabase
@@ -103,6 +120,31 @@ exports.updateMailItemStatus = async (req, res, next) => {
     }
 
     res.json({ mailItem });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * DELETE /api/mail-items/:id
+ * Delete a mail item
+ */
+exports.deleteMailItem = async (req, res, next) => {
+  try {
+    const supabase = getSupabaseClient(req.user.token);
+    const { id } = req.params;
+
+    const { error } = await supabase
+      .from('mail_items')
+      .delete()
+      .eq('mail_item_id', id);
+
+    if (error) {
+      console.error('Error deleting mail item:', error);
+      return res.status(500).json({ error: 'Failed to delete mail item' });
+    }
+
+    res.status(204).send(); // No content on successful deletion
   } catch (error) {
     next(error);
   }

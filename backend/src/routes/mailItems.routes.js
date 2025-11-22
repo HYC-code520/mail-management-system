@@ -12,8 +12,11 @@ router.get('/', mailItemsController.getMailItems);
 // POST /api/mail-items - Create a new mail item
 router.post('/', mailItemsController.createMailItem);
 
-// PUT /api/mail-items/:id - Update mail item status
+// PUT /api/mail-items/:id - Update mail item
 router.put('/:id', mailItemsController.updateMailItemStatus);
+
+// DELETE /api/mail-items/:id - Delete mail item
+router.delete('/:id', mailItemsController.deleteMailItem);
 
 module.exports = router;
 
