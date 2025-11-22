@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Save, Bell } from 'lucide-react';
+import { Search, Save, Bell, Mail, Package } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 
@@ -293,7 +293,11 @@ export default function IntakePage() {
                   <tr key={entry.mail_item_id} className="border-b border-gray-100 hover:bg-gray-50">
                     <td className="py-4 px-6">
                       <span className="flex items-center gap-2">
-                        {entry.item_type === 'Package' ? '📦' : '✉️'}
+                        {entry.item_type === 'Package' ? (
+                          <Package className="w-4 h-4 text-gray-500" />
+                        ) : (
+                          <Mail className="w-4 h-4 text-gray-500" />
+                        )}
                         <span className="text-gray-900">{entry.item_type}</span>
                       </span>
                     </td>

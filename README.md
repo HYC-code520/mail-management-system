@@ -120,11 +120,27 @@ This application helps manage:
 
 ## 📚 Documentation
 
-- **[Setup Guide](./docs/SETUP_ENV.md)** - Detailed environment setup
-- **[Design System](./docs/DESIGN_SYSTEM_GUIDE.md)** - UI components and styling guide
-- **[Icon Guide](./docs/ICON_GUIDE.md)** - Icon usage and guidelines
+**📖 [Complete Documentation Index](./docs/README.md)** - Full documentation catalog
+
+### Quick Links:
+
+**Getting Started:**
+- **[Setup Guide](./docs/SETUP_ENV.md)** - Environment setup and configuration
 - **[Troubleshooting](./docs/TROUBLESHOOTING.md)** - Common issues and solutions
-- **[Frontend Build Summary](./docs/FRONTEND_BUILD_SUMMARY.md)** - Frontend architecture details
+
+**Testing & Quality:**
+- **[Automated Testing Guide](./docs/AUTOMATED_TESTING_GUIDE.md)** - Complete testing workflow
+- **[Testing Details](./docs/TESTING_COMPLETE.md)** - What's being tested
+- **[CI/CD Pipeline](./docs/CI_CD_SETUP_COMPLETE.md)** - GitHub Actions and automation
+
+**Development:**
+- **[Design System](./docs/DESIGN_SYSTEM_GUIDE.md)** - UI components and styling
+- **[Icon Guide](./docs/ICON_GUIDE.md)** - Icon usage guidelines
+- **[Branch Protection](./docs/BRANCH_PROTECTION_GUIDE.md)** - Git workflow and PR process
+
+**Project Info:**
+- **[Progress Summary](./docs/PROGRESS_SUMMARY.md)** - Current project status
+- **[Frontend Architecture](./docs/FRONTEND_BUILD_SUMMARY.md)** - Frontend details
 
 ## 🗄️ Database Schema
 
