@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Package, Calendar } from 'lucide-react';
+import { Mail, Package } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 

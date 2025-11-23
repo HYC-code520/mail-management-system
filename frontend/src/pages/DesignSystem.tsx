@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  Palette, Type, Layers, Grid, Languages, 
+  Palette, Type, Layers, Grid,
   Mail, Package, Bell, Clock, User, FileText, Settings,
   ChevronRight, Plus, Search, Calendar, Eye, Copy, Check
 } from 'lucide-react';

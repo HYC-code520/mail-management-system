@@ -56,7 +56,7 @@ class ApiClient {
   /**
    * POST request
    */
-  async post(endpoint: string, data: any) {
+  async post(endpoint: string, data: Record<string, unknown>) {
     return this.request(endpoint, {
       method: 'POST',
       body: JSON.stringify(data),
@@ -66,7 +66,7 @@ class ApiClient {
   /**
    * PUT request
    */
-  async put(endpoint: string, data: any) {
+  async put(endpoint: string, data: Record<string, unknown>) {
     return this.request(endpoint, {
       method: 'PUT',
       body: JSON.stringify(data),
@@ -89,14 +89,14 @@ export const api = {
   contacts: {
     getAll: () => apiClient.get('/contacts'),
     getById: (id: string) => apiClient.get(`/contacts/${id}`),
-    create: (data: any) => apiClient.post('/contacts', data),
-    update: (id: string, data: any) => apiClient.put(`/contacts/${id}`, data),
+    create: (data: Record<string, unknown>) => apiClient.post('/contacts', data),
+    update: (id: string, data: Record<string, unknown>) => apiClient.put(`/contacts/${id}`, data),
     delete: (id: string) => apiClient.delete(`/contacts/${id}`),
   },
   mailItems: {
     getAll: (contactId?: string) => apiClient.get(`/mail-items${contactId ? `?contact_id=${contactId}` : ''}`),
-    create: (data: any) => apiClient.post('/mail-items', data),
-    update: (id: string, data: any) => apiClient.put(`/mail-items/${id}`, data),
+    create: (data: Record<string, unknown>) => apiClient.post('/mail-items', data),
+    update: (id: string, data: Record<string, unknown>) => apiClient.put(`/mail-items/${id}`, data),
     updateStatus: (id: string, status: string) => apiClient.put(`/mail-items/${id}`, { status }),
     delete: (id: string) => apiClient.delete(`/mail-items/${id}`),
   },
@@ -107,12 +107,12 @@ export const api = {
       if (mailItemId) params.append('mail_item_id', mailItemId);
       return apiClient.get(`/outreach-messages${params.toString() ? `?${params}` : ''}`);
     },
-    create: (data: any) => apiClient.post('/outreach-messages', data),
+    create: (data: Record<string, unknown>) => apiClient.post('/outreach-messages', data),
   },
   templates: {
     getAll: () => apiClient.get('/templates'),
-    create: (data: any) => apiClient.post('/templates', data),
-    update: (id: string, data: any) => apiClient.put(`/templates/${id}`, data),
+    create: (data: Record<string, unknown>) => apiClient.post('/templates', data),
+    update: (id: string, data: Record<string, unknown>) => apiClient.put(`/templates/${id}`, data),
     delete: (id: string) => apiClient.delete(`/templates/${id}`),
   },
 };

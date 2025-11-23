@@ -1,18 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
 import { Mail, Package, Bell, Search } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
-import { Button } from '../components/ui/button.tsx';
+
+interface MailItem {
+  mail_item_id: string;
+  item_type: string;
+  status: string;
+  received_date: string;
+  contact_id: string;
+  contacts?: {
+    contact_person?: string;
+    company_name?: string;
+    mailbox_number?: string;
+  };
+}
 
 interface DashboardStats {
   todaysMail: number;
   pendingPickups: number;
   remindersDue: number;
-  recentMailItems: any[];
+  recentMailItems: MailItem[];
 }
 
 export default function DashboardPage() {
-  const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -24,7 +34,7 @@ export default function DashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      const [contacts, mailItems] = await Promise.all([
+      const [, mailItems] = await Promise.all([
         api.contacts.getAll(),
         api.mailItems.getAll()
       ]);
@@ -32,13 +42,13 @@ export default function DashboardPage() {
       const today = new Date().toISOString().split('T')[0];
       
       setStats({
-        todaysMail: mailItems.filter((item: any) => 
+        todaysMail: mailItems.filter((item: MailItem) => 
           item.received_date?.startsWith(today)
         ).length,
-        pendingPickups: mailItems.filter((item: any) => 
+        pendingPickups: mailItems.filter((item: MailItem) => 
           item.status === 'Notified'
         ).length,
-        remindersDue: mailItems.filter((item: any) => 
+        remindersDue: mailItems.filter((item: MailItem) => 
           item.status === 'Received'
         ).length,
         recentMailItems: mailItems.slice(0, 6)
@@ -170,7 +180,7 @@ export default function DashboardPage() {
                   </td>
                 </tr>
               ) : (
-                filteredItems.map((item: any) => (
+                filteredItems.map((item: MailItem) => (
                   <tr key={item.mail_item_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6 text-gray-900">
                       {new Date(item.received_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }).replace(/\//g, '-')}

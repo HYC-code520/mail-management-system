@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit, Trash2 } from 'lucide-react';
+import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';

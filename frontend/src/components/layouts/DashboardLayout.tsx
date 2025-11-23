@@ -13,7 +13,7 @@ export default function DashboardLayout() {
       await signOut();
       toast.success('Signed out successfully');
       navigate('/signin');
-    } catch (error) {
+    } catch {
       toast.error('Error signing out');
     }
   };
