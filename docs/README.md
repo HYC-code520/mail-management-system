@@ -59,6 +59,21 @@ Step-by-step guide for setting up branch protection rules.
 
 ## 🎨 Design & Frontend
 
+### [Mail Log Filtering](MAIL_LOG_FILTERING.md) ⭐ **NEW**
+Enhanced filtering and sorting for the Mail Log page.
+- Multi-dimensional filters (status, type, date, mailbox)
+- Visual filter chips
+- Smart sorting options
+- Results counter
+
+### [Mail Management Page](MAIL_MANAGEMENT_PAGE.md)
+Documentation for the combined Mail Management page.
+- Sub-tabs for Intake and History
+- Hover dropdown navigation
+
+### [Intake Active Customers Only](INTAKE_ACTIVE_CUSTOMERS_ONLY.md)
+Explanation of filtering archived customers in forms.
+
 ### [Design System Guide](DESIGN_SYSTEM_GUIDE.md)
 Complete design system documentation.
 - Colors and typography
@@ -232,15 +247,15 @@ When adding new documentation:
 
 ## 📊 Documentation Stats
 
-- **Total Documentation Files:** 15
+- **Total Documentation Files:** 18
 - **Testing Documentation:** 5 files
 - **Setup Guides:** 3 files
-- **Design Documentation:** 4 files
+- **Design & UX Documentation:** 7 files
 - **CI/CD Documentation:** 2 files
 - **Project Management:** 3 files
 
 ---
 
-**Last Updated:** November 22, 2025
+**Last Updated:** November 23, 2025
 
 

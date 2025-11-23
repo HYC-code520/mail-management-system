@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Package, Search, ChevronRight } from 'lucide-react';
+import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
@@ -40,9 +40,18 @@ export default function LogPage({ embedded = false }: LogPageProps) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  
+  // Filter states
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [typeFilter, setTypeFilter] = useState('All Types');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateRangeFilter, setDateRangeFilter] = useState('All Time');
+  const [mailboxFilter, setMailboxFilter] = useState('All Mailboxes');
+  const [sortColumn, setSortColumn] = useState<'date' | 'status' | 'customer' | 'type'>('date');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [isFilterExpanded, setIsFilterExpanded] = useState(true); // New state for filter panel
+  
+  // Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingMailItem, setEditingMailItem] = useState<MailItem | null>(null);
   const [saving, setSaving] = useState(false);
@@ -163,16 +172,109 @@ export default function LogPage({ embedded = false }: LogPageProps) {
     setExpandedRows(newExpanded);
   };
 
+  const clearAllFilters = () => {
+    setStatusFilter('All Status');
+    setTypeFilter('All Types');
+    setSearchTerm('');
+    setDateRangeFilter('All Time');
+    setMailboxFilter('All Mailboxes');
+    setSortColumn('date');
+    setSortDirection('desc');
+  };
+
+  const handleSort = (column: 'date' | 'status' | 'customer' | 'type') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to ascending (except date defaults to descending)
+      setSortColumn(column);
+      setSortDirection(column === 'date' ? 'desc' : 'asc');
+    }
+  };
+
+  const getDateRangeFilter = () => {
+    const today = new Date();
+    switch (dateRangeFilter) {
+      case 'Today':
+        return { start: new Date(today.setHours(0, 0, 0, 0)), end: new Date(today.setHours(23, 59, 59, 999)) };
+      case 'Last 7 Days':
+        return { start: new Date(today.setDate(today.getDate() - 7)), end: new Date() };
+      case 'Last 30 Days':
+        return { start: new Date(today.setDate(today.getDate() - 30)), end: new Date() };
+      case 'All Time':
+      default:
+        return null;
+    }
+  };
+
+  // Get unique mailboxes for filter
+  const uniqueMailboxes = Array.from(new Set(
+    mailItems
+      .map(item => item.contacts?.mailbox_number)
+      .filter(Boolean)
+  )).sort();
+
   const filteredItems = mailItems.filter((item) => {
+    // Search filter
     const matchesSearch = searchTerm === '' ||
       item.contacts?.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.contacts?.company_name?.toLowerCase().includes(searchTerm.toLowerCase());
+      item.contacts?.company_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.contacts?.mailbox_number?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.contacts?.unit_number?.toLowerCase().includes(searchTerm.toLowerCase());
     
+    // Status filter
     const matchesStatus = statusFilter === 'All Status' || item.status === statusFilter;
+    
+    // Type filter
     const matchesType = typeFilter === 'All Types' || item.item_type === typeFilter;
 
-    return matchesSearch && matchesStatus && matchesType;
+    // Date range filter
+    const dateRange = getDateRangeFilter();
+    const matchesDateRange = !dateRange || (
+      new Date(item.received_date) >= dateRange.start &&
+      new Date(item.received_date) <= dateRange.end
+    );
+
+    // Mailbox filter
+    const matchesMailbox = mailboxFilter === 'All Mailboxes' || 
+      item.contacts?.mailbox_number === mailboxFilter;
+
+    return matchesSearch && matchesStatus && matchesType && matchesDateRange && matchesMailbox;
   });
+
+  // Sorting
+  const sortedItems = [...filteredItems].sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortColumn) {
+      case 'date':
+        comparison = new Date(a.received_date).getTime() - new Date(b.received_date).getTime();
+        break;
+      case 'status':
+        comparison = a.status.localeCompare(b.status);
+        break;
+      case 'customer':
+        const nameA = a.contacts?.contact_person || a.contacts?.company_name || '';
+        const nameB = b.contacts?.contact_person || b.contacts?.company_name || '';
+        comparison = nameA.localeCompare(nameB);
+        break;
+      case 'type':
+        comparison = a.item_type.localeCompare(b.item_type);
+        break;
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  // Count active filters
+  const activeFiltersCount = [
+    statusFilter !== 'All Status',
+    typeFilter !== 'All Types',
+    searchTerm !== '',
+    dateRangeFilter !== 'All Time',
+    mailboxFilter !== 'All Mailboxes'
+  ].filter(Boolean).length;
 
   if (loading) {
     return (
@@ -196,69 +298,275 @@ export default function LogPage({ embedded = false }: LogPageProps) {
       )}
 
       {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+      <div className="bg-white border border-gray-200 rounded-lg mb-6 shadow-sm">
+        {/* Filter Header - Always Visible */}
+        <button
+          onClick={() => setIsFilterExpanded(!isFilterExpanded)}
+          className="w-full flex items-center gap-2 p-4 hover:bg-gray-50 transition-colors"
         >
-          <option>All Status</option>
-          <option>Pending</option>
-          <option>Notified</option>
-          <option>Picked Up</option>
-        </select>
+          <Filter className="w-5 h-5 text-gray-600" />
+          <h3 className="font-semibold text-gray-900">Filters</h3>
+          {activeFiltersCount > 0 && (
+            <span className="px-2 py-0.5 bg-green-100 text-green-700 text-xs font-medium rounded-full">
+              {activeFiltersCount} active
+            </span>
+          )}
+          {activeFiltersCount > 0 && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                clearAllFilters();
+              }}
+              className="ml-auto text-sm text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+            >
+              <X className="w-4 h-4" />
+              Clear all
+            </button>
+          )}
+          <div className={`ml-${activeFiltersCount > 0 ? '0' : 'auto'} text-gray-400`}>
+            {isFilterExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          </div>
+        </button>
 
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-        >
-          <option>All Types</option>
-          <option>Letter</option>
-          <option>Package</option>
-        </select>
+        {/* Filter Content - Collapsible */}
+        {isFilterExpanded && (
+          <div className="px-4 pb-4 border-t border-gray-200">
+            {/* Filter Row 1 */}
+            <div className="grid grid-cols-4 gap-4 mb-4 mt-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option>All Status</option>
+                  <option>Received</option>
+                  <option>Notified</option>
+                  <option>Picked Up</option>
+                </select>
+              </div>
 
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search by customer name..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
-          />
-        </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                <select
+                  value={typeFilter}
+                  onChange={(e) => setTypeFilter(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option>All Types</option>
+                  <option>Letter</option>
+                  <option>Package</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Calendar className="w-4 h-4 inline mr-1" />
+                  Date Range
+                </label>
+                <select
+                  value={dateRangeFilter}
+                  onChange={(e) => setDateRangeFilter(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option>All Time</option>
+                  <option>Today</option>
+                  <option>Last 7 Days</option>
+                  <option>Last 30 Days</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Mailbox</label>
+                <select
+                  value={mailboxFilter}
+                  onChange={(e) => setMailboxFilter(e.target.value)}
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+                >
+                  <option>All Mailboxes</option>
+                  {uniqueMailboxes.map(mailbox => (
+                    <option key={mailbox} value={mailbox}>{mailbox}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Filter Row 2 - Just Search */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Search</label>
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search customer, mailbox, unit..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+                />
+              </div>
+            </div>
+
+            {/* Active Filter Chips */}
+            {activeFiltersCount > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-200">
+                <div className="flex flex-wrap gap-2">
+                  {statusFilter !== 'All Status' && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 text-sm rounded-full">
+                      Status: {statusFilter}
+                      <button onClick={() => setStatusFilter('All Status')} className="hover:bg-blue-200 rounded-full p-0.5">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {typeFilter !== 'All Types' && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-purple-100 text-purple-700 text-sm rounded-full">
+                      Type: {typeFilter}
+                      <button onClick={() => setTypeFilter('All Types')} className="hover:bg-purple-200 rounded-full p-0.5">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {dateRangeFilter !== 'All Time' && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-green-100 text-green-700 text-sm rounded-full">
+                      Date: {dateRangeFilter}
+                      <button onClick={() => setDateRangeFilter('All Time')} className="hover:bg-green-200 rounded-full p-0.5">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {mailboxFilter !== 'All Mailboxes' && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-orange-100 text-orange-700 text-sm rounded-full">
+                      Mailbox: {mailboxFilter}
+                      <button onClick={() => setMailboxFilter('All Mailboxes')} className="hover:bg-orange-200 rounded-full p-0.5">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                  {searchTerm !== '' && (
+                    <span className="inline-flex items-center gap-1 px-3 py-1 bg-gray-100 text-gray-700 text-sm rounded-full">
+                      Search: "{searchTerm}"
+                      <button onClick={() => setSearchTerm('')} className="hover:bg-gray-200 rounded-full p-0.5">
+                        <X className="w-3 h-3" />
+                      </button>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Results Counter */}
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-gray-600">
+          Showing <span className="font-semibold text-gray-900">{sortedItems.length}</span> of{' '}
+          <span className="font-semibold text-gray-900">{mailItems.length}</span> mail items
+        </p>
+        <p className="text-sm text-gray-500 italic">
+          💡 Click column headers to sort
+        </p>
       </div>
 
       {/* Log Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-        {filteredItems.length === 0 ? (
+        {sortedItems.length === 0 ? (
           <div className="text-center py-12">
             <Mail className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <p className="text-gray-600 mb-4">No mail items found</p>
-            <button
-              onClick={() => navigate('/dashboard/intake')}
-              className="px-6 py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors"
-            >
-              Add Mail Item
-            </button>
+            <p className="text-gray-600 mb-4">
+              {activeFiltersCount > 0 ? 'No mail items match your filters' : 'No mail items found'}
+            </p>
+            {activeFiltersCount > 0 ? (
+              <button
+                onClick={clearAllFilters}
+                className="px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg font-medium transition-colors"
+              >
+                Clear Filters
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate('/dashboard/intake')}
+                className="px-6 py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors"
+              >
+                Add Mail Item
+              </button>
+            )}
           </div>
         ) : (
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
                 <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700 w-10"></th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Date</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Type</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Customer</th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
+                
+                {/* Date Column - Sortable */}
+                <th 
+                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  onClick={() => handleSort('date')}
+                >
+                  <div className="flex items-center gap-2">
+                    Date
+                    {sortColumn === 'date' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                    ) : (
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                </th>
+                
+                {/* Type Column - Sortable */}
+                <th 
+                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  onClick={() => handleSort('type')}
+                >
+                  <div className="flex items-center gap-2">
+                    Type
+                    {sortColumn === 'type' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                    ) : (
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                </th>
+                
+                {/* Customer Column - Sortable */}
+                <th 
+                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  onClick={() => handleSort('customer')}
+                >
+                  <div className="flex items-center gap-2">
+                    Customer
+                    {sortColumn === 'customer' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                    ) : (
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                </th>
+                
+                {/* Status Column - Sortable */}
+                <th 
+                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  onClick={() => handleSort('status')}
+                >
+                  <div className="flex items-center gap-2">
+                    Status
+                    {sortColumn === 'status' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                    ) : (
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                </th>
+                
+                {/* Non-sortable columns */}
                 <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Last Notified</th>
                 <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Notes</th>
                 <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
-              {filteredItems.map((item) => (
+              {sortedItems.map((item) => (
                 <React.Fragment key={item.mail_item_id}>
                   {/* Main Row */}
                   <tr className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
@@ -310,16 +618,18 @@ export default function LogPage({ embedded = false }: LogPageProps) {
                       <div className="flex items-center gap-2 text-sm">
                         <button
                           onClick={() => openEditModal(item)}
-                          className="text-blue-600 hover:text-blue-700 font-medium"
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors group relative"
+                          title="Edit"
                         >
-                          Edit
+                          <Edit className="w-4 h-4" />
                         </button>
                         <button
                           onClick={() => handleDelete(item.mail_item_id)}
                           disabled={deletingItemId === item.mail_item_id}
-                          className="text-red-600 hover:text-red-700 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
+                          title="Delete"
                         >
-                          {deletingItemId === item.mail_item_id ? 'Deleting...' : 'Delete'}
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
