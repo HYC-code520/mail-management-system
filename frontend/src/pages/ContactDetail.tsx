@@ -168,14 +168,6 @@ export default function ContactDetailPage() {
               <p className="text-gray-900 font-medium">{contact.language_preference || 'English'}</p>
             </div>
 
-            {/* Type */}
-            <div>
-              <p className="text-sm text-gray-600 mb-1">Type</p>
-              <span className="inline-block px-3 py-1 bg-black text-white text-xs font-medium rounded">
-                {contact.customer_type || 'Business'}
-              </span>
-            </div>
-
             {/* Subscription Status */}
             <div>
               <p className="text-sm text-gray-600 mb-1">Subscription Status</p>
