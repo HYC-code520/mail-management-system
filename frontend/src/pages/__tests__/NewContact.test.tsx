@@ -62,7 +62,7 @@ describe('NewContact Page', () => {
     await user.type(screen.getByPlaceholderText(/e\.g\., 101/i), '201'); // Unit #
     await user.type(screen.getByPlaceholderText(/e\.g\., MB-101/i), 'MB201'); // Mailbox #
     await user.type(screen.getByPlaceholderText(/email/i), 'jane@newcompany.com');
-    await user.type(screen.getByPlaceholderText(/\+1.*555/i), '555-1234'); // Phone
+    await user.type(screen.getByPlaceholderText(/917-822-5751/i), '5551234567'); // Phone - will be auto-formatted
     
     // Submit form
     await user.click(screen.getByRole('button', { name: /save customer/i }));
@@ -75,7 +75,7 @@ describe('NewContact Page', () => {
           unit_number: '201',
           mailbox_number: 'MB201',
           email: 'jane@newcompany.com',
-          phone: '555-1234',
+          phone: '555-123-4567', // Formatted by the phone formatter
         })
       );
     });
@@ -133,7 +133,7 @@ describe('NewContact Page', () => {
     expect(screen.getByPlaceholderText(/e\.g\., 101/i)).toBeInTheDocument(); // Unit #
     expect(screen.getByPlaceholderText(/e\.g\., MB-101/i)).toBeInTheDocument(); // Mailbox #
     expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/\+1.*555/i)).toBeInTheDocument(); // Phone: +1 (555) 000-0000
+    expect(screen.getByPlaceholderText(/917-822-5751/i)).toBeInTheDocument(); // Phone: 917-822-5751
     expect(screen.getByText(/Preferred Language/i)).toBeInTheDocument();
   });
 
@@ -141,7 +141,7 @@ describe('NewContact Page', () => {
     render(<NewContact />);
     
     const emailInput = screen.getByPlaceholderText(/email/i);
-    const phoneInput = screen.getByPlaceholderText(/\+1.*555/i); // +1 (555) 000-0000
+    const phoneInput = screen.getByPlaceholderText(/917-822-5751/i); // Updated to new format
     
     expect(emailInput).toHaveAttribute('type', 'email');
     expect(phoneInput).toHaveAttribute('type', 'tel');

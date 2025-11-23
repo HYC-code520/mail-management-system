@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit } from 'lucide-react';
+import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
@@ -29,6 +29,10 @@ export default function ContactsPage() {
   const [saving, setSaving] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
+  
+  // Sorting states
+  const [sortColumn, setSortColumn] = useState<'mailbox' | 'name' | 'status'>('mailbox');
+  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
   
   // Form data
   const [formData, setFormData] = useState({
@@ -80,10 +84,38 @@ export default function ContactsPage() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: name === 'service_tier' ? parseInt(value) : value
-    }));
+    
+    // Apply phone formatting if the field is 'phone_number'
+    if (name === 'phone_number') {
+      const formatted = formatPhoneNumber(value);
+      setFormData(prev => ({
+        ...prev,
+        [name]: formatted
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: name === 'service_tier' ? parseInt(value) : value
+      }));
+    }
+  };
+
+  // Format phone number as user types: 917-822-5751
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    const limitedDigits = digits.slice(0, 10);
+    
+    // Format: XXX-XXX-XXXX
+    if (limitedDigits.length <= 3) {
+      return limitedDigits;
+    } else if (limitedDigits.length <= 6) {
+      return `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3)}`;
+    } else {
+      return `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+    }
   };
 
   const openEditModal = (contact: Contact) => {
@@ -194,6 +226,17 @@ export default function ContactsPage() {
     }
   };
 
+  const handleSort = (column: 'mailbox' | 'name' | 'status') => {
+    if (sortColumn === column) {
+      // Toggle direction if clicking the same column
+      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+    } else {
+      // New column, default to ascending
+      setSortColumn(column);
+      setSortDirection('asc');
+    }
+  };
+
   const filteredContacts = contacts.filter((contact) => {
     const matchesSearch = searchTerm === '' ||
       contact.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -204,6 +247,27 @@ export default function ContactsPage() {
       contact.phone_number?.toLowerCase().includes(searchTerm.toLowerCase());
 
     return matchesSearch;
+  });
+
+  // Sorting
+  const sortedContacts = [...filteredContacts].sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortColumn) {
+      case 'mailbox':
+        comparison = (a.mailbox_number || '').localeCompare(b.mailbox_number || '');
+        break;
+      case 'name':
+        const nameA = a.contact_person || a.company_name || '';
+        const nameB = b.contact_person || b.company_name || '';
+        comparison = nameA.localeCompare(nameB);
+        break;
+      case 'status':
+        comparison = (a.status || '').localeCompare(b.status || '');
+        break;
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
   });
 
   if (loading) {
@@ -290,18 +354,61 @@ export default function ContactsPage() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Contact</th>
+                  {/* Contact Name - Sortable */}
+                  <th 
+                    className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={() => handleSort('name')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Contact
+                      {sortColumn === 'name' ? (
+                        sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                      ) : (
+                        <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Email</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Phone</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Service Tier</th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Mailbox #</th>
+                  
+                  {/* Mailbox # - Sortable */}
+                  <th 
+                    className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={() => handleSort('mailbox')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Mailbox #
+                      {sortColumn === 'mailbox' ? (
+                        sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                      ) : (
+                        <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
+                  
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Unit #</th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
+                  
+                  {/* Status - Sortable */}
+                  <th 
+                    className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                    onClick={() => handleSort('status')}
+                  >
+                    <div className="flex items-center gap-2">
+                      Status
+                      {sortColumn === 'status' ? (
+                        sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                      ) : (
+                        <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                      )}
+                    </div>
+                  </th>
+                  
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
                 </tr>
               </thead>
               <tbody>
-                {filteredContacts.map((contact) => (
+                {sortedContacts.map((contact) => (
                   <tr key={contact.contact_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
                     <td className="py-4 px-6">
                       <div className="font-medium text-gray-900">
@@ -492,7 +599,8 @@ export default function ContactsPage() {
                 name="phone_number"
                 value={formData.phone_number}
                 onChange={handleChange}
-                placeholder="+1 (555) 000-0000"
+                placeholder="917-822-5751"
+                maxLength={12}
                 className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>

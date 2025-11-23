@@ -18,12 +18,40 @@ export default function NewContactPage() {
     status: 'Pending'
   });
 
+  // Format phone number as user types: 917-822-5751
+  const formatPhoneNumber = (value: string) => {
+    // Remove all non-digits
+    const digits = value.replace(/\D/g, '');
+    
+    // Limit to 10 digits
+    const limitedDigits = digits.slice(0, 10);
+    
+    // Format: XXX-XXX-XXXX
+    if (limitedDigits.length <= 3) {
+      return limitedDigits;
+    } else if (limitedDigits.length <= 6) {
+      return `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3)}`;
+    } else {
+      return `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Apply phone formatting if the field is 'phone'
+    if (name === 'phone') {
+      const formatted = formatPhoneNumber(value);
+      setFormData(prev => ({
+        ...prev,
+        [name]: formatted
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -163,7 +191,8 @@ export default function NewContactPage() {
                 name="phone"
                 value={formData.phone}
                 onChange={handleChange}
-                placeholder="+1 (555) 000-0000"
+                placeholder="917-822-5751"
+                maxLength={12}
                 className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
