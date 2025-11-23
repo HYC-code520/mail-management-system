@@ -1,3 +1,20 @@
+/**
+ * ⚠️ DEPRECATION NOTICE - DO NOT USE THIS MIGRATION
+ * 
+ * This was the initial migration from a Stripe SaaS template.
+ * The Stripe tables (customers, products, prices, subscriptions) have been
+ * removed from production and are NO LONGER USED.
+ * 
+ * See: supabase/migrations/20250122120000_migrate_to_mail_management.sql
+ * for the current/actual database schema.
+ * 
+ * This file is kept ONLY for migration history tracking.
+ * Supabase has already applied this migration, so deleting it could
+ * cause migration tracking issues.
+ * 
+ * ============================================================
+ */
+
 /** 
 * USERS
 * Note: This table contains user data. Users should only be able to view and update their own data.

@@ -1,0 +1,17 @@
+#!/usr/bin/env sh
+
+# Get the root directory of the git repository
+REPO_ROOT=$(git rev-parse --show-toplevel)
+
+echo "🧪 Running backend tests before commit..."
+
+# Change to backend directory and run tests
+cd "$REPO_ROOT/backend" && npm test
+
+if [ $? -ne 0 ]; then
+  echo "❌ Tests failed! Commit aborted."
+  echo "Fix the failing tests before committing."
+  exit 1
+fi
+
+echo "✅ All tests passed! Proceeding with commit..."
