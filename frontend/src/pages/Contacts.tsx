@@ -534,7 +534,9 @@ export default function ContactsPage() {
           {/* Name & Company */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-900 mb-2">Name</label>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Name <span className="text-red-500">*</span>
+              </label>
               <input
                 type="text"
                 name="contact_person"
