@@ -19,6 +19,7 @@ interface Contact {
   customer_type?: string;
   subscription_status?: string;
   notes?: string;
+  created_at?: string;
 }
 
 interface MailItem {
@@ -173,6 +174,20 @@ export default function ContactDetailPage() {
               <p className="text-sm text-gray-600 mb-1">Subscription Status</p>
               <p className="text-gray-900 font-medium">{contact.subscription_status || 'Thinking'}</p>
             </div>
+
+            {/* Customer Since */}
+            {contact.created_at && (
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Customer Since</p>
+                <p className="text-gray-900 font-medium">
+                  {new Date(contact.created_at).toLocaleDateString('en-US', { 
+                    year: 'numeric', 
+                    month: 'long', 
+                    day: 'numeric' 
+                  })}
+                </p>
+              </div>
+            )}
           </div>
         </div>
 
