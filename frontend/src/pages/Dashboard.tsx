@@ -237,37 +237,41 @@ export default function DashboardPage() {
       }
 
       // Calculate 30-day customer growth
-      // Customer Growth Chart Data (last 30 days, sampled every 3 days)
-      // Show NEW customers added on each date (not cumulative)
+      // Customer Growth Chart Data - Show NEW customers added per day (last 14 days)
       const customerGrowthData = [];
-      const last30Days = [];
-      for (let i = 29; i >= 0; i--) {
-        const date = new Date();
-        date.setDate(date.getDate() - i);
-        last30Days.push(date.toISOString().split('T')[0]);
-      }
-
-      // Sample every 3 days for readability
-      for (let i = 0; i < last30Days.length; i += 3) {
-        const dateStr = last30Days[i];
-        const date = new Date(dateStr);
+      
+      if (activeContacts.length > 0) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         
-        // Count NEW customers added on this specific date
-        const newCustomersOnDate = activeContacts.filter((c: Contact) => {
-          if (!c.created_at) return false;
-          // Extract just the date part from created_at timestamp
-          const createdDate = c.created_at.split('T')[0];
-          return createdDate === dateStr;
-        }).length;
+        // Always show last 14 days
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - 13); // 13 days ago + today = 14 days
+        startDate.setHours(0, 0, 0, 0);
         
-        customerGrowthData.push({
-          date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          customers: newCustomersOnDate
-        });
+        // Generate one point per day for 14 days
+        for (let i = 0; i <= 13; i++) {
+          const date = new Date(startDate);
+          date.setDate(date.getDate() + i);
+          const dateStr = date.toISOString().split('T')[0];
+          
+          // Count NEW customers added on THIS SPECIFIC DAY
+          const newCustomersOnDate = activeContacts.filter((c: Contact) => {
+            if (!c.created_at) return false;
+            const createdDate = c.created_at.split('T')[0];
+            return createdDate === dateStr; // Exact match for this day only
+          }).length;
+          
+          customerGrowthData.push({
+            date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+            customers: newCustomersOnDate
+          });
+        }
       }
       
-      console.log('Customer Growth Data:', customerGrowthData); // Debug log
-      console.log('Active Contacts:', activeContacts.length); // Debug log
+      console.log('Customer Growth Data (new per day):', customerGrowthData);
+      console.log('Data points:', customerGrowthData.length);
+      console.log('Active Contacts:', activeContacts.length);
       
       setStats({
         todaysMail: mailItems.filter((item: MailItem) => 
@@ -552,7 +556,7 @@ export default function DashboardPage() {
             <UserPlus className="w-6 h-6 text-green-600" />
             <div>
               <h2 className="text-xl font-bold text-gray-900">New Customers</h2>
-              <p className="text-sm text-gray-600">Last 30 days (sampled every 3 days)</p>
+              <p className="text-sm text-gray-600">Added per day (last 14 days)</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={250}>
@@ -728,59 +732,6 @@ export default function DashboardPage() {
               )}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      {/* Customer Activity Section */}
-      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <UserPlus className="w-6 h-6 text-green-600" />
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Recent Customers</h2>
-              <p className="text-sm text-gray-600">Latest customer additions</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-green-600">{stats?.newCustomersToday || 0}</p>
-            <p className="text-sm text-gray-500">added today</p>
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          {stats?.recentCustomers && stats.recentCustomers.length > 0 ? (
-            stats.recentCustomers.map((customer) => (
-              <div
-                key={customer.contact_id}
-                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors cursor-pointer"
-                onClick={() => navigate(`/dashboard/contacts/${customer.contact_id}`)}
-              >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                    <UserPlus className="w-5 h-5 text-green-600" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-gray-900">
-                      {customer.contact_person || customer.company_name || 'Unknown'}
-                    </p>
-                    <p className="text-sm text-gray-600">
-                      {customer.mailbox_number && `📮 ${customer.mailbox_number}`}
-                    </p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-500">
-                    {customer.created_at ? new Date(customer.created_at).toLocaleDateString() : 'Recently'}
-                  </p>
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-              <p>No recent customers</p>
-            </div>
-          )}
         </div>
       </div>
 
