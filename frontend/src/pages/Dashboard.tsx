@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Mail, Package, Bell, Search, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Mail, Package, Bell, Search, ArrowUpDown, ArrowUp, ArrowDown, UserPlus } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 
 interface MailItem {
@@ -16,11 +16,22 @@ interface MailItem {
   };
 }
 
+interface Contact {
+  contact_id: string;
+  contact_person?: string;
+  company_name?: string;
+  mailbox_number?: string;
+  status?: string;
+  created_at?: string;
+}
+
 interface DashboardStats {
   todaysMail: number;
   pendingPickups: number;
   remindersDue: number;
   recentMailItems: MailItem[];
+  recentCustomers: Contact[];
+  newCustomersToday: number;
 }
 
 export default function DashboardPage() {
@@ -39,12 +50,27 @@ export default function DashboardPage() {
 
   const loadDashboardData = async () => {
     try {
-      const [, mailItems] = await Promise.all([
+      const [contacts, mailItems] = await Promise.all([
         api.contacts.getAll(),
         api.mailItems.getAll()
       ]);
 
       const today = new Date().toISOString().split('T')[0];
+      
+      // Filter active customers (not archived)
+      const activeContacts = contacts.filter((c: Contact) => c.status !== 'No');
+      
+      // Get customers added today
+      const newCustomersToday = activeContacts.filter((c: Contact) => 
+        c.created_at?.startsWith(today)
+      ).length;
+      
+      // Get recent customers (last 5)
+      const recentCustomers = activeContacts
+        .sort((a: Contact, b: Contact) => 
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        )
+        .slice(0, 5);
       
       setStats({
         todaysMail: mailItems.filter((item: MailItem) => 
@@ -56,7 +82,9 @@ export default function DashboardPage() {
         remindersDue: mailItems.filter((item: MailItem) => 
           item.status === 'Received'
         ).length,
-        recentMailItems: mailItems.slice(0, 6)
+        recentMailItems: mailItems.slice(0, 6),
+        recentCustomers: recentCustomers,
+        newCustomersToday: newCustomersToday
       });
     } catch (err) {
       console.error('Error loading dashboard data:', err);
@@ -313,6 +341,59 @@ export default function DashboardPage() {
               )}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      {/* Customer Activity Section */}
+      <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <UserPlus className="w-6 h-6 text-green-600" />
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Customer Activity</h2>
+              <p className="text-sm text-gray-600">Recent customer additions</p>
+            </div>
+          </div>
+          <div className="text-right">
+            <p className="text-3xl font-bold text-green-600">{stats?.newCustomersToday || 0}</p>
+            <p className="text-sm text-gray-500">added today</p>
+          </div>
+        </div>
+
+        {/* Recent Customers List */}
+        <div className="space-y-3">
+          {stats?.recentCustomers && stats.recentCustomers.length > 0 ? (
+            stats.recentCustomers.map((customer) => (
+              <div
+                key={customer.contact_id}
+                className="flex items-center justify-between p-4 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                    <UserPlus className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-gray-900">
+                      {customer.contact_person || customer.company_name || 'Unknown'}
+                    </p>
+                    <p className="text-sm text-gray-600">
+                      {customer.mailbox_number && `📮 ${customer.mailbox_number}`}
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-500">
+                    {customer.created_at ? new Date(customer.created_at).toLocaleDateString() : 'Recently'}
+                  </p>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              <UserPlus className="w-12 h-12 text-gray-300 mx-auto mb-3" />
+              <p>No recent customers</p>
+            </div>
+          )}
         </div>
       </div>
     </div>

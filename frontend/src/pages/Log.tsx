@@ -33,9 +33,10 @@ interface Contact {
 
 interface LogPageProps {
   embedded?: boolean;
+  showAddForm?: boolean;
 }
 
-export default function LogPage({ embedded = false }: LogPageProps) {
+export default function LogPage({ embedded = false, showAddForm = false }: LogPageProps) {
   const navigate = useNavigate();
   const [mailItems, setMailItems] = useState<MailItem[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -65,6 +66,17 @@ export default function LogPage({ embedded = false }: LogPageProps) {
     description: '',
     status: 'Received'
   });
+  
+  // Add form states (for showAddForm)
+  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [itemType, setItemType] = useState('Letter');
+  const [quantity, setQuantity] = useState(1);
+  const [note, setNote] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
+  const [searchResults, setSearchResults] = useState<Contact[]>([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [addingMail, setAddingMail] = useState(false);
 
   useEffect(() => {
     loadMailItems();
@@ -89,6 +101,78 @@ export default function LogPage({ embedded = false }: LogPageProps) {
       setContacts(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error loading contacts:', err);
+    }
+  };
+
+  // Add form: Search contacts
+  useEffect(() => {
+    if (showAddForm && searchQuery.length >= 2) {
+      searchContacts();
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+    }
+  }, [searchQuery, showAddForm]);
+
+  const searchContacts = async () => {
+    try {
+      const filtered = contacts.filter((c: Contact) => {
+        const isActive = (c as any).status !== 'No';
+        const matchesQuery = 
+          c.contact_person?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.company_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          c.mailbox_number?.toLowerCase().includes(searchQuery.toLowerCase());
+        return isActive && matchesQuery;
+      });
+      setSearchResults(filtered.slice(0, 8));
+      setShowDropdown(true);
+    } catch (err) {
+      console.error('Error searching contacts:', err);
+    }
+  };
+
+  const handleSelectContact = (contact: Contact) => {
+    setSelectedContact(contact);
+    setSearchQuery(contact.contact_person || contact.company_name || '');
+    setShowDropdown(false);
+  };
+
+  const handleAddMailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedContact) {
+      toast.error('Please select a customer');
+      return;
+    }
+
+    setAddingMail(true);
+
+    try {
+      await api.mailItems.create({
+        contact_id: selectedContact.contact_id,
+        item_type: itemType,
+        description: note,
+        status: 'Received',
+        quantity: quantity
+      });
+
+      toast.success(`${quantity} mail item(s) added successfully!`);
+      
+      // Reset form
+      setItemType('Letter');
+      setQuantity(1);
+      setNote('');
+      setSearchQuery('');
+      setSelectedContact(null);
+      setDate(new Date().toISOString().split('T')[0]);
+      
+      // Reload mail items
+      loadMailItems();
+    } catch (err) {
+      console.error('Error creating mail item:', err);
+      toast.error('Failed to add mail item');
+    } finally {
+      setAddingMail(false);
     }
   };
 
@@ -301,6 +385,133 @@ export default function LogPage({ embedded = false }: LogPageProps) {
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Mail Log</h1>
           <p className="text-gray-600">Complete history of mail activities</p>
         </div>
+      )}
+
+      {/* Add New Mail Form - show if enabled */}
+      {showAddForm && (
+        <form onSubmit={handleAddMailSubmit} className="bg-white border border-gray-200 rounded-lg p-6 mb-6 shadow-sm">
+          <h2 className="text-xl font-bold text-gray-900 mb-6">Add New Mail</h2>
+
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {/* Date */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Date</label>
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            {/* Type */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+              <select
+                value={itemType}
+                onChange={(e) => setItemType(e.target.value)}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="Letter">Letter</option>
+                <option value="Package">Package</option>
+              </select>
+            </div>
+
+            {/* Quantity */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Quantity</label>
+              <input
+                type="number"
+                min="1"
+                value={quantity}
+                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          {/* Note */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Note (Optional)</label>
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value)}
+              rows={3}
+              placeholder="Add any relevant notes..."
+              className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+            />
+          </div>
+
+          {/* Link to Customer */}
+          <div className="mb-6 relative">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Link to Customer</label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search by Name / Company / Mailbox #..."
+                className="w-full px-4 py-2 pl-10 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+
+            {/* Dropdown Results */}
+            {showDropdown && searchResults.length > 0 && (
+              <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-64 overflow-y-auto">
+                {searchResults.map((contact) => (
+                  <button
+                    key={contact.contact_id}
+                    type="button"
+                    onClick={() => handleSelectContact(contact)}
+                    className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
+                  >
+                    <div className="font-medium text-gray-900">
+                      {contact.contact_person || contact.company_name}
+                    </div>
+                    <div className="text-sm text-gray-600 flex gap-4">
+                      {contact.mailbox_number && <span>📮 {contact.mailbox_number}</span>}
+                      {(contact as any).unit_number && <span>🏢 Unit {(contact as any).unit_number}</span>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Selected Contact Display */}
+            {selectedContact && (
+              <div className="mt-3 px-4 py-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
+                <div>
+                  <div className="font-medium text-green-900">
+                    {selectedContact.contact_person || selectedContact.company_name}
+                  </div>
+                  <div className="text-sm text-green-700">
+                    {selectedContact.mailbox_number && `📮 ${selectedContact.mailbox_number}`}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedContact(null);
+                    setSearchQuery('');
+                  }}
+                  className="text-green-700 hover:text-green-900 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <button
+            type="submit"
+            disabled={addingMail || !selectedContact}
+            className="w-full px-6 py-3 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {addingMail ? 'Saving...' : 'Add Mail Item'}
+          </button>
+        </form>
       )}
 
       {/* Filters */}
