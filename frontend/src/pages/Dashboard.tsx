@@ -398,7 +398,7 @@ export default function DashboardPage() {
       {/* Stats Cards - 4 columns */}
       <div className="grid grid-cols-4 gap-6 mb-8">
         {/* Today's Mail */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-gray-600 text-sm mb-1">Today's Mail</p>
@@ -410,7 +410,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Pending Pickups */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-gray-600 text-sm mb-1">Pending Pickups</p>
@@ -422,7 +422,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Overdue! */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-gray-600 text-sm mb-1 font-semibold">Overdue!</p>
@@ -434,7 +434,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Completed Today */}
-        <div className="bg-white border border-green-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
+        <div className="bg-white border border-green-200 rounded-lg p-6 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
               <p className="text-gray-600 text-sm mb-1">Completed Today</p>
