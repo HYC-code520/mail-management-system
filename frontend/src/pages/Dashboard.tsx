@@ -237,6 +237,8 @@ export default function DashboardPage() {
       }
 
       // Calculate 30-day customer growth
+      // Customer Growth Chart Data (last 30 days, sampled every 3 days)
+      // Show NEW customers added on each date (not cumulative)
       const customerGrowthData = [];
       const last30Days = [];
       for (let i = 29; i >= 0; i--) {
@@ -249,14 +251,23 @@ export default function DashboardPage() {
       for (let i = 0; i < last30Days.length; i += 3) {
         const dateStr = last30Days[i];
         const date = new Date(dateStr);
-        const customersUpToDate = activeContacts.filter((c: Contact) => 
-          c.created_at && c.created_at <= dateStr
-        ).length;
+        
+        // Count NEW customers added on this specific date
+        const newCustomersOnDate = activeContacts.filter((c: Contact) => {
+          if (!c.created_at) return false;
+          // Extract just the date part from created_at timestamp
+          const createdDate = c.created_at.split('T')[0];
+          return createdDate === dateStr;
+        }).length;
+        
         customerGrowthData.push({
           date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          customers: customersUpToDate
+          customers: newCustomersOnDate
         });
       }
+      
+      console.log('Customer Growth Data:', customerGrowthData); // Debug log
+      console.log('Active Contacts:', activeContacts.length); // Debug log
       
       setStats({
         todaysMail: mailItems.filter((item: MailItem) => 
@@ -540,8 +551,8 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3 mb-6">
             <UserPlus className="w-6 h-6 text-green-600" />
             <div>
-              <h2 className="text-xl font-bold text-gray-900">Customer Growth</h2>
-              <p className="text-sm text-gray-600">Last 30 days</p>
+              <h2 className="text-xl font-bold text-gray-900">New Customers</h2>
+              <p className="text-sm text-gray-600">Last 30 days (sampled every 3 days)</p>
             </div>
           </div>
           <ResponsiveContainer width="100%" height={250}>
@@ -555,6 +566,7 @@ export default function DashboardPage() {
               <YAxis 
                 tick={{ fill: '#6B7280', fontSize: 12 }}
                 tickLine={{ stroke: '#E5E7EB' }}
+                allowDecimals={false}
               />
               <Tooltip 
                 contentStyle={{ 
