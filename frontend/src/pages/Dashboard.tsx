@@ -212,10 +212,10 @@ export default function DashboardPage() {
       twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
       
       const needsFollowUp = mailItems.filter((item: MailItem) => {
-        // Urgent: Notified for more than 2 days
-        if (item.status === 'Notified') {
-          const receivedDate = new Date(item.received_date);
-          return receivedDate < twoDaysAgo;
+        // Urgent: Notified for more than 2 days (use last_notified date, not received_date)
+        if (item.status === 'Notified' && item.last_notified) {
+          const notifiedDate = new Date(item.last_notified);
+          return notifiedDate < twoDaysAgo;
         }
         // Action needed: Still in Received status
         if (item.status === 'Received') {
@@ -480,7 +480,11 @@ export default function DashboardPage() {
           {isFollowUpExpanded && (
             <div className="p-4 pt-0 space-y-3">
               {stats.needsFollowUp.map((item) => {
-                const daysSince = getDaysSince(item.received_date);
+                // Calculate days since notified (use last_notified for Notified status, received_date for Received)
+                const dateToUse = item.status === 'Notified' && item.last_notified 
+                  ? item.last_notified 
+                  : item.received_date;
+                const daysSince = getDaysSince(dateToUse);
                 const isUrgent = item.status === 'Notified' && daysSince > 2;
                 
                 return (
@@ -503,27 +507,13 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {isUrgent && (
-                        <span className="px-3 py-1 bg-gray-900 text-white text-xs font-medium rounded">
-                          Urgent!
-                        </span>
-                      )}
-                      {item.status === 'Received' ? (
-                        <button
-                          onClick={() => openQuickNotifyModal(item)}
-                          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded-lg transition-colors flex items-center gap-2"
-                        >
-                          <Bell className="w-4 h-4" />
-                          Mark as Notified
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => navigate('/dashboard/mail')}
-                          className="px-4 py-2 bg-black hover:bg-gray-800 text-white text-sm rounded-lg transition-colors"
-                        >
-                          View in Mail Log
-                        </button>
-                      )}
+                      <button
+                        onClick={() => openQuickNotifyModal(item)}
+                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded-lg transition-colors flex items-center gap-2"
+                      >
+                        <Bell className="w-4 h-4" />
+                        Mark as Notified
+                      </button>
                     </div>
                   </div>
                 );
@@ -728,7 +718,6 @@ export default function DashboardPage() {
               >
                 <option value={1}>Tier 1 - Basic</option>
                 <option value={2}>Tier 2 - Standard</option>
-                <option value={3}>Tier 3 - Premium</option>
               </select>
             </div>
           </div>

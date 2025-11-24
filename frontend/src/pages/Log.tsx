@@ -149,6 +149,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   };
 
   const handleSelectContact = (contact: Contact) => {
+    // Warn if selecting a Pending customer
+    if ((contact as any).status === 'Pending') {
+      if (!window.confirm('⚠️ Warning: This customer has "Pending" status and may not be fully onboarded yet. Are you sure you want to log mail for this customer?')) {
+        return; // Don't select if user cancels
+      }
+    }
+    
     setSelectedContact(contact);
     setSearchQuery(contact.contact_person || contact.company_name || '');
     setShowDropdown(false);
@@ -501,12 +508,27 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
               <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
               <select
                 value={itemType}
-                onChange={(e) => setItemType(e.target.value)}
+                onChange={(e) => {
+                  const newType = e.target.value;
+                  // Check if selecting Package for Tier 1 customer
+                  if (newType === 'Package' && selectedContact && (selectedContact as any).service_tier === 1) {
+                    if (!window.confirm('⚠️ Warning: This customer is on Service Tier 1, which typically does not include package handling. Are you sure you want to log a package for this customer?')) {
+                      return; // Don't change if user cancels
+                    }
+                  }
+                  setItemType(newType);
+                }}
                 className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
               >
                 <option value="Letter">Letter</option>
                 <option value="Package">Package</option>
               </select>
+              {itemType === 'Package' && selectedContact && (selectedContact as any).service_tier === 1 && (
+                <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  Tier 1 customers typically don't receive packages
+                </p>
+              )}
             </div>
 
             {/* Quantity */}
@@ -558,8 +580,21 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     onClick={() => handleSelectContact(contact)}
                     className="w-full px-4 py-3 text-left hover:bg-gray-50 transition-colors border-b border-gray-100 last:border-b-0"
                   >
-                    <div className="font-medium text-gray-900">
-                      {contact.contact_person || contact.company_name}
+                    <div className="flex items-center justify-between">
+                      <div className="font-medium text-gray-900">
+                        {contact.contact_person || contact.company_name}
+                      </div>
+                      {(contact as any).status && (
+                        <span className={`px-2 py-0.5 text-xs font-medium rounded ${
+                          (contact as any).status === 'Active' 
+                            ? 'bg-green-100 text-green-700' 
+                            : (contact as any).status === 'Pending'
+                            ? 'bg-amber-100 text-amber-700'
+                            : 'bg-gray-200 text-gray-700'
+                        }`}>
+                          {(contact as any).status}
+                        </span>
+                      )}
                     </div>
                     <div className="text-sm text-gray-600 flex gap-4">
                       {contact.mailbox_number && <span>📮 {contact.mailbox_number}</span>}
@@ -572,14 +607,50 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
 
             {/* Selected Contact Display */}
             {selectedContact && (
-              <div className="mt-3 px-4 py-3 bg-green-50 border border-green-200 rounded-lg flex items-center justify-between">
-                <div>
-                  <div className="font-medium text-green-900">
-                    {selectedContact.contact_person || selectedContact.company_name}
+              <div className={`mt-3 px-4 py-3 rounded-lg flex items-center justify-between ${
+                (selectedContact as any).status === 'Pending' 
+                  ? 'bg-amber-50 border border-amber-300' 
+                  : (selectedContact as any).status === 'Archived'
+                  ? 'bg-gray-100 border border-gray-300'
+                  : 'bg-green-50 border border-green-200'
+              }`}>
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <div className={`font-medium ${
+                      (selectedContact as any).status === 'Pending' 
+                        ? 'text-amber-900' 
+                        : (selectedContact as any).status === 'Archived'
+                        ? 'text-gray-700'
+                        : 'text-green-900'
+                    }`}>
+                      {selectedContact.contact_person || selectedContact.company_name}
+                    </div>
+                    {(selectedContact as any).status === 'Pending' && (
+                      <span className="px-2 py-0.5 bg-amber-200 text-amber-800 text-xs font-medium rounded">
+                        Pending
+                      </span>
+                    )}
+                    {(selectedContact as any).status === 'Archived' && (
+                      <span className="px-2 py-0.5 bg-gray-300 text-gray-700 text-xs font-medium rounded">
+                        Archived
+                      </span>
+                    )}
                   </div>
-                  <div className="text-sm text-green-700">
+                  <div className={`text-sm ${
+                    (selectedContact as any).status === 'Pending' 
+                      ? 'text-amber-700' 
+                      : (selectedContact as any).status === 'Archived'
+                      ? 'text-gray-600'
+                      : 'text-green-700'
+                  }`}>
                     {selectedContact.mailbox_number && `📮 ${selectedContact.mailbox_number}`}
                   </div>
+                  {(selectedContact as any).status === 'Pending' && (
+                    <div className="mt-1 text-xs text-amber-700 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      Customer not fully onboarded
+                    </div>
+                  )}
                 </div>
                 <button
                   type="button"
@@ -587,7 +658,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     setSelectedContact(null);
                     setSearchQuery('');
                   }}
-                  className="text-green-700 hover:text-green-900 transition-colors"
+                  className={`${
+                    (selectedContact as any).status === 'Pending' 
+                      ? 'text-amber-700 hover:text-amber-900' 
+                      : (selectedContact as any).status === 'Archived'
+                      ? 'text-gray-600 hover:text-gray-800'
+                      : 'text-green-700 hover:text-green-900'
+                  } transition-colors`}
                 >
                   <X className="w-5 h-5" />
                 </button>
