@@ -22,7 +22,10 @@ export default function DashboardLayout() {
 
   const handleLanguageChange = (lang: 'EN' | 'CN' | 'BOTH') => {
     setCurrentLanguage(lang);
-    toast.success(`Language switched to ${lang === 'EN' ? 'English' : lang === 'CN' ? '中文' : 'Bilingual'}`);
+    toast('🚧 Language switching feature coming soon!', {
+      icon: '🔜',
+      duration: 3000,
+    });
     // TODO: Implement actual language switching logic
   };
 
@@ -52,7 +55,7 @@ export default function DashboardLayout() {
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
-                  title="English"
+                  title="English (Coming Soon)"
                 >
                   EN
                 </button>
@@ -63,7 +66,7 @@ export default function DashboardLayout() {
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
-                  title="中文"
+                  title="中文 (Coming Soon)"
                 >
                   中文
                 </button>
@@ -74,7 +77,7 @@ export default function DashboardLayout() {
                       ? 'bg-white text-gray-900 shadow-sm'
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
-                  title="Bilingual"
+                  title="Bilingual (Coming Soon)"
                 >
                   <Languages className="w-4 h-4" />
                   <span>Both</span>

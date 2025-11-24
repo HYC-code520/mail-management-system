@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mail, Package } from 'lucide-react';
+import { Mail, Package, Bell, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 
@@ -31,11 +31,21 @@ interface MailItem {
   description?: string;
 }
 
+interface NotificationHistory {
+  notification_id: string;
+  notified_by: string;
+  notification_method: string;
+  notified_at: string;
+  notes?: string;
+}
+
 export default function ContactDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [contact, setContact] = useState<Contact | null>(null);
   const [mailHistory, setMailHistory] = useState<MailItem[]>([]);
+  const [notificationHistory, setNotificationHistory] = useState<Record<string, NotificationHistory[]>>({});
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -64,6 +74,32 @@ export default function ContactDetailPage() {
     } catch (err) {
       console.error('Error loading mail history:', err);
     }
+  };
+
+  const loadNotificationHistoryForMailItem = async (mailItemId: string) => {
+    try {
+      const data = await api.notifications.getByMailItem(mailItemId);
+      setNotificationHistory(prev => ({
+        ...prev,
+        [mailItemId]: data
+      }));
+    } catch (err) {
+      console.error('Error loading notification history:', err);
+    }
+  };
+
+  const toggleRow = (mailItemId: string) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(mailItemId)) {
+      newExpanded.delete(mailItemId);
+    } else {
+      newExpanded.add(mailItemId);
+      // Load notification history when row is expanded
+      if (!notificationHistory[mailItemId]) {
+        loadNotificationHistoryForMailItem(mailItemId);
+      }
+    }
+    setExpandedRows(newExpanded);
   };
 
   if (loading) {
@@ -171,8 +207,15 @@ export default function ContactDetailPage() {
 
             {/* Subscription Status */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Subscription Status</p>
-              <p className="text-gray-900 font-medium">{contact.subscription_status || 'Thinking'}</p>
+              <p className="text-sm text-gray-600 mb-1">Status</p>
+              <span className={`inline-block px-3 py-1 rounded text-xs font-medium ${
+                contact.status === 'Active' ? 'bg-green-100 text-green-700' :
+                contact.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
+                contact.status === 'No' ? 'bg-gray-100 text-gray-700' :
+                'bg-gray-200 text-gray-700'
+              }`}>
+                {contact.status || 'PENDING'}
+              </span>
             </div>
 
             {/* Customer Since */}
@@ -213,6 +256,7 @@ export default function ContactDetailPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700 w-10"></th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Date</th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Type</th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
@@ -221,31 +265,104 @@ export default function ContactDetailPage() {
                 </thead>
                 <tbody>
                   {mailHistory.map((item) => (
-                    <tr key={item.mail_item_id} className="border-b border-gray-100 hover:bg-gray-50">
-                      <td className="py-4 px-6 text-gray-900">
-                        {new Date(item.received_date).toISOString().split('T')[0]}
-                      </td>
-                      <td className="py-4 px-6">
-                        <div className="flex items-center gap-2 text-gray-700">
-                          {item.item_type === 'Package' ? (
-                            <Package className="w-4 h-4 text-gray-500" />
-                          ) : (
-                            <Mail className="w-4 h-4 text-gray-500" />
-                          )}
-                          <span>{item.item_type}</span>
-                        </div>
-                      </td>
-                      <td className="py-4 px-6">
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${
-                          item.status === 'Pending' ? 'bg-black text-white' :
-                          item.status === 'Picked Up' ? 'bg-gray-200 text-gray-700' :
-                          'bg-gray-200 text-gray-700'
-                        }`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-gray-700">{item.description || '—'}</td>
-                    </tr>
+                    <React.Fragment key={item.mail_item_id}>
+                      {/* Main Row */}
+                      <tr className="border-b border-gray-100 hover:bg-gray-50">
+                        <td className="py-4 px-6">
+                          <button
+                            onClick={() => toggleRow(item.mail_item_id)}
+                            className="text-gray-500 hover:text-gray-700 transition-transform"
+                            style={{
+                              transform: expandedRows.has(item.mail_item_id) ? 'rotate(90deg)' : 'rotate(0deg)',
+                              display: 'inline-block',
+                            }}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </button>
+                        </td>
+                        <td className="py-4 px-6 text-gray-900">
+                          {new Date(item.received_date).toISOString().split('T')[0]}
+                        </td>
+                        <td className="py-4 px-6">
+                          <div className="flex items-center gap-2 text-gray-700">
+                            {item.item_type === 'Package' ? (
+                              <Package className="w-4 h-4 text-gray-500" />
+                            ) : (
+                              <Mail className="w-4 h-4 text-gray-500" />
+                            )}
+                            <span>{item.item_type}</span>
+                          </div>
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className={`px-3 py-1 rounded text-xs font-medium ${
+                            item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
+                            item.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                            item.status === 'Notified' ? 'bg-purple-100 text-purple-700' :
+                            item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
+                            item.status === 'Scanned Document' ? 'bg-cyan-100 text-cyan-700' :
+                            item.status === 'Forward' ? 'bg-orange-100 text-orange-700' :
+                            item.status === 'Abandoned Package' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-200 text-gray-700'
+                          }`}>
+                            {item.status}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-gray-700">{item.description || '—'}</td>
+                      </tr>
+
+                      {/* Expanded Row - Notification History */}
+                      {expandedRows.has(item.mail_item_id) && (
+                        <tr className="bg-gray-50 border-b border-gray-200">
+                          <td colSpan={5} className="py-6 px-6">
+                            <div className="ml-10">
+                              <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                <Bell className="w-5 h-5 text-purple-600" />
+                                Notification History
+                              </h4>
+                              {notificationHistory[item.mail_item_id]?.length > 0 ? (
+                                <div className="space-y-3">
+                                  {notificationHistory[item.mail_item_id].map((notif) => (
+                                    <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-semibold text-gray-900">
+                                              {new Date(notif.notified_at).toLocaleString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                year: 'numeric',
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                hour12: true
+                                              })}
+                                            </span>
+                                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                                              {notif.notification_method}
+                                            </span>
+                                          </div>
+                                          <p className="text-sm text-gray-600">
+                                            Notified by: <span className="font-medium text-gray-900">{notif.notified_by}</span>
+                                          </p>
+                                          {notif.notes && (
+                                            <p className="text-sm text-gray-600 mt-1 italic">
+                                              Note: {notif.notes}
+                                            </p>
+                                          )}
+                                        </div>
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 italic">
+                                  No notifications sent for this mail item yet.
+                                </p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>

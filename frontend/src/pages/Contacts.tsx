@@ -642,6 +642,21 @@ export default function ContactsPage() {
             </div>
           </div>
 
+          {/* Customer Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">Customer Status</label>
+            <select
+              name="status"
+              value={formData.status}
+              onChange={handleChange}
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="PENDING">Pending</option>
+              <option value="Active">Active</option>
+              <option value="No">Archived</option>
+            </select>
+          </div>
+
           {/* Action Buttons */}
           <div className="flex gap-4 pt-4">
             <button

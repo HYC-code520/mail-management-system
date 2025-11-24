@@ -98,7 +98,7 @@ exports.updateMailItemStatus = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
-    const { status, item_type, description, contact_id } = req.body;
+    const { status, item_type, description, contact_id, received_date, quantity } = req.body;
 
     // Build update data object with only provided fields
     const updateData = {};
@@ -110,15 +110,30 @@ exports.updateMailItemStatus = async (req, res, next) => {
         return res.status(400).json({ error: `Invalid status. Must be one of: ${validStatuses.join(', ')}` });
       }
       updateData.status = status;
+      
       // If status is 'Picked Up', set pickup_date to now
       if (status === 'Picked Up') {
         updateData.pickup_date = new Date().toISOString();
+      } else {
+        updateData.pickup_date = null; // Clear pickup date if status changes from Picked Up
+      }
+      
+      // If status is changed back to 'Received', clear last_notified
+      if (status === 'Received') {
+        updateData.last_notified = null;
       }
     }
     
     if (item_type !== undefined) updateData.item_type = item_type;
     if (description !== undefined) updateData.description = description;
     if (contact_id !== undefined) updateData.contact_id = contact_id;
+    if (received_date !== undefined) updateData.received_date = received_date;
+    if (quantity !== undefined) {
+      if (quantity < 1 || !Number.isInteger(quantity)) {
+        return res.status(400).json({ error: 'quantity must be a positive integer' });
+      }
+      updateData.quantity = quantity;
+    }
 
     if (Object.keys(updateData).length === 0) {
       return res.status(400).json({ error: 'No update fields provided' });

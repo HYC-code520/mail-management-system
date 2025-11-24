@@ -4,6 +4,7 @@ import { Mail, Package, Bell, Search, ArrowUpDown, ArrowUp, ArrowDown, UserPlus,
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
+import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import toast from 'react-hot-toast';
 
 interface MailItem {
@@ -57,6 +58,8 @@ export default function DashboardPage() {
 
   // Add Customer Modal states
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [isQuickNotifyModalOpen, setIsQuickNotifyModalOpen] = useState(false);
+  const [notifyingMailItem, setNotifyingMailItem] = useState<MailItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [formData, setFormData] = useState({
     contact_person: '',
@@ -307,6 +310,17 @@ export default function DashboardPage() {
     return diffDays;
   };
 
+  const openQuickNotifyModal = (item: MailItem) => {
+    setNotifyingMailItem(item);
+    setIsQuickNotifyModalOpen(true);
+  };
+
+  const handleQuickNotifySuccess = () => {
+    loadDashboardData();
+    setIsQuickNotifyModalOpen(false);
+    setNotifyingMailItem(null);
+  };
+
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -373,11 +387,11 @@ export default function DashboardPage() {
       {/* Quick Action Buttons */}
       <div className="grid grid-cols-3 gap-4 mb-8">
         <button
-          onClick={() => navigate('/dashboard/mail')}
-          className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
+          onClick={() => navigate('/dashboard/templates')}
+          className="flex items-center justify-center gap-3 px-6 py-4 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
         >
-          <Mail className="w-5 h-5" />
-          <span>Log New Mail</span>
+          <FileText className="w-5 h-5" />
+          <span>View Templates</span>
         </button>
         <button
           onClick={() => setIsAddCustomerModalOpen(true)}
@@ -387,11 +401,11 @@ export default function DashboardPage() {
           <span>Add Customer</span>
         </button>
         <button
-          onClick={() => navigate('/dashboard/templates')}
-          className="flex items-center justify-center gap-3 px-6 py-4 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
+          onClick={() => navigate('/dashboard/mail')}
+          className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
         >
-          <FileText className="w-5 h-5" />
-          <span>View Templates</span>
+          <Mail className="w-5 h-5" />
+          <span>Log New Mail</span>
         </button>
       </div>
 
@@ -489,22 +503,27 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      {item.status === 'Received' && (
-                        <span className="px-3 py-1 bg-gray-100 text-gray-700 text-xs font-medium rounded">
-                          Need to Notify
-                        </span>
-                      )}
                       {isUrgent && (
                         <span className="px-3 py-1 bg-gray-900 text-white text-xs font-medium rounded">
                           Urgent!
                         </span>
                       )}
-                      <button
-                        onClick={() => navigate('/dashboard/mail')}
-                        className="px-4 py-2 bg-black hover:bg-gray-800 text-white text-sm rounded-lg transition-colors"
-                      >
-                        Take Action
-                      </button>
+                      {item.status === 'Received' ? (
+                        <button
+                          onClick={() => openQuickNotifyModal(item)}
+                          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded-lg transition-colors flex items-center gap-2"
+                        >
+                          <Bell className="w-4 h-4" />
+                          Mark as Notified
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => navigate('/dashboard/mail')}
+                          className="px-4 py-2 bg-black hover:bg-gray-800 text-white text-sm rounded-lg transition-colors"
+                        >
+                          View in Mail Log
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -590,148 +609,6 @@ export default function DashboardPage() {
               />
             </LineChart>
           </ResponsiveContainer>
-        </div>
-      </div>
-
-      {/* Recent Mail Activity */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm mb-8">
-        <div className="p-6 border-b border-gray-200">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Recent Mail Activity</h2>
-            <div className="flex gap-3">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option>All Status</option>
-                <option>Received</option>
-                <option>Pending</option>
-                <option>Notified</option>
-                <option>Picked Up</option>
-              </select>
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-700 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
-              <tr>
-                <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                  onClick={() => handleSort('date')}
-                >
-                  <div className="flex items-center gap-2">
-                    Date
-                    {sortColumn === 'date' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
-                    ) : (
-                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                  onClick={() => handleSort('type')}
-                >
-                  <div className="flex items-center gap-2">
-                    Type
-                    {sortColumn === 'type' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
-                    ) : (
-                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                    )}
-                  </div>
-                </th>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Qty</th>
-                <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                  onClick={() => handleSort('customer')}
-                >
-                  <div className="flex items-center gap-2">
-                    Customer
-                    {sortColumn === 'customer' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
-                    ) : (
-                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                    )}
-                  </div>
-                </th>
-                <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                  onClick={() => handleSort('status')}
-                >
-                  <div className="flex items-center gap-2">
-                    Status
-                    {sortColumn === 'status' ? (
-                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
-                    ) : (
-                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
-                    )}
-                  </div>
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedItems.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="text-center py-12">
-                    <Mail className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500">No mail items yet</p>
-                  </td>
-                </tr>
-              ) : (
-                sortedItems.map((item: MailItem) => (
-                  <tr key={item.mail_item_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-6 text-gray-900">
-                      {new Date(item.received_date).toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' }).replace(/\//g, '-')}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center gap-2 text-gray-700">
-                        {item.item_type === 'Package' ? (
-                          <Package className="w-4 h-4" />
-                        ) : (
-                          <Mail className="w-4 h-4" />
-                        )}
-                        <span>{item.item_type}</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-gray-900 font-semibold">
-                      {item.quantity || 1}
-                    </td>
-                    <td className="py-4 px-6 text-gray-900">
-                      {item.contacts?.contact_person || item.contacts?.company_name || 'Unknown'}
-                    </td>
-                    <td className="py-4 px-6">
-                      <span className={`px-3 py-1 rounded text-xs font-medium ${
-                        item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
-                        item.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                        item.status === 'Notified' ? 'bg-purple-100 text-purple-700' :
-                        item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
-                        item.status === 'Scanned Document' ? 'bg-cyan-100 text-cyan-700' :
-                        item.status === 'Forward' ? 'bg-orange-100 text-orange-700' :
-                        item.status === 'Abandoned Package' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-200 text-gray-700'
-                      }`}>
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
         </div>
       </div>
 
@@ -876,6 +753,21 @@ export default function DashboardPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Quick Notify Modal */}
+      {notifyingMailItem && (
+        <QuickNotifyModal
+          isOpen={isQuickNotifyModalOpen}
+          onClose={() => {
+            setIsQuickNotifyModalOpen(false);
+            setNotifyingMailItem(null);
+          }}
+          mailItemId={notifyingMailItem.mail_item_id}
+          contactId={notifyingMailItem.contact_id}
+          customerName={notifyingMailItem.contacts?.contact_person || notifyingMailItem.contacts?.company_name || 'Customer'}
+          onSuccess={handleQuickNotifySuccess}
+        />
+      )}
     </div>
   );
 }

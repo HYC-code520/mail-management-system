@@ -329,6 +329,193 @@ describe('Mail Items API', () => {
       expect(response.body).toHaveProperty('error');
       expect(response.body.error).toContain('Invalid status');
     });
+
+    it('should update mail item quantity', async () => {
+      const updateData = {
+        quantity: 5
+      };
+
+      const updatedMailItem = {
+        mail_item_id: 'mail-1',
+        contact_id: 'contact-123',
+        quantity: 5,
+        status: 'Received'
+      };
+
+      mockSupabaseClient.single.mockResolvedValue({
+        data: updatedMailItem,
+        error: null
+      });
+
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('mailItem');
+      expect(response.body.mailItem.quantity).toBe(5);
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({ quantity: 5 })
+      );
+    });
+
+    it('should return 400 when updating with invalid quantity (negative)', async () => {
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send({ quantity: -1 })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('quantity must be a positive integer');
+    });
+
+    it('should return 400 when updating with invalid quantity (zero)', async () => {
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send({ quantity: 0 })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('quantity must be a positive integer');
+    });
+
+    it('should return 400 when updating with invalid quantity (decimal)', async () => {
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send({ quantity: 3.5 })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toContain('quantity must be a positive integer');
+    });
+
+    it('should update received_date', async () => {
+      const newDate = '2025-11-25';
+      const updateData = {
+        received_date: newDate
+      };
+
+      const updatedMailItem = {
+        mail_item_id: 'mail-1',
+        contact_id: 'contact-123',
+        received_date: newDate,
+        status: 'Received'
+      };
+
+      mockSupabaseClient.single.mockResolvedValue({
+        data: updatedMailItem,
+        error: null
+      });
+
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('mailItem');
+      expect(response.body.mailItem.received_date).toBe(newDate);
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({ received_date: newDate })
+      );
+    });
+
+    it('should update multiple fields at once (quantity, status, date)', async () => {
+      const updateData = {
+        quantity: 3,
+        status: 'Notified',
+        received_date: '2025-11-24'
+      };
+
+      const updatedMailItem = {
+        mail_item_id: 'mail-1',
+        contact_id: 'contact-123',
+        quantity: 3,
+        status: 'Notified',
+        received_date: '2025-11-24'
+      };
+
+      mockSupabaseClient.single.mockResolvedValue({
+        data: updatedMailItem,
+        error: null
+      });
+
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body).toHaveProperty('mailItem');
+      expect(response.body.mailItem.quantity).toBe(3);
+      expect(response.body.mailItem.status).toBe('Notified');
+      expect(response.body.mailItem.received_date).toBe('2025-11-24');
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          quantity: 3,
+          status: 'Notified',
+          received_date: '2025-11-24'
+        })
+      );
+    });
+
+    it('should set pickup_date when status is updated to "Picked Up"', async () => {
+      const updateData = {
+        status: 'Picked Up'
+      };
+
+      const updatedMailItem = {
+        mail_item_id: 'mail-1',
+        status: 'Picked Up',
+        pickup_date: new Date().toISOString()
+      };
+
+      mockSupabaseClient.single.mockResolvedValue({
+        data: updatedMailItem,
+        error: null
+      });
+
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body.mailItem.status).toBe('Picked Up');
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'Picked Up',
+          pickup_date: expect.any(String)
+        })
+      );
+    });
+
+    it('should clear pickup_date when status changes from "Picked Up"', async () => {
+      const updateData = {
+        status: 'Received'
+      };
+
+      const updatedMailItem = {
+        mail_item_id: 'mail-1',
+        status: 'Received',
+        pickup_date: null
+      };
+
+      mockSupabaseClient.single.mockResolvedValue({
+        data: updatedMailItem,
+        error: null
+      });
+
+      const response = await request(app)
+        .put('/api/mail-items/mail-1')
+        .send(updateData)
+        .expect(200);
+
+      expect(response.body.mailItem.status).toBe('Received');
+      expect(mockSupabaseClient.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          status: 'Received',
+          pickup_date: null
+        })
+      );
+    });
   });
 });
 

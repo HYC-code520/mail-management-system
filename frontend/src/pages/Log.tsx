@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, Bell, CheckCircle, FileText, Send, AlertTriangle } from 'lucide-react';
+import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, Bell, CheckCircle, FileText, Send, AlertTriangle, Eye, MoreVertical } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
+import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 
 interface MailItem {
   mail_item_id: string;
@@ -31,6 +32,14 @@ interface Contact {
   mailbox_number?: string;
 }
 
+interface NotificationHistory {
+  notification_id: string;
+  notified_by: string;
+  notification_method: string;
+  notified_at: string;
+  notes?: string;
+}
+
 interface LogPageProps {
   embedded?: boolean;
   showAddForm?: boolean;
@@ -42,6 +51,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const [notificationHistory, setNotificationHistory] = useState<Record<string, NotificationHistory[]>>({});
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -58,6 +69,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const [editingMailItem, setEditingMailItem] = useState<MailItem | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+  
+  // Quick Notify Modal states
+  const [isQuickNotifyModalOpen, setIsQuickNotifyModalOpen] = useState(false);
+  const [notifyingMailItem, setNotifyingMailItem] = useState<MailItem | null>(null);
   
   // Form data
   const [formData, setFormData] = useState({
@@ -226,9 +241,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       if (editingMailItem) {
         await api.mailItems.update(editingMailItem.mail_item_id, formData);
         toast.success('Mail item updated successfully!');
+        closeModal();
+        await loadMailItems(); // Ensure we wait for reload
       }
-      closeModal();
-      loadMailItems();
     } catch (err) {
       console.error('Failed to update mail item:', err);
       toast.error('Failed to update mail item');
@@ -256,14 +271,67 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
-  const quickStatusUpdate = async (mailItemId: string, newStatus: string) => {
+  const quickStatusUpdate = async (mailItemId: string, newStatus: string, currentStatus?: string) => {
+    // Store the previous status for undo
+    const previousStatus = currentStatus || 'Received';
+    
     try {
+      // Update to new status
       await api.mailItems.update(mailItemId, { status: newStatus });
-      toast.success(`Status updated to ${newStatus}`);
+      
+      // Show success toast with undo button
+      toast.success(
+        (t) => (
+          <div className="flex items-center justify-between gap-4">
+            <span>Status updated to {newStatus}</span>
+            <button
+              onClick={async () => {
+                try {
+                  await api.mailItems.update(mailItemId, { status: previousStatus });
+                  toast.dismiss(t.id);
+                  toast.success(`Undone! Status reverted to ${previousStatus}`);
+                  loadMailItems();
+                } catch (err) {
+                  console.error('Failed to undo:', err);
+                  toast.error('Failed to undo');
+                }
+              }}
+              className="px-3 py-1 bg-white hover:bg-gray-100 text-gray-900 text-sm font-medium rounded border border-gray-300 transition-colors"
+            >
+              Undo
+            </button>
+          </div>
+        ),
+        {
+          duration: 8000, // Show for 8 seconds to give time to undo
+        }
+      );
+      
       loadMailItems();
     } catch (err) {
       console.error('Failed to update status:', err);
       toast.error('Failed to update status');
+    }
+  };
+
+  const openQuickNotifyModal = (item: MailItem) => {
+    setNotifyingMailItem(item);
+    setIsQuickNotifyModalOpen(true);
+  };
+
+  const handleQuickNotifySuccess = () => {
+    loadMailItems();
+  };
+
+  const loadNotificationHistory = async (mailItemId: string) => {
+    try {
+      const history = await api.notifications.getByMailItem(mailItemId);
+      setNotificationHistory(prev => ({
+        ...prev,
+        [mailItemId]: history
+      }));
+    } catch (err) {
+      console.error('Failed to load notification history:', err);
     }
   };
 
@@ -273,6 +341,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       newExpanded.delete(id);
     } else {
       newExpanded.add(id);
+      // Load notification history when row is expanded
+      if (!notificationHistory[id]) {
+        loadNotificationHistory(id);
+      }
     }
     setExpandedRows(newExpanded);
   };
@@ -711,7 +783,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       </div>
 
       {/* Log Table */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <div className="overflow-x-auto">
         {sortedItems.length === 0 ? (
           <div className="text-center py-12">
             <Mail className="w-16 h-16 text-gray-300 mx-auto mb-4" />
@@ -738,11 +811,11 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-200">
               <tr>
-                <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700 w-10"></th>
+                <th className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700 w-10"></th>
                 
                 {/* Date Column - Sortable */}
                 <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
                   onClick={() => handleSort('date')}
                 >
                   <div className="flex items-center gap-2">
@@ -757,7 +830,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 
                 {/* Type Column - Sortable */}
                 <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
                   onClick={() => handleSort('type')}
                 >
                   <div className="flex items-center gap-2">
@@ -772,7 +845,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 
                 {/* Quantity Column - Sortable */}
                 <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
                   onClick={() => handleSort('quantity')}
                 >
                   <div className="flex items-center gap-2">
@@ -787,7 +860,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 
                 {/* Customer Column - Sortable */}
                 <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
                   onClick={() => handleSort('customer')}
                 >
                   <div className="flex items-center gap-2">
@@ -802,7 +875,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 
                 {/* Status Column - Sortable */}
                 <th 
-                  className="text-left py-3 px-6 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
                   onClick={() => handleSort('status')}
                 >
                   <div className="flex items-center gap-2">
@@ -816,9 +889,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 </th>
                 
                 {/* Non-sortable columns */}
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Last Notified</th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Notes</th>
-                  <th className="sticky right-0 bg-white text-left py-3 px-6 text-sm font-semibold text-gray-700 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] z-10">Actions</th>
+                  <th className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700">Last Notified</th>
+                  <th className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700">Notes</th>
+                  <th className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -826,7 +899,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                   <React.Fragment key={item.mail_item_id}>
                     {/* Main Row */}
                     <tr className="group border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <button
                         onClick={() => toggleRow(item.mail_item_id)}
                         className="text-gray-500 hover:text-gray-700 transition-transform"
@@ -838,10 +911,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         <ChevronRight className="w-4 h-4" />
                       </button>
                     </td>
-                    <td className="py-4 px-6 text-gray-900">
+                    <td className="py-3 px-4 text-gray-900">
                       {new Date(item.received_date).toISOString().split('T')[0]}
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <div className="flex items-center gap-2 text-gray-700">
                         {item.item_type === 'Package' ? (
                           <Package className="w-4 h-4 text-gray-500" />
@@ -851,13 +924,26 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         <span>{item.item_type}</span>
                       </div>
                     </td>
-                    <td className="py-4 px-6 text-gray-900 font-semibold">
+                    <td className="py-3 px-4 text-gray-900 font-semibold">
                       {item.quantity || 1}
                     </td>
-                    <td className="py-4 px-6 text-gray-900">
-                      {item.contacts?.contact_person || item.contacts?.company_name || 'Unknown'}
+                    <td className="py-3 px-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-900">
+                          {item.contacts?.contact_person || item.contacts?.company_name || 'Unknown'}
+                        </span>
+                        {item.contact_id && (
+                          <button
+                            onClick={() => navigate(`/dashboard/contacts/${item.contact_id}`)}
+                            className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                            title="View Customer Profile"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
                     </td>
-                    <td className="py-4 px-6">
+                    <td className="py-3 px-4">
                       <span className={`px-3 py-1 rounded text-xs font-medium ${
                         item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
                         item.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
@@ -871,65 +957,23 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         {item.status}
                       </span>
                     </td>
-                    <td className="py-4 px-6 text-gray-700">
-                      {item.last_notified || '—'}
+                    <td className="py-3 px-4 text-gray-700">
+                      {item.last_notified ? (
+                        new Date(item.last_notified).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })
+                      ) : '—'}
                     </td>
-                    <td className="py-4 px-6 text-gray-700">
+                    <td className="py-3 px-4 text-gray-700">
                       {item.description || '—'}
                     </td>
-                    <td className="sticky right-0 bg-white group-hover:bg-gray-50 py-4 px-6 shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.1)] transition-colors z-10">
+                    <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2 text-sm">
-                        {/* Quick Status Actions - Show contextual buttons based on current status */}
-                        <div className="flex items-center gap-2 min-w-[120px]">
-                          {item.status === 'Received' && (
-                            <>
-                              <button
-                                onClick={() => quickStatusUpdate(item.mail_item_id, 'Notified')}
-                                className="p-2 text-purple-600 hover:bg-purple-50 rounded-lg transition-colors group relative"
-                                title="Mark as Notified"
-                              >
-                                <Bell className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => quickStatusUpdate(item.mail_item_id, 'Scanned Document')}
-                                className="p-2 text-cyan-600 hover:bg-cyan-50 rounded-lg transition-colors group relative"
-                                title="Mark as Scanned"
-                              >
-                                <FileText className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                          {(item.status === 'Notified' || item.status === 'Pending') && (
-                            <>
-                              <button
-                                onClick={() => quickStatusUpdate(item.mail_item_id, 'Picked Up')}
-                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors group relative"
-                                title="Mark as Picked Up"
-                              >
-                                <CheckCircle className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => quickStatusUpdate(item.mail_item_id, 'Forward')}
-                                className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors group relative"
-                                title="Mark as Forward"
-                              >
-                                <Send className="w-4 h-4" />
-                              </button>
-                            </>
-                          )}
-                          {(item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending') && (
-                            <button
-                              onClick={() => quickStatusUpdate(item.mail_item_id, 'Abandoned Package')}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors group relative"
-                              title="Mark as Abandoned"
-                            >
-                              <AlertTriangle className="w-4 h-4" />
-                            </button>
-                          )}
-                        </div>
-                        
-                        {/* Always show Edit and Delete - Fixed on the right */}
-                        <div className="border-l border-gray-300 h-6 mx-1"></div>
+                        {/* Edit and Delete buttons first */}
                         <div className="flex items-center gap-2">
                           <button
                             onClick={() => openEditModal(item)}
@@ -947,6 +991,173 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
+                        
+                        {/* Separator */}
+                        <div className="border-l border-gray-300 h-6 mx-1"></div>
+                        
+                        {/* More Actions Dropdown - on the far right */}
+                        <div className="relative">
+                          <button
+                            id={`more-btn-${item.mail_item_id}`}
+                            onClick={(e) => {
+                              setOpenDropdownId(openDropdownId === item.mail_item_id ? null : item.mail_item_id);
+                            }}
+                            className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                            title="More Actions"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                          
+                          {/* Dropdown Menu */}
+                          {openDropdownId === item.mail_item_id && (
+                            <>
+                              {/* Backdrop to close dropdown */}
+                              <div 
+                                className="fixed inset-0 z-30" 
+                                onClick={() => setOpenDropdownId(null)}
+                              ></div>
+                              
+                              {/* Dropdown content - using fixed positioning */}
+                              <div 
+                                className="fixed w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-40 max-h-96 overflow-y-auto"
+                                style={{
+                                  top: `${(document.getElementById(`more-btn-${item.mail_item_id}`)?.getBoundingClientRect().bottom ?? 0) + 4}px`,
+                                  right: `${window.innerWidth - (document.getElementById(`more-btn-${item.mail_item_id}`)?.getBoundingClientRect().right ?? 0)}px`,
+                                }}
+                              >
+                                {/* Mark as Notified - Only for Received */}
+                                {item.status === 'Received' && (
+                                  <button
+                                    onClick={() => {
+                                      openQuickNotifyModal(item);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-3"
+                                  >
+                                    <Bell className="w-4 h-4 text-purple-600" />
+                                    Mark as Notified
+                                  </button>
+                                )}
+                                
+                                {/* Mark as Scanned - Only for Received */}
+                                {item.status === 'Received' && (
+                                  <button
+                                    onClick={() => {
+                                      quickStatusUpdate(item.mail_item_id, 'Scanned Document', item.status);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-cyan-50 flex items-center gap-3"
+                                  >
+                                    <FileText className="w-4 h-4 text-cyan-600" />
+                                    Mark as Scanned
+                                  </button>
+                                )}
+                                
+                                {/* Mark as Picked Up - For Notified/Pending */}
+                                {(item.status === 'Notified' || item.status === 'Pending') && (
+                                  <button
+                                    onClick={() => {
+                                      quickStatusUpdate(item.mail_item_id, 'Picked Up', item.status);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-3"
+                                  >
+                                    <CheckCircle className="w-4 h-4 text-green-600" />
+                                    Mark as Picked Up
+                                  </button>
+                                )}
+                                
+                                {/* Mark as Forward - For Notified/Pending */}
+                                {(item.status === 'Notified' || item.status === 'Pending') && (
+                                  <button
+                                    onClick={() => {
+                                      quickStatusUpdate(item.mail_item_id, 'Forward', item.status);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-3"
+                                  >
+                                    <Send className="w-4 h-4 text-orange-600" />
+                                    Mark as Forward
+                                  </button>
+                                )}
+                                
+                                {/* Mark as Abandoned - For Received/Notified/Pending */}
+                                {(item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending') && (
+                                  <button
+                                    onClick={() => {
+                                      quickStatusUpdate(item.mail_item_id, 'Abandoned Package', item.status);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-3"
+                                  >
+                                    <AlertTriangle className="w-4 h-4 text-red-600" />
+                                    Mark as Abandoned
+                                  </button>
+                                )}
+                                
+                                {/* Separator if there were actions above */}
+                                {(item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending') && (
+                                  <div className="border-t border-gray-200 my-1"></div>
+                                )}
+                                
+                                {/* View Customer Profile - Always available */}
+                                {item.contact_id && (
+                                  <button
+                                    onClick={() => {
+                                      navigate(`/dashboard/contacts/${item.contact_id}`);
+                                      setOpenDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
+                                  >
+                                    <Eye className="w-4 h-4 text-gray-600" />
+                                    View Customer Profile
+                                  </button>
+                                )}
+                                
+                                {/* Status-specific messages for completed items */}
+                                {item.status === 'Picked Up' && (
+                                  <div className="px-4 py-3 text-sm text-gray-600 border-t border-gray-200">
+                                    <div className="flex items-center gap-2 text-green-700 font-medium mb-1">
+                                      <CheckCircle className="w-4 h-4" />
+                                      Completed
+                                    </div>
+                                    <p className="text-xs">Item has been picked up. No further action required.</p>
+                                  </div>
+                                )}
+                                
+                                {item.status === 'Scanned Document' && (
+                                  <div className="px-4 py-3 text-sm text-gray-600 border-t border-gray-200">
+                                    <div className="flex items-center gap-2 text-cyan-700 font-medium mb-1">
+                                      <FileText className="w-4 h-4" />
+                                      Document Scanned
+                                    </div>
+                                    <p className="text-xs">Document has been scanned and sent to customer.</p>
+                                  </div>
+                                )}
+                                
+                                {item.status === 'Forward' && (
+                                  <div className="px-4 py-3 text-sm text-gray-600 border-t border-gray-200">
+                                    <div className="flex items-center gap-2 text-orange-700 font-medium mb-1">
+                                      <Send className="w-4 h-4" />
+                                      Forwarded
+                                    </div>
+                                    <p className="text-xs">Mail has been forwarded to customer's address.</p>
+                                  </div>
+                                )}
+                                
+                                {item.status === 'Abandoned Package' && (
+                                  <div className="px-4 py-3 text-sm text-gray-600 border-t border-gray-200">
+                                    <div className="flex items-center gap-2 text-red-700 font-medium mb-1">
+                                      <AlertTriangle className="w-4 h-4" />
+                                      Abandoned
+                                    </div>
+                                    <p className="text-xs">Package marked as abandoned. No further action required.</p>
+                                  </div>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
                       </div>
                     </td>
                   </tr>
@@ -954,23 +1165,87 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                   {/* Expanded Row Details */}
                   {expandedRows.has(item.mail_item_id) && (
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <td colSpan={8} className="py-6 px-6">
+                      <td colSpan={9} className="py-6 px-4">
                         <div className="space-y-6">
                           {/* Notification History */}
                           <div>
-                            <h3 className="font-bold text-gray-900 mb-3">Notification History</h3>
-                            <div className="space-y-2 text-sm text-gray-700">
-                              <p>• 2025-11-10 9:00 AM - Email - Sent by Merlin</p>
-                              <p>• 2025-11-10 1:00 PM - Phone - Sent by Madison</p>
-                            </div>
+                            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                              <Bell className="w-5 h-5 text-purple-600" />
+                              Notification History
+                            </h3>
+                            {notificationHistory[item.mail_item_id]?.length > 0 ? (
+                              <div className="space-y-3">
+                                {notificationHistory[item.mail_item_id].map((notif) => (
+                                  <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
+                                    <div className="flex items-start justify-between">
+                                      <div className="flex-1">
+                                        <div className="flex items-center gap-2 mb-1">
+                                          <span className="font-semibold text-gray-900">
+                                            {new Date(notif.notified_at).toLocaleString('en-US', {
+                                              month: 'short',
+                                              day: 'numeric',
+                                              year: 'numeric',
+                                              hour: 'numeric',
+                                              minute: '2-digit',
+                                              hour12: true
+                                            })}
+                                          </span>
+                                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                                            {notif.notification_method}
+                                          </span>
+                                        </div>
+                                        <p className="text-sm text-gray-600">
+                                          Notified by: <span className="font-medium text-gray-900">{notif.notified_by}</span>
+                                        </p>
+                                        {notif.notes && (
+                                          <p className="text-sm text-gray-600 mt-1 italic">
+                                            Note: {notif.notes}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-gray-500 italic">
+                                No notifications sent yet. Click "Mark as Notified" to log the first notification.
+                              </p>
+                            )}
                           </div>
 
-                          {/* Follow-up Notes */}
+                          {/* Mail Item Details */}
                           <div>
-                            <h3 className="font-bold text-gray-900 mb-3">Follow-up Notes</h3>
-                            <div className="space-y-2 text-sm text-gray-700">
-                              <p>• Customer picked up at 3:45 PM</p>
-                              <p>• ID verified</p>
+                            <h3 className="font-bold text-gray-900 mb-3">Mail Item Details</h3>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div>
+                                <span className="text-gray-600">Received:</span>
+                                <span className="ml-2 text-gray-900 font-medium">
+                                  {new Date(item.received_date).toLocaleDateString()}
+                                </span>
+                              </div>
+                              {item.pickup_date && (
+                                <div>
+                                  <span className="text-gray-600">Picked Up:</span>
+                                  <span className="ml-2 text-gray-900 font-medium">
+                                    {new Date(item.pickup_date).toLocaleDateString()}
+                                  </span>
+                                </div>
+                              )}
+                              <div>
+                                <span className="text-gray-600">Mailbox:</span>
+                                <span className="ml-2 text-gray-900 font-medium">
+                                  {item.contacts?.mailbox_number || 'N/A'}
+                                </span>
+                              </div>
+                              {item.contacts?.unit_number && (
+                                <div>
+                                  <span className="text-gray-600">Unit:</span>
+                                  <span className="ml-2 text-gray-900 font-medium">
+                                    {item.contacts.unit_number}
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -982,6 +1257,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
             </tbody>
           </table>
         )}
+        </div>
       </div>
 
       {filteredItems.length > 0 && (
@@ -1131,6 +1407,21 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           </div>
         </form>
       </Modal>
+
+      {/* Quick Notify Modal */}
+      {notifyingMailItem && (
+        <QuickNotifyModal
+          isOpen={isQuickNotifyModalOpen}
+          onClose={() => {
+            setIsQuickNotifyModalOpen(false);
+            setNotifyingMailItem(null);
+          }}
+          mailItemId={notifyingMailItem.mail_item_id}
+          contactId={notifyingMailItem.contact_id}
+          customerName={notifyingMailItem.contacts?.contact_person || notifyingMailItem.contacts?.company_name || 'Customer'}
+          onSuccess={handleQuickNotifySuccess}
+        />
+      )}
     </div>
   );
 }

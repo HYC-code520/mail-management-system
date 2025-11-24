@@ -82,6 +82,18 @@ CREATE TABLE outreach_messages (
     notes               TEXT
 );
 
+-- Notification history table (audit trail of customer notifications)
+CREATE TABLE notification_history (
+    notification_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mail_item_id        UUID NOT NULL REFERENCES mail_items(mail_item_id) ON DELETE CASCADE,
+    contact_id          UUID NOT NULL REFERENCES contacts(contact_id) ON DELETE CASCADE,
+    notified_by         TEXT NOT NULL, -- Staff member who sent the notification
+    notification_method TEXT DEFAULT 'Email', -- Email, Phone, Text, In-Person, WeChat
+    notified_at         TIMESTAMPTZ DEFAULT NOW(),
+    notes               TEXT, -- Optional additional details
+    created_at          TIMESTAMPTZ DEFAULT NOW()
+);
+
 -- Message templates table (reusable message templates)
 CREATE TABLE message_templates (
     template_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -103,6 +115,7 @@ ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mail_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE outreach_messages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE notification_history ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_templates ENABLE ROW LEVEL SECURITY;
 
 -- ##############################################################
@@ -124,6 +137,13 @@ CREATE POLICY "Users can manage mail items for their contacts." ON mail_items
 -- Outreach messages policies (users can only manage outreach for their contacts)
 CREATE POLICY "Users can manage outreach for their contacts." ON outreach_messages
     FOR ALL USING (auth.uid() = (SELECT contacts.user_id FROM contacts WHERE contacts.contact_id = outreach_messages.contact_id));
+
+-- Notification history policies (users can view/create notifications for their contacts)
+CREATE POLICY "Users can view notification history for their contacts." ON notification_history
+    FOR SELECT USING (auth.uid() = (SELECT contacts.user_id FROM contacts WHERE contacts.contact_id = notification_history.contact_id));
+
+CREATE POLICY "Users can create notifications for their contacts." ON notification_history
+    FOR INSERT WITH CHECK (auth.uid() = (SELECT contacts.user_id FROM contacts WHERE contacts.contact_id = notification_history.contact_id));
 
 -- Message templates policies (users can manage their own templates + see defaults)
 CREATE POLICY "Users can manage their templates." ON message_templates
@@ -148,12 +168,38 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
 
+-- Function to automatically update last_notified when notification is added
+CREATE OR REPLACE FUNCTION update_mail_item_last_notified()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE mail_items 
+    SET last_notified = NEW.notified_at
+    WHERE mail_item_id = NEW.mail_item_id;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger to auto-update last_notified
+CREATE TRIGGER trigger_update_last_notified
+    AFTER INSERT ON notification_history
+    FOR EACH ROW
+    EXECUTE FUNCTION update_mail_item_last_notified();
+
+-- ##############################################################
+-- ##               STEP 6.5: CREATE INDEXES                  ##
+-- ##############################################################
+
+-- Notification history indexes for faster queries
+CREATE INDEX idx_notification_history_mail_item ON notification_history(mail_item_id);
+CREATE INDEX idx_notification_history_contact ON notification_history(contact_id);
+CREATE INDEX idx_notification_history_date ON notification_history(notified_at);
+
 -- ##############################################################
 -- ##               STEP 7: SETUP REALTIME                   ##
 -- ##############################################################
 
 -- Create publication for realtime subscriptions (for live updates)
-CREATE PUBLICATION supabase_realtime FOR TABLE contacts, mail_items, outreach_messages, message_templates;
+CREATE PUBLICATION supabase_realtime FOR TABLE contacts, mail_items, outreach_messages, notification_history, message_templates;
 
 -- ##############################################################
 -- ##                STEP 8: INSERT DEFAULT DATA             ##

@@ -27,6 +27,7 @@ class ApiClient {
     const headers = {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${token}`,
+      'ngrok-skip-browser-warning': 'true', // Skip ngrok browser warning for API requests
       ...options.headers,
     };
 
@@ -114,6 +115,12 @@ export const api = {
     create: (data: Record<string, unknown>) => apiClient.post('/templates', data),
     update: (id: string, data: Record<string, unknown>) => apiClient.put(`/templates/${id}`, data),
     delete: (id: string) => apiClient.delete(`/templates/${id}`),
+  },
+  notifications: {
+    getByMailItem: (mailItemId: string) => apiClient.get(`/notifications/mail-item/${mailItemId}`),
+    getByContact: (contactId: string) => apiClient.get(`/notifications/contact/${contactId}`),
+    create: (data: Record<string, unknown>) => apiClient.post('/notifications', data),
+    quickNotify: (data: Record<string, unknown>) => apiClient.post('/notifications/quick-notify', data),
   },
 };
 
