@@ -54,3 +54,4 @@ backend/build
 # Frontend specific  
 frontend/dist
 frontend/build
+ngrok.yml
