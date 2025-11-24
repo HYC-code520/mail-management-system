@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Package, Bell, Search, ArrowUpDown, ArrowUp, ArrowDown, UserPlus, Plus, FileText, Clock, AlertCircle, CheckCircle2, TrendingUp, ChevronDown, ChevronUp, AlertTriangle } from 'lucide-react';
+import { Mail, Package, Bell, Search, ArrowUpDown, ArrowUp, ArrowDown, UserPlus, Plus, FileText, Clock, AlertCircle, CheckCircle2, TrendingUp, ChevronDown, ChevronUp, AlertTriangle, MoreVertical, Send } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
@@ -64,6 +64,7 @@ export default function DashboardPage() {
   const [isQuickNotifyModalOpen, setIsQuickNotifyModalOpen] = useState(false);
   const [notifyingMailItem, setNotifyingMailItem] = useState<MailItem | null>(null);
   const [saving, setSaving] = useState(false);
+  const [openFollowUpDropdownId, setOpenFollowUpDropdownId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     contact_person: '',
     company_name: '',
@@ -202,16 +203,18 @@ export default function DashboardPage() {
         )
         .slice(0, 5);
       
-      // Calculate overdue mail (Notified for more than 7 days)
+      // Calculate overdue mail (7+ days old from received_date, not picked up yet)
       const sevenDaysAgo = new Date(now);
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
       const overdueMail = mailItems.filter((item: MailItem) => {
-        if (item.status === 'Notified' && item.last_notified) {
-          const notifiedDate = new Date(item.last_notified);
-          return notifiedDate < sevenDaysAgo;
+        // Only count mail that's still pending pickup (not completed statuses)
+        if (item.status === 'Picked Up' || item.status === 'Forward' || item.status === 'Scanned Document' || item.status === 'Abandoned Package') {
+          return false;
         }
-        return false;
+        // Check if received_date is 7+ days old
+        const receivedDate = new Date(item.received_date);
+        return receivedDate < sevenDaysAgo;
       }).length;
 
       // Calculate completed today (picked up today)
@@ -301,7 +304,8 @@ export default function DashboardPage() {
           item.received_date?.startsWith(today)
         ).length,
         pendingPickups: mailItems.filter((item: MailItem) => 
-          item.status === 'Notified'
+          // All mail waiting to be picked up (in the shop)
+          item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending'
         ).length,
         remindersDue: mailItems.filter((item: MailItem) => 
           item.status === 'Received'
@@ -474,7 +478,7 @@ export default function DashboardPage() {
             <div>
               <p className="text-gray-600 text-sm mb-1 font-semibold">Overdue!</p>
               <p className="text-4xl font-bold text-gray-900">{stats?.overdueMail || 0}</p>
-              <p className="text-gray-500 text-sm mt-1">&gt;7 days notified</p>
+              <p className="text-gray-500 text-sm mt-1">&gt;7 days old</p>
             </div>
             <AlertCircle className="w-8 h-8 text-gray-900" />
           </div>
@@ -546,6 +550,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
+                      {/* Primary Action Button - Most Common/Urgent Action */}
                       {isAbandoned ? (
                         <button
                           onClick={() => handleQuickStatusUpdate(item.mail_item_id, item.status, 'Abandoned Package')}
@@ -563,6 +568,109 @@ export default function DashboardPage() {
                           Mark as Notified
                         </button>
                       )}
+                      
+                      {/* Three-Dots Dropdown for More Actions */}
+                      <div className="relative">
+                        <button
+                          id={`followup-more-btn-${item.mail_item_id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenFollowUpDropdownId(openFollowUpDropdownId === item.mail_item_id ? null : item.mail_item_id);
+                          }}
+                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="More Actions"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Dropdown Menu */}
+                        {openFollowUpDropdownId === item.mail_item_id && (
+                          <>
+                            {/* Backdrop to close dropdown */}
+                            <div 
+                              className="fixed inset-0 z-30" 
+                              onClick={() => setOpenFollowUpDropdownId(null)}
+                            ></div>
+                            
+                            {/* Dropdown content - using fixed positioning */}
+                            <div 
+                              className="fixed w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-40 max-h-96 overflow-y-auto"
+                              style={{
+                                top: `${(document.getElementById(`followup-more-btn-${item.mail_item_id}`)?.getBoundingClientRect().bottom ?? 0) + 4}px`,
+                                right: `${window.innerWidth - (document.getElementById(`followup-more-btn-${item.mail_item_id}`)?.getBoundingClientRect().right ?? 0)}px`,
+                              }}
+                            >
+                              {/* Mark as Notified - For Received status */}
+                              {item.status === 'Received' && !isAbandoned && (
+                                <button
+                                  onClick={() => {
+                                    openQuickNotifyModal(item);
+                                    setOpenFollowUpDropdownId(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-3"
+                                >
+                                  <Bell className="w-4 h-4 text-purple-600" />
+                                  Mark as Notified
+                                </button>
+                              )}
+                              
+                              {/* Mark as Picked Up - For all statuses */}
+                              <button
+                                onClick={() => {
+                                  handleQuickStatusUpdate(item.mail_item_id, item.status, 'Picked Up');
+                                  setOpenFollowUpDropdownId(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-3"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                Mark as Picked Up
+                              </button>
+                              
+                              {/* Mark as Scanned - For Received status */}
+                              {item.status === 'Received' && (
+                                <button
+                                  onClick={() => {
+                                    handleQuickStatusUpdate(item.mail_item_id, item.status, 'Scanned Document');
+                                    setOpenFollowUpDropdownId(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-cyan-50 flex items-center gap-3"
+                                >
+                                  <FileText className="w-4 h-4 text-cyan-600" />
+                                  Mark as Scanned
+                                </button>
+                              )}
+                              
+                              {/* Forward - For Notified/Pending */}
+                              {(item.status === 'Notified' || item.status === 'Pending') && (
+                                <button
+                                  onClick={() => {
+                                    handleQuickStatusUpdate(item.mail_item_id, item.status, 'Forward');
+                                    setOpenFollowUpDropdownId(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-3"
+                                >
+                                  <Send className="w-4 h-4 text-orange-600" />
+                                  Forward
+                                </button>
+                              )}
+                              
+                              {/* Mark as Abandoned - For all statuses */}
+                              {!isAbandoned && (
+                                <button
+                                  onClick={() => {
+                                    handleQuickStatusUpdate(item.mail_item_id, item.status, 'Abandoned Package');
+                                    setOpenFollowUpDropdownId(null);
+                                  }}
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-3"
+                                >
+                                  <AlertTriangle className="w-4 h-4 text-red-600" />
+                                  Mark as Abandoned
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 );
