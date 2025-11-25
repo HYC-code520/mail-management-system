@@ -55,6 +55,9 @@ export default function DashboardPage() {
   const [isFollowUpExpanded, setIsFollowUpExpanded] = useState(true);
   const [followUpDisplayCount, setFollowUpDisplayCount] = useState(10); // Show 10 initially
   
+  // Chart time range state
+  const [chartTimeRange, setChartTimeRange] = useState<7 | 14 | 30>(7); // Default to 7 days
+  
   // Sorting states
   const [sortColumn, setSortColumn] = useState<'date' | 'type' | 'customer' | 'status'>('date');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -79,7 +82,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [chartTimeRange]); // Reload when time range changes
 
   // Format phone number as user types: 917-822-5751
   const formatPhoneNumber = (value: string) => {
@@ -247,9 +250,9 @@ export default function DashboardPage() {
         return new Date(dateA).getTime() - new Date(dateB).getTime();
       }); // Don't limit here - let the UI handle display count
 
-      // Calculate 7-day mail volume
+      // Calculate mail volume based on selected time range
       const mailVolumeData = [];
-      for (let i = 6; i >= 0; i--) {
+      for (let i = chartTimeRange - 1; i >= 0; i--) {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split('T')[0];
@@ -262,21 +265,19 @@ export default function DashboardPage() {
         });
       }
 
-      // Calculate 30-day customer growth
-      // Customer Growth Chart Data - Show NEW customers added per day (last 14 days)
+      // Calculate customer growth based on selected time range
       const customerGrowthData = [];
       
       if (activeContacts.length > 0) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         
-        // Always show last 14 days
         const startDate = new Date();
-        startDate.setDate(startDate.getDate() - 13); // 13 days ago + today = 14 days
+        startDate.setDate(startDate.getDate() - (chartTimeRange - 1));
         startDate.setHours(0, 0, 0, 0);
         
-        // Generate one point per day for 14 days
-        for (let i = 0; i <= 13; i++) {
+        // Generate one point per day for selected range
+        for (let i = 0; i < chartTimeRange; i++) {
           const date = new Date(startDate);
           date.setDate(date.getDate() + i);
           const dateStr = date.toISOString().split('T')[0];
@@ -479,14 +480,14 @@ export default function DashboardPage() {
         </div>
 
         {/* Overdue! */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
+        <div className="bg-white border-2 border-red-200 rounded-lg p-6 shadow-sm">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <p className="text-gray-600 text-sm mb-1 font-semibold">Overdue!</p>
-              <p className="text-4xl font-bold text-gray-900">{stats?.overdueMail || 0}</p>
-              <p className="text-gray-500 text-sm mt-1">&gt;7 days old</p>
+              <p className="text-gray-900 text-sm mb-1 font-semibold">Overdue!</p>
+              <p className="text-4xl font-bold text-red-600">{stats?.overdueMail || 0}</p>
+              <p className="text-gray-900 text-sm mt-1">&gt;7 days old</p>
             </div>
-            <AlertCircle className="w-8 h-8 text-gray-900" />
+            <AlertCircle className="w-8 h-8 text-red-600" />
           </div>
         </div>
 
@@ -503,22 +504,26 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Needs Follow-Up Widget - HIGH PRIORITY */}
-      {stats && stats.needsFollowUp.length > 0 && (
-        <div className="bg-gray-50 border-2 border-gray-300 rounded-lg mb-8">
-          <div 
-            className="p-4 cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-between"
-            onClick={() => setIsFollowUpExpanded(!isFollowUpExpanded)}
-          >
-            <div className="flex items-center gap-3">
-              <Clock className="w-6 h-6 text-gray-900" />
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">⚠️ Needs Follow-Up</h3>
-                <p className="text-sm text-gray-600">{stats.needsFollowUp.length} items require attention</p>
+      {/* Two-Column Layout: Needs Follow-Up + Charts */}
+      <div className="grid grid-cols-5 gap-6 mb-8 items-start">
+        {/* Left Column: Needs Follow-Up (60% width = 3 cols) */}
+        <div className="col-span-3 h-full">
+          {/* Needs Follow-Up Widget - HIGH PRIORITY */}
+          {stats && stats.needsFollowUp.length > 0 && (
+            <div className="bg-gray-50 border-2 border-gray-300 rounded-lg h-full">
+              <div 
+                className="p-4 cursor-pointer hover:bg-gray-100 transition-colors flex items-center justify-between"
+                onClick={() => setIsFollowUpExpanded(!isFollowUpExpanded)}
+              >
+                <div className="flex items-center gap-3">
+                  <Clock className="w-6 h-6 text-gray-900" />
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">⚠️ Needs Follow-Up</h3>
+                    <p className="text-sm text-gray-600">{stats.needsFollowUp.length} items require attention</p>
+                  </div>
+                </div>
+                {isFollowUpExpanded ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
               </div>
-            </div>
-            {isFollowUpExpanded ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
-          </div>
           
           {isFollowUpExpanded && (
             <div className="p-4 pt-0 space-y-3">
@@ -703,85 +708,130 @@ export default function DashboardPage() {
               )}
             </div>
           )}
-        </div>
-      )}
-
-      {/* Charts Row */}
-      <div className="grid grid-cols-2 gap-6 mb-8">
-        {/* Mail Volume Chart */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <TrendingUp className="w-6 h-6 text-gray-900" />
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">Mail Volume</h2>
-              <p className="text-sm text-gray-600">Last 7 days</p>
             </div>
-          </div>
-          <ResponsiveContainer width="100%" height={250}>
-            <BarChart data={stats?.mailVolumeData || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="date" 
-                tick={{ fill: '#6B7280', fontSize: 12 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-              />
-              <YAxis 
-                tick={{ fill: '#6B7280', fontSize: 12 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Bar dataKey="count" fill="#10B981" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          )}
         </div>
 
-        {/* Customer Growth Chart */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <div className="flex items-center gap-3 mb-6">
-            <UserPlus className="w-6 h-6 text-green-600" />
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">New Customers</h2>
-              <p className="text-sm text-gray-600">Added per day (last 14 days)</p>
-            </div>
+        {/* Right Column: Charts (40% width = 2 cols) */}
+        <div className="col-span-2 space-y-6 h-full">
+          {/* Time Range Toggle - Shared for both charts */}
+          <div className="flex items-center justify-center gap-2 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setChartTimeRange(7)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                chartTimeRange === 7
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              7 Days
+            </button>
+            <button
+              onClick={() => setChartTimeRange(14)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                chartTimeRange === 14
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              14 Days
+            </button>
+            <button
+              onClick={() => setChartTimeRange(30)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                chartTimeRange === 30
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              30 Days
+            </button>
           </div>
-          <ResponsiveContainer width="100%" height={250}>
-            <LineChart data={stats?.customerGrowthData || []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="date" 
-                tick={{ fill: '#6B7280', fontSize: 12 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-              />
-              <YAxis 
-                tick={{ fill: '#6B7280', fontSize: 12 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-                allowDecimals={false}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="customers" 
-                stroke="#10B981" 
-                strokeWidth={3}
-                dot={{ fill: '#10B981', r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+
+          {/* Mail Volume Chart */}
+          <div className="bg-white border-2 border-gray-300 rounded-lg p-6 shadow-sm h-[calc(50%-3rem)]">
+            <div className="flex items-center gap-3 mb-6">
+              <TrendingUp className="w-6 h-6 text-gray-900" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Mail Volume</h2>
+                <p className="text-sm text-gray-600">Last {chartTimeRange} days</p>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={250}>
+              <BarChart data={stats?.mailVolumeData || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  tickLine={{ stroke: '#E5E7EB' }}
+                  interval={chartTimeRange === 30 ? 4 : chartTimeRange === 14 ? 1 : 0}
+                  angle={chartTimeRange === 30 ? -45 : 0}
+                  textAnchor={chartTimeRange === 30 ? "end" : "middle"}
+                  height={chartTimeRange === 30 ? 60 : 30}
+                />
+                <YAxis 
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  tickLine={{ stroke: '#E5E7EB' }}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Bar dataKey="count" fill="#10B981" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+
+          {/* Customer Growth Chart */}
+          <div className="bg-white border-2 border-gray-300 rounded-lg p-6 shadow-sm h-[calc(50%-3rem)]">
+            <div className="flex items-center gap-3 mb-6">
+              <UserPlus className="w-6 h-6 text-green-600" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">New Customers</h2>
+                <p className="text-sm text-gray-600">Added per day (last {chartTimeRange} days)</p>
+              </div>
+            </div>
+            <ResponsiveContainer width="100%" height={250}>
+              <LineChart data={stats?.customerGrowthData || []}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  tickLine={{ stroke: '#E5E7EB' }}
+                  interval={chartTimeRange === 30 ? 4 : chartTimeRange === 14 ? 1 : 0}
+                  angle={chartTimeRange === 30 ? -45 : 0}
+                  textAnchor={chartTimeRange === 30 ? "end" : "middle"}
+                  height={chartTimeRange === 30 ? 60 : 30}
+                />
+                <YAxis 
+                  tick={{ fill: '#6B7280', fontSize: 12 }}
+                  tickLine={{ stroke: '#E5E7EB' }}
+                  allowDecimals={false}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                  }}
+                />
+                <Line 
+                  type="monotone" 
+                  dataKey="customers" 
+                  stroke="#10B981" 
+                  strokeWidth={3}
+                  dot={{ fill: '#10B981', r: 4 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
 
