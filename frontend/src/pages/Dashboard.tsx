@@ -433,7 +433,7 @@ export default function DashboardPage() {
             className="flex items-center justify-center gap-3 px-6 py-4 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
           >
             <FileText className="w-5 h-5" />
-            <span>View Templates</span>
+            <span>View Email Templates</span>
           </button>
           <button
             onClick={() => setIsAddCustomerModalOpen(true)}

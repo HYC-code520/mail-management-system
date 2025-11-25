@@ -46,3 +46,4 @@ echo "After running, restart your backend server:"
 echo "  cd backend && npm start"
 echo ""
 
+

@@ -1256,13 +1256,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <td colSpan={9} className="py-6 px-4">
                         <div className="space-y-6">
-                          {/* Notification History */}
-                          <div>
-                            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                              <Bell className="w-5 h-5 text-purple-600" />
-                              Notification History
-                            </h3>
-                            {notificationHistory[item.mail_item_id]?.length > 0 ? (
+                          {/* Notification History - Only show if there are notifications */}
+                          {notificationHistory[item.mail_item_id]?.length > 0 && (
+                            <div>
+                              <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                <Bell className="w-5 h-5 text-purple-600" />
+                                Notification History
+                              </h3>
                               <div className="space-y-3">
                                 {notificationHistory[item.mail_item_id].map((notif) => (
                                   <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
@@ -1296,12 +1296,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   </div>
                                 ))}
                               </div>
-                            ) : (
-                              <p className="text-sm text-gray-500 italic">
-                                No notifications sent yet. Click "Mark as Notified" to log the first notification.
-                              </p>
-                            )}
-                          </div>
+                            </div>
+                          )}
 
                           {/* Mail Item Details */}
                           <div>

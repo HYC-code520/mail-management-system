@@ -570,3 +570,111 @@ SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhY
 - Always check Vercel deployment logs for "Building for production" to confirm a fresh build
 
 ---
+
+## 10. Vercel Deployment Protection / Authentication Redirects
+
+**Timestamp:** `2025-11-25 00:45:00`  
+**Category:** `DEPLOYMENT`  
+**Status:** `SOLVED`  
+**Error Message:** Browser redirected to "Log in to Vercel" page when accessing deployment URL in Safari, while same URL worked in Chrome  
+**Context:** After merging `develop` to `main` and pushing to GitHub, the `git-main` branch deployment URL (`https://mail-management-system-git-main-mei-ways-projects.vercel.app`) was redirecting to Vercel's login page in Safari, but worked in Chrome. Users also saw `404: NOT_FOUND` errors when trying to access the application.
+
+**Root Cause Analysis:**  
+1. **Vercel Deployment Protection**: Vercel has a security feature called "Deployment Protection" (also known as "Vercel Authentication") that automatically protects all non-production preview deployments
+2. **Branch-Specific URLs**: URLs with `git-{branchname}` pattern (like `git-main`, `git-develop`) are considered preview deployments by Vercel
+3. **Browser Cache**: Chrome had cached authentication credentials from previous Vercel dashboard sessions, allowing access. Safari didn't have cached credentials, so it enforced the authentication requirement
+4. **Default Security Setting**: By default, Vercel protects all preview deployments to prevent unauthorized access to in-development features
+
+**Solution Implemented:**  
+1. **Use Production Deployment URL**: Instead of using `git-main` URL, use the actual production deployment URL:
+   - Working URL: `https://mail-management-system-git-develop-mei-ways-projects.vercel.app`
+   - This URL is configured as the production deployment and doesn't require Vercel authentication
+
+2. **Alternative Solution - Disable Deployment Protection** (if needed):
+   - Go to Vercel → Project Settings → Deployment Protection
+   - Adjust authentication settings:
+     - Option 1: Disable "Vercel Authentication" for preview deployments
+     - Option 2: Generate shareable links for specific deployments
+     - Option 3: Add team members who need access
+   - Reference: [Vercel Community Discussion](https://community.vercel.com/t/my-application-is-redirecting-to-vercel-login/736)
+
+3. **Understanding Vercel URL Patterns**:
+   - `https://project-name.vercel.app` = Primary production URL (public)
+   - `https://project-name-git-branchname-team.vercel.app` = Branch preview URL (may be protected)
+   - Preview URLs require authentication by default for security
+
+**Prevention Strategy:**  
+1. **Use Production URLs**: Always share the primary production URL with end users, not preview/branch URLs
+2. **Document URLs**: Maintain a clear list of which URLs are for development/preview vs. production
+3. **Test in Multiple Browsers**: Always test deployments in different browsers (Chrome, Safari, Firefox) to catch authentication issues
+4. **Configure Deployment Protection**: Set up Deployment Protection settings based on project needs (private vs. public preview deployments)
+5. **Team Access**: Ensure all team members are added to the Vercel project so they can access protected deployments
+6. **Shareable Links**: For external stakeholders, generate shareable links instead of sharing protected preview URLs
+
+**Tests Added:**  
+- Verified production URL works in both Chrome and Safari without login
+- Confirmed preview URLs show authentication prompt as expected
+- Tested that authenticated users can access preview deployments
+- Verified 404 errors were specific to `git-main` branch deployment, not a general issue
+
+**Additional Notes:**  
+- Vercel Deployment Protection is a security feature, not a bug - it's designed to protect in-development features
+- The `git-main` branch showed 404 errors because the deployment had issues, separate from the authentication requirement
+- Preview deployments are useful for testing branches before merging to production
+- Vercel's authentication uses the same login as the dashboard (email, Google, GitHub, etc.)
+- Once logged in to Vercel, the authentication cookie allows access to all protected deployments in that project
+- For public projects (open source), Deployment Protection can be disabled entirely
+
+---
+
+## 11. Backend Failing to Start - Missing Environment Variables (Recurring)
+
+**Timestamp:** `2025-11-24 21:27:00`  
+**Category:** `DEPLOYMENT`  
+**Status:** `SOLVED`  
+**Error Message:** `[dotenv@17.2.3] injecting env (0) from .env` and `Error: Missing Supabase environment variables`  
+**Context:** Backend server generated error log (`backend/backend.log`) showing dotenv loaded 0 variables and server crashed with missing Supabase environment variables. This occurred despite the `.env` file existing and containing all required variables.
+
+**Root Cause Analysis:**  
+1. **Same as Error #8**: This is the same issue as documented earlier (variable order in `.env` file)
+2. **Recurring Pattern**: Indicates the `.env` file was manually edited again or restored from a backup
+3. **Log File Created**: The error was captured in `backend/backend.log` (created automatically by npm or terminal redirection)
+4. **Silent Failure**: dotenv doesn't throw descriptive errors - it just reports `(0)` variables loaded
+
+**Solution Implemented:**  
+1. **Verified `.env` File**: Checked that `.env` file exists and has correct variable order (SUPABASE_URL before SUPABASE_ANON_KEY)
+2. **Backend Working**: Current backend is running successfully - this log file was from an old failure
+3. **Deleted Log File**: Removed `backend/backend.log` as it's outdated and was never meant to be committed (should be in `.gitignore`)
+
+**Prevention Strategy:**  
+1. **Add to .gitignore**: Ensure `*.log` files are gitignored to prevent committing debug logs:
+   ```gitignore
+   # Log files
+   *.log
+   logs/
+   backend/backend.log
+   ```
+2. **Use .env Template**: Always copy from `.env.example` rather than manually editing
+3. **Validation Script**: Add a `check-env.js` script that validates `.env` file before starting server:
+   ```javascript
+   const required = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'PORT', 'FRONTEND_URL'];
+   const missing = required.filter(key => !process.env[key]);
+   if (missing.length > 0) {
+     console.error(`❌ Missing environment variables: ${missing.join(', ')}`);
+     process.exit(1);
+   }
+   ```
+4. **Document in README**: Add a troubleshooting section for "Backend not starting" → "Check dotenv output for (0) variables"
+
+**Tests Added:**  
+- Verified backend starts successfully with current `.env` configuration
+- All 33 backend tests passing (pre-commit hook validates functionality)
+
+**Additional Notes:**  
+- This is a recurring issue pattern - happened at least twice (see Error #8)
+- The `backend.log` file should never be committed to Git
+- Consider adding a `.prettierignore` or `.editorconfig` to prevent accidental `.env` formatting
+- Future consideration: Use `dotenv-expand` or `dotenv-safe` for better error reporting
+- The issue only affects local development - production uses Render's environment variable UI
+
+---

@@ -141,7 +141,7 @@ export default function DashboardLayout() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Templates
+              Email Templates
             </Link>
             {/* Design tab temporarily hidden - route still exists at /dashboard/design-system */}
           </div>

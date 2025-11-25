@@ -20,3 +20,4 @@ CREATE POLICY "Users can update templates." ON message_templates
 CREATE POLICY "Users can delete own templates." ON message_templates
     FOR DELETE USING (auth.uid() = user_id AND is_default = FALSE);
 
+

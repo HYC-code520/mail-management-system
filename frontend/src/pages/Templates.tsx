@@ -221,7 +221,7 @@ export default function TemplatesPage() {
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Notification Templates</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Email Templates</h1>
           <p className="text-gray-600">Manage and use bilingual message templates</p>
         </div>
         <button
@@ -251,7 +251,7 @@ export default function TemplatesPage() {
           <div className="col-span-1">
             <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
               <div className="p-4 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">Templates</h3>
+                <h3 className="font-semibold text-gray-900">Email Templates</h3>
               </div>
               <div className="p-2">
                 <div className="space-y-1">
