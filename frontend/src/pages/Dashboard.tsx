@@ -210,23 +210,27 @@ export default function DashboardPage() {
       const sevenDaysAgo = new Date(now);
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
       
-      const overdueMail = mailItems.filter((item: MailItem) => {
-        // Only count mail that's still pending pickup (not completed statuses)
-        if (item.status === 'Picked Up' || item.status === 'Forward' || item.status === 'Scanned Document' || item.status === 'Abandoned Package') {
-          return false;
-        }
-        // Check if received_date is 7+ days old
-        const receivedDate = new Date(item.received_date);
-        return receivedDate < sevenDaysAgo;
-      }).length;
+      const overdueMail = mailItems
+        .filter((item: MailItem) => {
+          // Only count mail that's still pending pickup (not completed statuses)
+          if (item.status === 'Picked Up' || item.status === 'Forward' || item.status === 'Scanned Document' || item.status === 'Abandoned Package') {
+            return false;
+          }
+          // Check if received_date is 7+ days old
+          const receivedDate = new Date(item.received_date);
+          return receivedDate < sevenDaysAgo;
+        })
+        .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
 
       // Calculate completed today (picked up today)
-      const completedToday = mailItems.filter((item: MailItem) => {
-        if (item.status === 'Picked Up' && item.pickup_date) {
-          return item.pickup_date.startsWith(today);
-        }
-        return false;
-      }).length;
+      const completedToday = mailItems
+        .filter((item: MailItem) => {
+          if (item.status === 'Picked Up' && item.pickup_date) {
+            return item.pickup_date.startsWith(today);
+          }
+          return false;
+        })
+        .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
 
       // Find mail that needs follow-up
       const twoDaysAgo = new Date(now);
@@ -256,9 +260,10 @@ export default function DashboardPage() {
         const date = new Date();
         date.setDate(date.getDate() - i);
         const dateStr = date.toISOString().split('T')[0];
-        const count = mailItems.filter((item: MailItem) => 
-          item.received_date?.startsWith(dateStr)
-        ).length;
+        // Sum up quantities instead of counting entries
+        const count = mailItems
+          .filter((item: MailItem) => item.received_date?.startsWith(dateStr))
+          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
         mailVolumeData.push({
           date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           count
@@ -301,13 +306,15 @@ export default function DashboardPage() {
       console.log('Active Contacts:', activeContacts.length);
       
       setStats({
-        todaysMail: mailItems.filter((item: MailItem) => 
-          item.received_date?.startsWith(today)
-        ).length,
-        pendingPickups: mailItems.filter((item: MailItem) => 
-          // All mail waiting to be picked up (in the shop)
-          item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending'
-        ).length,
+        todaysMail: mailItems
+          .filter((item: MailItem) => item.received_date?.startsWith(today))
+          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0),
+        pendingPickups: mailItems
+          .filter((item: MailItem) => 
+            // All mail waiting to be picked up (in the shop)
+            item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending'
+          )
+          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0),
         remindersDue: mailItems.filter((item: MailItem) => 
           item.status === 'Received'
         ).length,
