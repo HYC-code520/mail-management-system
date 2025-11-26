@@ -73,7 +73,7 @@ export default function DashboardPage() {
   
   // Action Modal states (for picked up, forward, abandoned actions)
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
-  const [actionModalType, setActionModalType] = useState<'picked_up' | 'forward' | 'abandoned'>('picked_up');
+  const [actionModalType, setActionModalType] = useState<'picked_up' | 'forward' | 'scanned' | 'abandoned'>('picked_up');
   const [actionMailItem, setActionMailItem] = useState<MailItem | null>(null);
   
   const [formData, setFormData] = useState({
