@@ -14,12 +14,25 @@ export function getNYDate(): Date {
  * Convert a date to New York timezone and return as YYYY-MM-DD string
  */
 export function toNYDateString(date: Date | string): string {
+  // If it's already a date-only string (YYYY-MM-DD), return it as-is
+  // This avoids timezone conversion issues for dates without time components
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return date;
+  }
+  
   const d = typeof date === 'string' ? new Date(date) : date;
-  const nyDate = new Date(d.toLocaleString('en-US', { timeZone: 'America/New_York' }));
-  const year = nyDate.getFullYear();
-  const month = String(nyDate.getMonth() + 1).padStart(2, '0');
-  const day = String(nyDate.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  
+  // Convert to NY timezone
+  const nyDateStr = d.toLocaleString('en-US', { 
+    timeZone: 'America/New_York',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  // Parse the formatted string (MM/DD/YYYY) and convert to YYYY-MM-DD
+  const [month, day, year] = nyDateStr.split(',')[0].split('/');
+  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
 /**
