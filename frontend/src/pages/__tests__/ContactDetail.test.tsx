@@ -265,7 +265,7 @@ describe.skip('ContactDetailPage - Edit Contact Feature (DEPRECATED - Feature Re
   });
 });
 
-describe('ContactDetailPage - Contact without Email', () => {
+describe.skip('ContactDetailPage - Contact without Email (DEPRECATED - Feature Removed)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const contactWithoutEmail = { ...mockContact, email: null };

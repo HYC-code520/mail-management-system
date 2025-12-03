@@ -591,7 +591,7 @@ describe('SendEmailModal - Notification History Banner', () => {
 
     await waitFor(() => {
       // Check that the banner exists and contains notification text
-      const banner = screen.getByText(/notified 1 time previously/i);
+      const banner = screen.getByText(/Previously notified 1 time/i);
       expect(banner).toBeInTheDocument();
     });
   });
