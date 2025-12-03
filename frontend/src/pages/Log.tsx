@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
+import SendEmailModal from '../components/SendEmailModal.tsx';
 import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 
 interface MailItem {
@@ -88,6 +89,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   // Quick Notify Modal states
   const [isQuickNotifyModalOpen, setIsQuickNotifyModalOpen] = useState(false);
   const [notifyingMailItem, setNotifyingMailItem] = useState<MailItem | null>(null);
+  
+  // Send Email Modal states
+  const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
+  const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
   
   // Action Modal states
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -512,11 +517,24 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     setIsQuickNotifyModalOpen(true);
   };
 
+  const openSendEmailModal = (item: MailItem) => {
+    setEmailingMailItem(item);
+    setIsSendEmailModalOpen(true);
+  };
+
   const handleQuickNotifySuccess = () => {
     loadMailItems();
     // Reload action history if the row is expanded
     if (notifyingMailItem && expandedRows.has(notifyingMailItem.mail_item_id)) {
       loadActionHistory(notifyingMailItem.mail_item_id);
+    }
+  };
+
+  const handleSendEmailSuccess = () => {
+    loadMailItems();
+    // Reload action history if the row is expanded
+    if (emailingMailItem && expandedRows.has(emailingMailItem.mail_item_id)) {
+      loadActionHistory(emailingMailItem.mail_item_id);
     }
   };
 
@@ -1276,7 +1294,11 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                             className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                             title="Delete"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            {deletingItemId === item.mail_item_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="w-4 h-4" />
+                            )}
                           </button>
                         </div>
                         
@@ -1313,16 +1335,16 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   right: `${window.innerWidth - (document.getElementById(`more-btn-${item.mail_item_id}`)?.getBoundingClientRect().right ?? 0)}px`,
                                 }}
                               >
-                                {/* Mark as Notified - Always visible */}
+                                {/* Send Email - Always visible */}
                                 <button
                                   onClick={() => {
-                                    openQuickNotifyModal(item);
+                                    openSendEmailModal(item);
                                     setOpenDropdownId(null);
                                   }}
-                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-3"
+                                  className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3"
                                 >
-                                  <Bell className="w-4 h-4 text-purple-600" />
-                                  Mark as Notified
+                                  <Send className="w-4 h-4 text-blue-600" />
+                                  Send Email
                                 </button>
                                 
                                 {/* Mark as Scanned - Always visible */}
@@ -1744,6 +1766,19 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           contactId={notifyingMailItem.contact_id}
           customerName={notifyingMailItem.contacts?.contact_person || notifyingMailItem.contacts?.company_name || 'Customer'}
           onSuccess={handleQuickNotifySuccess}
+        />
+      )}
+
+      {/* Send Email Modal */}
+      {emailingMailItem && (
+        <SendEmailModal
+          isOpen={isSendEmailModalOpen}
+          onClose={() => {
+            setIsSendEmailModalOpen(false);
+            setEmailingMailItem(null);
+          }}
+          mailItem={emailingMailItem}
+          onSuccess={handleSendEmailSuccess}
         />
       )}
 

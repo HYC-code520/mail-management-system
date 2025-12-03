@@ -501,7 +501,11 @@ export default function ContactsPage() {
                               className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                               title="Archive"
                             >
-                              <Archive className="w-4 h-4" />
+                              {deletingContactId === contact.contact_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Archive className="w-4 h-4" />
+                              )}
                               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                                 {deletingContactId === contact.contact_id ? 'Archiving...' : 'Archive'}
                               </span>
@@ -515,7 +519,11 @@ export default function ContactsPage() {
                             className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                             title="Restore"
                           >
-                            <ArchiveRestore className="w-4 h-4" />
+                            {deletingContactId === contact.contact_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <ArchiveRestore className="w-4 h-4" />
+                            )}
                             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                               {deletingContactId === contact.contact_id ? 'Restoring...' : 'Restore'}
                             </span>

@@ -108,11 +108,11 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
 
       // Wait for modal to load
       await waitFor(() => {
-        expect(screen.getByText('Send Email Notification')).toBeInTheDocument();
+        expect(screen.getByText('New Message')).toBeInTheDocument();
       });
 
       // Find and click send button
-      const sendButton = screen.getByRole('button', { name: /send email/i });
+      const sendButton = screen.getByRole('button', { name: /send$/i });
       fireEvent.click(sendButton);
 
       // Wait for error toast to be called
@@ -144,10 +144,10 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Send Email Notification')).toBeInTheDocument();
+        expect(screen.getByText('New Message')).toBeInTheDocument();
       });
 
-      const sendButton = screen.getByRole('button', { name: /send email/i });
+      const sendButton = screen.getByRole('button', { name: /send$/i });
       fireEvent.click(sendButton);
 
       await waitFor(() => {
@@ -174,10 +174,10 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Send Email Notification')).toBeInTheDocument();
+        expect(screen.getByText('New Message')).toBeInTheDocument();
       });
 
-      const sendButton = screen.getByRole('button', { name: /send email/i });
+      const sendButton = screen.getByRole('button', { name: /send$/i });
       fireEvent.click(sendButton);
 
       await waitFor(() => {
@@ -223,7 +223,7 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       });
 
       // Send button should be disabled
-      const sendButton = screen.getByRole('button', { name: /send email/i });
+      const sendButton = screen.getByRole('button', { name: /send$/i });
       expect(sendButton).toBeDisabled();
     });
 
@@ -267,12 +267,12 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Send Email Notification')).toBeInTheDocument();
+        expect(screen.getByText('New Message')).toBeInTheDocument();
       });
 
       // Wait for templates to load and send button to be enabled
       await waitFor(() => {
-        const sendButton = screen.getByRole('button', { name: /send email/i });
+        const sendButton = screen.getByRole('button', { name: /send$/i });
         expect(sendButton).not.toBeDisabled();
       });
 
@@ -293,10 +293,10 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Send Email Notification')).toBeInTheDocument();
+        expect(screen.getByText('New Message')).toBeInTheDocument();
       });
 
-      const sendButton = screen.getByRole('button', { name: /send email/i });
+      const sendButton = screen.getByRole('button', { name: /send$/i });
       
       // With no templates, button should still render but not send
       expect(sendButton).toBeInTheDocument();
@@ -320,7 +320,7 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       });
 
       // Send button should be disabled when no email
-      const sendButton = screen.getByRole('button', { name: /send email/i });
+      const sendButton = screen.getByRole('button', { name: /send$/i });
       expect(sendButton).toBeDisabled();
     });
   });

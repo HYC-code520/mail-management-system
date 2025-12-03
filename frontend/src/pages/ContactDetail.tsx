@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mail, Package, Bell, ChevronRight, Send, Edit } from 'lucide-react';
+import { Mail, Package, Bell, ChevronRight, Send } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import SendEmailModal from '../components/SendEmailModal.tsx';
 import toast from 'react-hot-toast';
@@ -63,20 +63,6 @@ export default function ContactDetailPage() {
   // Send Email Modal states
   const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
   const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
-  
-  // Edit Contact Modal state
-  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [formData, setFormData] = useState({
-    contact_person: '',
-    company_name: '',
-    mailbox_number: '',
-    unit_number: '',
-    email: '',
-    phone_number: '',
-    language_preference: 'English',
-    service_tier: 1,
-    status: 'Pending'
-  });
 
   useEffect(() => {
     if (id) {
@@ -155,42 +141,6 @@ export default function ContactDetailPage() {
     setEmailingMailItem(null);
   };
 
-  const openEditModal = () => {
-    if (contact) {
-      setFormData({
-        contact_person: contact.contact_person || '',
-        company_name: contact.company_name || '',
-        mailbox_number: contact.mailbox_number || '',
-        unit_number: contact.unit_number || '',
-        email: contact.email || '',
-        phone_number: contact.phone_number || '',
-        language_preference: contact.language_preference || 'English',
-        service_tier: contact.service_tier || 1,
-        status: contact.status || 'Pending'
-      });
-      setIsEditModalOpen(true);
-    }
-  };
-
-  const closeEditModal = () => {
-    setIsEditModalOpen(false);
-  };
-
-  const handleEditSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!contact) return;
-
-    try {
-      await api.contacts.update(contact.contact_id, formData);
-      toast.success('Contact updated successfully!');
-      loadContactDetails(); // Refresh contact data
-      closeEditModal();
-    } catch (error: any) {
-      console.error('Error updating contact:', error);
-      toast.error(error.message || 'Failed to update contact');
-    }
-  };
-
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
@@ -224,22 +174,11 @@ export default function ContactDetailPage() {
       </button>
 
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">
-            {contact.contact_person || contact.company_name || 'Unnamed Contact'}
-          </h1>
-          <p className="text-gray-600">Customer Profile</p>
-        </div>
-        
-        {/* Edit Button */}
-        <button
-          onClick={openEditModal}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-        >
-          <Edit className="w-4 h-4" />
-          Edit Contact
-        </button>
+      <div className="mb-8">
+        <h1 className="text-3xl font-bold text-gray-900 mb-1">
+          {contact.contact_person || contact.company_name || 'Unnamed Contact'}
+        </h1>
+        <p className="text-gray-600">Customer Profile</p>
       </div>
 
       {/* Two Column Layout */}
@@ -494,165 +433,6 @@ export default function ContactDetailPage() {
           mailItem={emailingMailItem}
           onSuccess={handleEmailSuccess}
         />
-      )}
-
-      {/* Edit Contact Modal */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 z-10">
-              <h2 className="text-2xl font-bold text-gray-900">Edit Contact</h2>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="p-8 space-y-6">
-              {/* Name & Company */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Contact Person <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="contact_person"
-                    value={formData.contact_person}
-                    onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                    placeholder="John Doe"
-                    required
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Company Name</label>
-                  <input
-                    type="text"
-                    name="company_name"
-                    value={formData.company_name}
-                    onChange={(e) => setFormData({ ...formData, company_name: e.target.value })}
-                    placeholder="Acme Corp"
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Mailbox & Language */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">
-                    Mailbox # <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="mailbox_number"
-                    value={formData.mailbox_number}
-                    onChange={(e) => setFormData({ ...formData, mailbox_number: e.target.value })}
-                    placeholder="e.g., A1"
-                    required
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Preferred Language</label>
-                  <select
-                    name="language_preference"
-                    value={formData.language_preference}
-                    onChange={(e) => setFormData({ ...formData, language_preference: e.target.value })}
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="English">English</option>
-                    <option value="Chinese">Chinese</option>
-                    <option value="Both">Both</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Email & Phone */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="email@example.com"
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Phone</label>
-                  <input
-                    type="tel"
-                    name="phone_number"
-                    value={formData.phone_number}
-                    onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                    placeholder="917-822-5751"
-                    maxLength={12}
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-              </div>
-
-              {/* Unit & Service Tier */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Unit #</label>
-                  <input
-                    type="text"
-                    name="unit_number"
-                    value={formData.unit_number}
-                    onChange={(e) => setFormData({ ...formData, unit_number: e.target.value })}
-                    placeholder="e.g., 101"
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-900 mb-2">Service Tier</label>
-                  <select
-                    name="service_tier"
-                    value={formData.service_tier}
-                    onChange={(e) => setFormData({ ...formData, service_tier: parseInt(e.target.value) })}
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="1">1</option>
-                    <option value="2">2</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Customer Status */}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">Customer Status</label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="PENDING">Pending</option>
-                  <option value="Active">Active</option>
-                  <option value="No">Archived</option>
-                </select>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex justify-end gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={closeEditModal}
-                  className="px-6 py-2.5 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
       )}
     </div>
   );
