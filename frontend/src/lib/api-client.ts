@@ -127,5 +127,27 @@ export const api = {
     create: (data: Record<string, unknown>) => apiClient.post('/action-history', data),
     createBulk: (actions: Record<string, unknown>[]) => apiClient.post('/action-history/bulk', { actions }),
   },
+  emails: {
+    sendWithTemplate: (data: {
+      contact_id: string;
+      template_id: string;
+      mail_item_id?: string;
+      message_type?: string;
+      custom_variables?: Record<string, string>;
+    }) => apiClient.post('/emails/send', data),
+    sendCustom: (data: {
+      to: string;
+      subject: string;
+      body: string;
+      contact_id?: string;
+      mail_item_id?: string;
+    }) => apiClient.post('/emails/send-custom', data),
+    test: (testEmail?: string) => apiClient.get(`/emails/test${testEmail ? `?to=${testEmail}` : ''}`),
+  },
+  oauth: {
+    getGmailAuthUrl: () => apiClient.get('/oauth/gmail/auth-url'),
+    getGmailStatus: () => apiClient.get('/oauth/gmail/status'),
+    disconnectGmail: () => apiClient.post('/oauth/gmail/disconnect', {}),
+  },
 };
 

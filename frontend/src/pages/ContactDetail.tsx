@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mail, Package, Bell, ChevronRight } from 'lucide-react';
+import { Mail, Package, Bell, ChevronRight, Send } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
+import SendEmailModal from '../components/SendEmailModal.tsx';
 import toast from 'react-hot-toast';
 
 interface Contact {
@@ -29,6 +30,17 @@ interface MailItem {
   received_date: string;
   pickup_date?: string;
   description?: string;
+  quantity?: number;
+  tracking_number?: string;
+  contact_id?: string;
+  contacts?: {
+    contact_id?: string;
+    contact_person?: string;
+    company_name?: string;
+    mailbox_number?: string;
+    email?: string;
+    phone_number?: string;
+  };
 }
 
 interface NotificationHistory {
@@ -47,6 +59,10 @@ export default function ContactDetailPage() {
   const [notificationHistory, setNotificationHistory] = useState<Record<string, NotificationHistory[]>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  
+  // Send Email Modal states
+  const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
+  const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -100,6 +116,29 @@ export default function ContactDetailPage() {
       }
     }
     setExpandedRows(newExpanded);
+  };
+
+  const openSendEmailModal = (item: MailItem) => {
+    // Attach contact info to mail item if not already there
+    if (!item.contacts && contact) {
+      item.contacts = {
+        contact_id: contact.contact_id,
+        contact_person: contact.contact_person,
+        company_name: contact.company_name,
+        mailbox_number: contact.mailbox_number,
+        email: contact.email,
+        phone_number: contact.phone_number
+      };
+      item.contact_id = contact.contact_id;
+    }
+    setEmailingMailItem(item);
+    setIsSendEmailModalOpen(true);
+  };
+
+  const handleEmailSuccess = () => {
+    loadMailHistory(); // Refresh mail history after email sent
+    setIsSendEmailModalOpen(false);
+    setEmailingMailItem(null);
   };
 
   if (loading) {
@@ -261,6 +300,7 @@ export default function ContactDetailPage() {
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Type</th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Note</th>
+                    <th className="text-right py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -308,12 +348,23 @@ export default function ContactDetailPage() {
                           </span>
                         </td>
                         <td className="py-4 px-6 text-gray-700">{item.description || '—'}</td>
+                        <td className="py-4 px-6 text-right">
+                          {item.status !== 'Picked Up' && item.status !== 'Abandoned Package' && contact?.email && (
+                            <button
+                              onClick={() => openSendEmailModal(item)}
+                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2 ml-auto"
+                            >
+                              <Send className="w-4 h-4" />
+                              Send Email
+                            </button>
+                          )}
+                        </td>
                       </tr>
 
                       {/* Expanded Row - Notification History */}
                       {expandedRows.has(item.mail_item_id) && (
                         <tr className="bg-gray-50 border-b border-gray-200">
-                          <td colSpan={5} className="py-6 px-6">
+                          <td colSpan={6} className="py-6 px-6">
                             <div className="ml-10">
                               <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                                 <Bell className="w-5 h-5 text-purple-600" />
@@ -370,6 +421,19 @@ export default function ContactDetailPage() {
           </div>
         </div>
       </div>
+      
+      {/* Send Email Modal */}
+      {emailingMailItem && (
+        <SendEmailModal
+          isOpen={isSendEmailModalOpen}
+          onClose={() => {
+            setIsSendEmailModalOpen(false);
+            setEmailingMailItem(null);
+          }}
+          mailItem={emailingMailItem}
+          onSuccess={handleEmailSuccess}
+        />
+      )}
     </div>
   );
 }

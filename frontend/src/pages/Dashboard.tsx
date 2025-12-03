@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Package, Bell, Search, ArrowUpDown, ArrowUp, ArrowDown, UserPlus, Plus, FileText, Clock, AlertCircle, CheckCircle2, TrendingUp, ChevronDown, ChevronUp, AlertTriangle, MoreVertical, Send } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { Mail, Package, UserPlus, FileText, Clock, AlertCircle, CheckCircle2, TrendingUp, ChevronDown, ChevronUp, AlertTriangle, MoreVertical, Send } from 'lucide-react';
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
+import SendEmailModal from '../components/SendEmailModal.tsx';
 import toast from 'react-hot-toast';
-import { getTodayNY, toNYDateString, getChartDateRange } from '../utils/timezone.ts';
+import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 
 interface MailItem {
   mail_item_id: string;
@@ -18,6 +19,7 @@ interface MailItem {
   contact_id: string;
   quantity?: number;
   last_notified?: string;
+  notification_count?: number; // How many times customer has been notified
   contacts?: {
     contact_person?: string;
     company_name?: string;
@@ -71,6 +73,10 @@ export default function DashboardPage() {
   const [saving, setSaving] = useState(false);
   const [openFollowUpDropdownId, setOpenFollowUpDropdownId] = useState<string | null>(null);
   
+  // Send Email Modal states
+  const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
+  const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
+  
   // Action Modal states (for picked up, forward, abandoned actions)
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [actionModalType, setActionModalType] = useState<'picked_up' | 'forward' | 'scanned' | 'abandoned'>('picked_up');
@@ -91,6 +97,113 @@ export default function DashboardPage() {
   useEffect(() => {
     loadDashboardData();
   }, [chartTimeRange]); // Reload when time range changes
+
+  // Helper function to get notification context based on notification history
+  const getNotificationContext = (mailItem: MailItem) => {
+    const count = mailItem.notification_count || 0;
+    
+    let buttonText: string;
+    let suggestedTemplateType: string;
+    let buttonColor: string;
+    
+    if (count === 0) {
+      buttonText = "Send Notification";
+      suggestedTemplateType = "Initial";
+      buttonColor = "bg-blue-600/40 hover:bg-blue-600/60 text-blue-900 border border-blue-600/40"; // Border matches background
+    } else if (count === 1) {
+      buttonText = "Send Reminder";
+      suggestedTemplateType = "Reminder";
+      buttonColor = "bg-gray-600/40 hover:bg-gray-600/60 text-gray-900 border border-gray-300"; // 40% transparent gray
+    } else {
+      buttonText = "Send Final Notice";
+      suggestedTemplateType = "Final Notice";
+      buttonColor = "bg-gray-700/40 hover:bg-gray-700/60 text-gray-900 border border-gray-400"; // 40% transparent dark gray
+    }
+    
+    return { buttonText, suggestedTemplateType, buttonColor, count };
+  };
+
+  // Helper function to calculate days since a date (NY timezone aware)
+  const getDaysSince = (dateStr: string) => {
+    // Get today's date in NY timezone
+    const todayNY = getTodayNY();
+    const todayDate = new Date(todayNY + 'T00:00:00');
+    
+    // Convert the input date to NY timezone
+    const itemDateNY = toNYDateString(dateStr);
+    const itemDate = new Date(itemDateNY + 'T00:00:00');
+    
+    // Calculate difference in days
+    const diffTime = todayDate.getTime() - itemDate.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    return Math.max(0, diffDays); // Return 0 for same day, prevent negative
+  };
+
+  // Helper function to format date for tooltip display (NY timezone)
+  const formatDateForTooltip = (dateStr: string) => {
+    const nyDateStr = toNYDateString(dateStr);
+    const date = new Date(nyDateStr + 'T12:00:00'); // Use noon to avoid timezone edge cases
+    return date.toLocaleDateString('en-US', { 
+      month: 'short', 
+      day: 'numeric', 
+      year: 'numeric' 
+    });
+  };
+
+  // Helper function to generate date range for charts
+  const getChartDateRange = (days: number) => {
+    const result = [];
+    const today = new Date();
+    
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(today);
+      date.setDate(date.getDate() - i);
+      
+      // Format as YYYY-MM-DD for data matching
+      const dateStr = toNYDateString(date.toISOString());
+      
+      // Format for display (e.g., "Nov 20")
+      const displayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+      
+      result.push({ dateStr, displayDate, date: displayDate }); // 'date' is what the chart uses
+    }
+    
+    return result;
+  };
+
+  // Helper function to generate tooltip content for notification button
+  const getNotificationTooltip = (mailItem: MailItem) => {
+    const count = mailItem.notification_count || 0;
+    const daysSinceReceived = getDaysSince(mailItem.received_date);
+    const receivedDateFormatted = formatDateForTooltip(mailItem.received_date);
+    
+    let tooltip = `📦 Received: ${receivedDateFormatted} (${daysSinceReceived} ${daysSinceReceived === 1 ? 'day' : 'days'} ago)\n`;
+    
+    if (count === 0) {
+      tooltip += `✉️ Status: Not notified yet\n`;
+      tooltip += `→ Action: Send initial notification`;
+    } else if (count === 1) {
+      if (mailItem.last_notified) {
+        const daysSinceNotified = getDaysSince(mailItem.last_notified);
+        const lastNotifiedFormatted = formatDateForTooltip(mailItem.last_notified);
+        tooltip += `✉️ Last notified: ${lastNotifiedFormatted} (${daysSinceNotified} ${daysSinceNotified === 1 ? 'day' : 'days'} ago)\n`;
+      } else {
+        tooltip += `✉️ Notified: 1 time\n`;
+      }
+      tooltip += `→ Action: Send reminder`;
+    } else {
+      if (mailItem.last_notified) {
+        const daysSinceNotified = getDaysSince(mailItem.last_notified);
+        const lastNotifiedFormatted = formatDateForTooltip(mailItem.last_notified);
+        tooltip += `✉️ Last notified: ${lastNotifiedFormatted} (${daysSinceNotified} ${daysSinceNotified === 1 ? 'day' : 'days'} ago)\n`;
+      }
+      tooltip += `🔔 Notified: ${count} times\n`;
+      tooltip += `⚠ Action: Send final notice`;
+    }
+    
+    return tooltip;
+  };
 
   // Format phone number as user types: 917-822-5751
   const formatPhoneNumber = (value: string) => {
@@ -262,15 +375,15 @@ export default function DashboardPage() {
         return new Date(dateA).getTime() - new Date(dateB).getTime();
       }); // Don't limit here - let the UI handle display count
 
-      // Calculate mail volume based on selected time range
+      // Calculate mail volume based on selected time range (NY timezone)
       const mailVolumeData = getChartDateRange(chartTimeRange).map(({ dateStr, displayDate }) => {
-        // Filter items for this specific date (extract date part from timestamp)
+        // Filter items for this specific date using NY timezone
         const count = mailItems
           .filter((item: MailItem) => {
             if (!item.received_date) return false;
-            // Extract just the date part (YYYY-MM-DD) from the timestamp
-            const itemDateOnly = item.received_date.split('T')[0];
-            return itemDateOnly === dateStr;
+            // Convert to NY date string for consistent comparison
+            const itemDateNY = toNYDateString(item.received_date);
+            return itemDateNY === dateStr;
           })
           .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
         
@@ -332,25 +445,20 @@ export default function DashboardPage() {
     }
   };
 
-  const getDaysSince = (dateStr: string) => {
-    // Get today's date in NY timezone
-    const todayNY = getTodayNY();
-    const todayDate = new Date(todayNY + 'T00:00:00');
-    
-    // Convert the input date to NY timezone
-    const itemDateNY = toNYDateString(dateStr);
-    const itemDate = new Date(itemDateNY + 'T00:00:00');
-    
-    // Calculate difference in days
-    const diffTime = todayDate.getTime() - itemDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    
-    return Math.max(0, diffDays); // Return 0 for same day, prevent negative
-  };
-
   const openQuickNotifyModal = (item: MailItem) => {
     setNotifyingMailItem(item);
     setIsQuickNotifyModalOpen(true);
+  };
+
+  const openSendEmailModal = (item: MailItem) => {
+    setEmailingMailItem(item);
+    setIsSendEmailModalOpen(true);
+  };
+
+  const handleEmailSuccess = () => {
+    loadDashboardData(); // Refresh data after email sent
+    setIsSendEmailModalOpen(false);
+    setEmailingMailItem(null);
   };
 
   const handleActionSuccess = () => {
@@ -407,11 +515,12 @@ export default function DashboardPage() {
       case 'type':
         comparison = a.item_type.localeCompare(b.item_type);
         break;
-      case 'customer':
+      case 'customer': {
         const nameA = a.contacts?.contact_person || a.contacts?.company_name || '';
         const nameB = b.contacts?.contact_person || b.contacts?.company_name || '';
         comparison = nameA.localeCompare(nameB);
         break;
+      }
       case 'status':
         comparison = a.status.localeCompare(b.status);
         break;
@@ -534,13 +643,17 @@ export default function DashboardPage() {
           {isFollowUpExpanded && (
             <div className="p-4 pt-0 space-y-3">
               {stats.needsFollowUp.slice(0, followUpDisplayCount).map((item) => {
-                // Calculate days since notified (use last_notified for Notified status, received_date for Received)
+                // Calculate days since received (for "X days old" display and abandoned check)
+                const daysSinceReceived = getDaysSince(item.received_date);
+                
+                // Calculate days since last action (for urgency check)
                 const dateToUse = item.status === 'Notified' && item.last_notified 
                   ? item.last_notified 
                   : item.received_date;
-                const daysSince = getDaysSince(dateToUse);
-                const isAbandoned = daysSince >= 30; // 30+ days old
-                const isUrgent = item.status === 'Notified' && daysSince > 2;
+                const daysSinceLastAction = getDaysSince(dateToUse);
+                
+                const isAbandoned = daysSinceReceived >= 30; // 30+ days since received
+                const isUrgent = item.status === 'Notified' && daysSinceLastAction > 2; // 2+ days since last notification
                 
                 return (
                   <div
@@ -559,7 +672,7 @@ export default function DashboardPage() {
                           {item.contacts?.contact_person || item.contacts?.company_name || 'Unknown Customer'}
                         </p>
                         <p className="text-sm text-gray-600">
-                          📮 {item.contacts?.mailbox_number} • {item.item_type} • {daysSince} {daysSince === 1 ? 'day' : 'days'} old
+                          📮 {item.contacts?.mailbox_number} • {item.item_type} • {daysSinceReceived} {daysSinceReceived === 1 ? 'day' : 'days'} old
                           {isAbandoned && (
                             <span className="font-semibold text-gray-900"> • ⚠️ ABANDONED</span>
                           )}
@@ -575,19 +688,37 @@ export default function DashboardPage() {
                             setActionModalType('abandoned');
                             setIsActionModalOpen(true);
                           }}
-                          className="px-4 py-2 bg-red-200 hover:bg-red-300 text-gray-900 text-sm rounded-lg transition-colors flex items-center gap-2"
+                          className="px-4 py-2 bg-red-200 hover:bg-red-300 text-gray-900 text-sm rounded-lg transition-colors flex items-center gap-2 relative group"
                         >
                           <AlertTriangle className="w-4 h-4" />
                           Mark as Abandoned
+                          
+                          {/* Tooltip for Abandoned */}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-64 z-50 pointer-events-none">
+                            {`📦 Received: ${formatDateForTooltip(item.received_date)} (${daysSinceReceived} days ago)\n⚠ Status: Abandoned (30+ days old)\n→ Action: Mark and archive this item`}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-200"></div>
+                          </div>
                         </button>
                       ) : (
-                        <button
-                          onClick={() => openQuickNotifyModal(item)}
-                          className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 text-sm rounded-lg transition-colors flex items-center gap-2"
-                        >
-                          <Bell className="w-4 h-4" />
-                          Mark as Notified
-                        </button>
+                        (() => {
+                          const notificationCtx = getNotificationContext(item);
+                          const tooltipText = getNotificationTooltip(item);
+                          return (
+                            <button
+                              onClick={() => openSendEmailModal(item)}
+                              className={`px-4 py-2 ${notificationCtx.buttonColor} text-sm rounded-lg transition-colors flex items-center gap-2 relative group`}
+                            >
+                              <Send className="w-4 h-4" />
+                              {notificationCtx.buttonText}
+                              
+                              {/* Custom Tooltip - Sharp corners and darker gray */}
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-64 z-50 pointer-events-none">
+                                {tooltipText}
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-200"></div>
+                              </div>
+                            </button>
+                          );
+                        })()
                       )}
                       
                       {/* Three-Dots Dropdown for More Actions */}
@@ -621,17 +752,29 @@ export default function DashboardPage() {
                                 right: `${window.innerWidth - (document.getElementById(`followup-more-btn-${item.mail_item_id}`)?.getBoundingClientRect().right ?? 0)}px`,
                               }}
                             >
-                              {/* Mark as Notified - Always visible */}
-                              <button
-                                onClick={() => {
-                                  openQuickNotifyModal(item);
-                                  setOpenFollowUpDropdownId(null);
-                                }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-purple-50 flex items-center gap-3"
-                              >
-                                <Bell className="w-4 h-4 text-purple-600" />
-                                Mark as Notified
-                              </button>
+                              {/* Send Email/Notification - Always visible */}
+                              {(() => {
+                                const notificationCtx = getNotificationContext(item);
+                                const tooltipText = getNotificationTooltip(item);
+                                return (
+                                  <button
+                                    onClick={() => {
+                                      openSendEmailModal(item);
+                                      setOpenFollowUpDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 relative group"
+                                  >
+                                    <Send className="w-4 h-4 text-blue-600" />
+                                    {notificationCtx.buttonText}
+                                    
+                                    {/* Tooltip for dropdown - Sharp corners and darker gray */}
+                                    <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-64 z-50 pointer-events-none">
+                                      {tooltipText}
+                                      <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                    </div>
+                                  </button>
+                                );
+                              })()}
                               
                               {/* Mark as Picked Up - For all statuses */}
                               <button
@@ -641,10 +784,16 @@ export default function DashboardPage() {
                                   setIsActionModalOpen(true);
                                   setOpenFollowUpDropdownId(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-3"
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-3 relative group"
                               >
                                 <CheckCircle2 className="w-4 h-4 text-green-600" />
                                 Mark as Picked Up
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`✓ Mark this item as picked up\n→ Customer collected their mail`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
                               </button>
                               
                               {/* Mark as Scanned - Always visible */}
@@ -655,10 +804,16 @@ export default function DashboardPage() {
                                   setIsActionModalOpen(true);
                                   setOpenFollowUpDropdownId(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-cyan-50 flex items-center gap-3"
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-cyan-50 flex items-center gap-3 relative group"
                               >
                                 <FileText className="w-4 h-4 text-cyan-600" />
                                 Mark as Scanned
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`📄 Scan document and send\n→ For letters and documents`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
                               </button>
                               
                               {/* Forward - Always visible */}
@@ -669,10 +824,16 @@ export default function DashboardPage() {
                                   setIsActionModalOpen(true);
                                   setOpenFollowUpDropdownId(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-3"
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-3 relative group"
                               >
                                 <Send className="w-4 h-4 text-orange-600" />
                                 Forward
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`→ Forward to another address\n✉️ Customer requested mail forwarding`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
                               </button>
                               
                               {/* Mark as Abandoned - Always visible */}
@@ -683,10 +844,16 @@ export default function DashboardPage() {
                                   setIsActionModalOpen(true);
                                   setOpenFollowUpDropdownId(null);
                                 }}
-                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-3"
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-3 relative group"
                               >
                                 <AlertTriangle className="w-4 h-4 text-red-600" />
                                 Mark as Abandoned
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`⚠ Mark as abandoned package\n→ Customer not responding (30+ days)`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
                               </button>
                             </div>
                           </>
@@ -767,33 +934,35 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-600">Last {chartTimeRange} days</p>
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={250}>
-              <BarChart data={stats?.mailVolumeData || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                  tickLine={{ stroke: '#E5E7EB' }}
-                  interval={chartTimeRange === 30 ? 4 : chartTimeRange === 14 ? 1 : 0}
-                  angle={chartTimeRange === 30 ? -45 : 0}
-                  textAnchor={chartTimeRange === 30 ? "end" : "middle"}
-                  height={chartTimeRange === 30 ? 60 : 30}
-                />
-                <YAxis 
-                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                  tickLine={{ stroke: '#E5E7EB' }}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-                <Bar dataKey="count" fill="#10B981" radius={[8, 8, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <div className="animate-fadeIn">
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={stats?.mailVolumeData || []} key={`mail-volume-${chartTimeRange}`}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: '#6B7280', fontSize: 11 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                    interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    tick={{ fill: '#6B7280', fontSize: 12 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#10B981" radius={[8, 8, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* Customer Growth Chart */}
@@ -805,42 +974,45 @@ export default function DashboardPage() {
                 <p className="text-sm text-gray-600">Added per day (last {chartTimeRange} days)</p>
               </div>
             </div>
-            <ResponsiveContainer width="100%" height={250}>
-              <LineChart data={stats?.customerGrowthData || []}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis 
-                  dataKey="date" 
-                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                  tickLine={{ stroke: '#E5E7EB' }}
-                  interval={chartTimeRange === 30 ? 4 : chartTimeRange === 14 ? 1 : 0}
-                  angle={chartTimeRange === 30 ? -45 : 0}
-                  textAnchor={chartTimeRange === 30 ? "end" : "middle"}
-                  height={chartTimeRange === 30 ? 60 : 30}
-                />
-                <YAxis 
-                  tick={{ fill: '#6B7280', fontSize: 12 }}
-                  tickLine={{ stroke: '#E5E7EB' }}
-                  allowDecimals={false}
-                />
-                <Tooltip 
-                  contentStyle={{ 
-                    backgroundColor: '#fff', 
-                    border: '1px solid #E5E7EB',
-                    borderRadius: '8px',
-                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                  }}
-                />
-                <Line 
-                  type="monotone" 
-                  dataKey="customers" 
-                  stroke="#10B981" 
-                  strokeWidth={3}
-                  dot={{ fill: '#10B981', r: 4 }}
-                  activeDot={{ r: 6 }}
-                  connectNulls={false}
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <div className="animate-fadeIn">
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={stats?.customerGrowthData || []} key={`customer-growth-${chartTimeRange}`}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: '#6B7280', fontSize: 11 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                    interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    tick={{ fill: '#6B7280', fontSize: 12 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="customers" 
+                    stroke="#10B981" 
+                    strokeWidth={3}
+                    isAnimationActive={false}
+                    dot={{ fill: '#10B981', r: 4 }}
+                    activeDot={{ r: 6 }}
+                    connectNulls={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
       </div>
@@ -1017,6 +1189,19 @@ export default function DashboardPage() {
           }}
           actionType={actionModalType}
           onSuccess={handleActionSuccess}
+        />
+      )}
+      
+      {/* Send Email Modal */}
+      {emailingMailItem && (
+        <SendEmailModal
+          isOpen={isSendEmailModalOpen}
+          onClose={() => {
+            setIsSendEmailModalOpen(false);
+            setEmailingMailItem(null);
+          }}
+          mailItem={emailingMailItem}
+          onSuccess={handleEmailSuccess}
         />
       )}
     </div>

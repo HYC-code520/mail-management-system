@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Plus, Edit, Trash2 } from 'lucide-react';
+import { Copy, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
@@ -284,7 +284,11 @@ export default function TemplatesPage() {
                           className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
                           title={template.is_default ? "Cannot delete default templates" : "Delete"}
                         >
-                          <Trash2 className="w-3 h-3" />
+                          {deletingTemplateId === template.template_id ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-3 h-3" />
+                          )}
                         </button>
                       </div>
                     </div>
@@ -314,7 +318,11 @@ export default function TemplatesPage() {
                     className="flex items-center gap-2 px-4 py-2 bg-white border border-red-300 hover:bg-red-50 text-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     title={selectedTemplate.is_default ? "Cannot delete default templates" : "Delete"}
                   >
-                    <Trash2 className="w-4 h-4" />
+                    {deletingTemplateId === selectedTemplate.template_id ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4" />
+                    )}
                     <span>{deletingTemplateId === selectedTemplate.template_id ? 'Deleting...' : 'Delete'}</span>
                   </button>
                 </div>

@@ -7,6 +7,8 @@ const outreachMessagesRoutes = require('./outreachMessages.routes');
 const templatesRoutes = require('./templates.routes');
 const notificationsRoutes = require('./notifications.routes');
 const actionHistoryRoutes = require('./actionHistory.routes');
+const emailRoutes = require('./email.routes');
+const oauthRoutes = require('./oauth.routes');
 
 router.use('/contacts', contactsRoutes);
 router.use('/mail-items', mailItemsRoutes);
@@ -15,6 +17,8 @@ router.use('/messages', outreachMessagesRoutes); // Alias for outreach-messages
 router.use('/templates', templatesRoutes);
 router.use('/notifications', notificationsRoutes);
 router.use('/action-history', actionHistoryRoutes);
+router.use('/emails', emailRoutes);
+router.use('/oauth', oauthRoutes);
 
 module.exports = router;
 

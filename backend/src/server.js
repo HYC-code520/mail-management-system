@@ -2,7 +2,11 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
-require('dotenv').config();
+const path = require('path');
+
+// Load environment variables from backend/.env
+const envPath = path.resolve(process.cwd(), '.env');
+require('dotenv').config({ path: envPath });
 
 const routes = require('./routes');
 const errorHandler = require('./middleware/errorHandler');

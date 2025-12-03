@@ -11,3 +11,6 @@ SET received_date = (
 )
 WHERE received_date IS NOT NULL;
 
+
+
+

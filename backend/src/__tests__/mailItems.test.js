@@ -83,6 +83,7 @@ describe('Mail Items API', () => {
           item_type: 'Package',
           status: 'Received',
           received_date: '2025-11-22',
+          notification_count: 0, // Added for notification history feature
           contacts: {
             contact_person: 'John Doe',
             mailbox_number: 'MB-101'

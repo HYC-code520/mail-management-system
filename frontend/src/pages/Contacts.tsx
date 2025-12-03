@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
+import { validateContactForm } from '../utils/validation.ts';
 
 interface Contact {
   contact_id: string;
@@ -152,23 +153,28 @@ export default function ContactsPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.contact_person && !formData.company_name) {
-      toast.error('Please enter either a name or company name');
+    // Validate form data
+    const validation = validateContactForm(formData);
+    
+    if (!validation.isValid) {
+      // Display validation errors
+      if (validation.errors.general) {
+        toast.error(validation.errors.general);
+      }
+      
+      Object.entries(validation.errors).forEach(([field, error]) => {
+        if (field !== 'general') {
+          const fieldName = field.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase());
+          toast.error(`${fieldName}: ${error}`);
+        }
+      });
+      
       return;
     }
 
     if (!formData.mailbox_number) {
       toast.error('Mailbox number is required');
       return;
-    }
-
-    // Validate phone number if provided
-    if (formData.phone_number) {
-      const digitsOnly = formData.phone_number.replace(/\D/g, '');
-      if (digitsOnly.length > 0 && digitsOnly.length !== 10) {
-        toast.error('Phone number must be exactly 10 digits');
-        return;
-      }
     }
 
     setSaving(true);
@@ -185,9 +191,19 @@ export default function ContactsPage() {
       }
       closeModal();
       loadContacts();
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to save contact:', err);
-      toast.error(`Failed to ${editingContact ? 'update' : 'add'} customer: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      
+      // Handle backend validation errors
+      if (err.response?.data?.details) {
+        const backendErrors = err.response.data.details;
+        Object.entries(backendErrors).forEach(([field, error]) => {
+          const fieldName = field.replace('_', ' ').replace(/\b\w/g, l => (l as string).toUpperCase());
+          toast.error(`${fieldName}: ${error}`);
+        });
+      } else {
+        toast.error(`Failed to ${editingContact ? 'update' : 'add'} customer: ${err.message || 'Unknown error'}`);
+      }
     } finally {
       setSaving(false);
     }
@@ -263,11 +279,12 @@ export default function ContactsPage() {
       case 'mailbox':
         comparison = (a.mailbox_number || '').localeCompare(b.mailbox_number || '');
         break;
-      case 'name':
+      case 'name': {
         const nameA = a.contact_person || a.company_name || '';
         const nameB = b.contact_person || b.company_name || '';
         comparison = nameA.localeCompare(nameB);
         break;
+      }
       case 'status':
         comparison = (a.status || '').localeCompare(b.status || '');
         break;
@@ -485,7 +502,11 @@ export default function ContactsPage() {
                               className="p-2 text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                               title="Archive"
                             >
-                              <Archive className="w-4 h-4" />
+                              {deletingContactId === contact.contact_id ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Archive className="w-4 h-4" />
+                              )}
                               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                                 {deletingContactId === contact.contact_id ? 'Archiving...' : 'Archive'}
                               </span>
@@ -499,7 +520,11 @@ export default function ContactsPage() {
                             className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
                             title="Restore"
                           >
-                            <ArchiveRestore className="w-4 h-4" />
+                            {deletingContactId === contact.contact_id ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <ArchiveRestore className="w-4 h-4" />
+                            )}
                             <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                               {deletingContactId === contact.contact_id ? 'Restoring...' : 'Restore'}
                             </span>

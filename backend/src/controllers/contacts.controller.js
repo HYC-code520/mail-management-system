@@ -1,4 +1,5 @@
 const { getSupabaseClient } = require('../services/supabase.service');
+const { validateContactData } = require('../utils/validation');
 
 // GET /api/contacts - Get all contacts for authenticated user
 exports.getContacts = async (req, res, next) => {
@@ -45,24 +46,18 @@ exports.createContact = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
     
-    // Whitelist and map fields to match database schema
-    const allowedFields = {
-      company_name: req.body.company_name,
-      unit_number: req.body.unit_number,
-      contact_person: req.body.contact_person,
-      language_preference: req.body.language_preference,
-      email: req.body.email,
-      phone_number: req.body.phone || req.body.phone_number, // Accept both 'phone' and 'phone_number'
-      service_tier: req.body.service_tier,
-      options: req.body.options,
-      mailbox_number: req.body.mailbox_number,
-      status: req.body.status || 'PENDING',
-    };
+    // Validate and sanitize input data
+    const validation = validateContactData(req.body);
     
-    // Remove undefined values
-    const contactData = Object.fromEntries(
-      Object.entries(allowedFields).filter(([_, v]) => v !== undefined)
-    );
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: validation.errors
+      });
+    }
+    
+    // Use sanitized data
+    const contactData = validation.sanitized;
     
     // Add user_id
     contactData.user_id = req.user.id;
@@ -113,24 +108,18 @@ exports.updateContact = async (req, res, next) => {
     const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
     
-    // Whitelist and map fields to match database schema
-    const allowedFields = {
-      company_name: req.body.company_name,
-      unit_number: req.body.unit_number,
-      contact_person: req.body.contact_person,
-      language_preference: req.body.language_preference,
-      email: req.body.email,
-      phone_number: req.body.phone || req.body.phone_number,
-      service_tier: req.body.service_tier,
-      options: req.body.options,
-      mailbox_number: req.body.mailbox_number,
-      status: req.body.status,
-    };
+    // Validate and sanitize input data
+    const validation = validateContactData(req.body);
     
-    // Remove undefined values
-    const updateData = Object.fromEntries(
-      Object.entries(allowedFields).filter(([_, v]) => v !== undefined)
-    );
+    if (!validation.valid) {
+      return res.status(400).json({ 
+        error: 'Validation failed',
+        details: validation.errors
+      });
+    }
+    
+    // Use sanitized data
+    const updateData = validation.sanitized;
     
     const { data, error } = await supabase
       .from('contacts')
