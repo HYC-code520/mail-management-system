@@ -11,6 +11,7 @@ interface MailItem {
   received_date: string;
   quantity?: number;
   tracking_number?: string;
+  notification_count?: number; // Add notification count
   contacts?: {
     contact_id?: string;
     contact_person?: string;
@@ -91,11 +92,29 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess }:
       const response = await api.templates.getAll();
       setTemplates(response.templates || []);
       
-      // Auto-select first template if available
+      // Determine suggested template type based on notification count
+      const notificationCount = mailItem.notification_count || 0;
+      let suggestedTemplateType: string;
+      
+      if (notificationCount === 0) {
+        suggestedTemplateType = "Initial";
+      } else if (notificationCount === 1) {
+        suggestedTemplateType = "Reminder";
+      } else {
+        suggestedTemplateType = "Final Notice";
+      }
+      
+      // Auto-select template matching the suggested type, or first template
       if (response.templates && response.templates.length > 0) {
-        const firstTemplate = response.templates[0];
-        setSelectedTemplateId(firstTemplate.template_id);
-        previewTemplate(firstTemplate);
+        // Try to find template matching suggested type
+        const suggestedTemplate = response.templates.find(
+          t => t.template_type?.toLowerCase() === suggestedTemplateType.toLowerCase() ||
+               t.template_name?.toLowerCase().includes(suggestedTemplateType.toLowerCase())
+        );
+        
+        const templateToUse = suggestedTemplate || response.templates[0];
+        setSelectedTemplateId(templateToUse.template_id);
+        previewTemplate(templateToUse);
       }
     } catch (error) {
       console.error('Error loading templates:', error);
@@ -250,6 +269,31 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess }:
             <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
+
+        {/* Notification History Banner */}
+        {mailItem.notification_count && mailItem.notification_count > 0 && (
+          <div className="px-6 py-3 bg-yellow-50 border-b border-yellow-100 flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-yellow-100 flex items-center justify-center">
+                <span className="text-sm font-bold text-yellow-700">
+                  {mailItem.notification_count}
+                </span>
+              </div>
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-yellow-900">
+                Customer has been notified {mailItem.notification_count} {mailItem.notification_count === 1 ? 'time' : 'times'} previously
+              </p>
+              <p className="text-xs text-yellow-700 mt-0.5">
+                {mailItem.notification_count === 1 
+                  ? "Consider sending a reminder" 
+                  : mailItem.notification_count === 2
+                  ? "This is the final notice"
+                  : "Multiple notifications sent"}
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">

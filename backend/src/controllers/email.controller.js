@@ -1,5 +1,5 @@
 const { sendTemplateEmail, sendEmail } = require('../services/email.service');
-const { supabase } = require('../services/supabase.service');
+const { getSupabaseClient } = require('../services/supabase.service');
 
 /**
  * Send email notification using a template and log it
@@ -8,6 +8,9 @@ const { supabase } = require('../services/supabase.service');
  */
 async function sendNotificationEmail(req, res, next) {
   try {
+    // Get user-scoped Supabase client (for RLS)
+    const supabase = getSupabaseClient(req.user.token);
+    
     const {
       contact_id,
       mail_item_id,
@@ -112,6 +115,53 @@ async function sendNotificationEmail(req, res, next) {
       // Don't fail the request if logging fails
     }
 
+    // 7. Update mail item status to "Notified" if mail_item_id provided
+    if (mail_item_id) {
+      const { error: updateError } = await supabase
+        .from('mail_items')
+        .update({ 
+          status: 'Notified',
+          last_notified: new Date().toISOString()
+        })
+        .eq('mail_item_id', mail_item_id);
+
+      if (updateError) {
+        console.error('Failed to update mail item status:', updateError);
+      }
+
+      // 8. Add to notification_history for tracking notification count
+      const { error: historyError } = await supabase
+        .from('notification_history')
+        .insert({
+          mail_item_id: mail_item_id,
+          contact_id: contact_id,
+          notified_by: req.user.email || 'System',
+          notification_method: 'Email',
+          notified_at: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error('Failed to log notification history:', historyError);
+        // Don't fail the request if logging fails
+      }
+
+      // 9. Add to action_history for action timeline display
+      const { error: actionError } = await supabase
+        .from('action_history')
+        .insert({
+          mail_item_id: mail_item_id,
+          action_type: 'notified',
+          action_description: `Email notification sent via ${template.template_name || template.template_type}`,
+          performed_by: req.user.email || 'System',
+          notes: `Template: ${template.template_name || template.template_type}`
+        });
+
+      if (actionError) {
+        console.error('Failed to log action history:', actionError);
+        // Don't fail the request if logging fails
+      }
+    }
+
     res.json({
       success: true,
       messageId: result.messageId,
@@ -121,6 +171,32 @@ async function sendNotificationEmail(req, res, next) {
 
   } catch (error) {
     console.error('Send notification email error:', error);
+    
+    // Check for OAuth2 authentication errors
+    if (error.message && (
+      error.message.includes('Invalid login') || 
+      error.message.includes('No OAuth2 tokens found') ||
+      error.message.includes('OAuth2 token') ||
+      error.message.includes('invalid_grant')
+    )) {
+      return res.status(401).json({
+        error: 'Gmail disconnected',
+        message: 'Your Gmail account is disconnected. Please reconnect in Settings to send emails.',
+        code: 'GMAIL_DISCONNECTED',
+        action: 'reconnect_gmail'
+      });
+    }
+    
+    // Check for email service not configured
+    if (error.message && error.message.includes('Email service not configured')) {
+      return res.status(503).json({
+        error: 'Email service not configured',
+        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+        code: 'EMAIL_NOT_CONFIGURED',
+        action: 'connect_gmail'
+      });
+    }
+    
     next(error);
   }
 }
@@ -132,6 +208,9 @@ async function sendNotificationEmail(req, res, next) {
  */
 async function sendCustomEmail(req, res, next) {
   try {
+    // Get user-scoped Supabase client (for RLS)
+    const supabase = getSupabaseClient(req.user.token);
+    
     const { to, subject, body, contact_id, mail_item_id } = req.body;
 
     // Validation
@@ -189,6 +268,53 @@ async function sendCustomEmail(req, res, next) {
       }
     }
 
+    // Update mail item status to "Notified" if mail_item_id provided
+    if (mail_item_id) {
+      const { error: updateError } = await supabase
+        .from('mail_items')
+        .update({ 
+          status: 'Notified',
+          last_notified: new Date().toISOString()
+        })
+        .eq('mail_item_id', mail_item_id);
+
+      if (updateError) {
+        console.error('Failed to update mail item status:', updateError);
+      }
+
+      // Add to notification_history for tracking notification count
+      const { error: historyError } = await supabase
+        .from('notification_history')
+        .insert({
+          mail_item_id: mail_item_id,
+          contact_id: contact_id,
+          notified_by: req.user.email || 'System',
+          notification_method: 'Email',
+          notified_at: new Date().toISOString()
+        });
+
+      if (historyError) {
+        console.error('Failed to log notification history:', historyError);
+        // Don't fail the request if logging fails
+      }
+
+      // Add to action_history for action timeline display
+      const { error: actionError } = await supabase
+        .from('action_history')
+        .insert({
+          mail_item_id: mail_item_id,
+          action_type: 'notified',
+          action_description: `Custom email sent: ${subject}`,
+          performed_by: req.user.email || 'System',
+          notes: `Subject: ${subject}`
+        });
+
+      if (actionError) {
+        console.error('Failed to log action history:', actionError);
+        // Don't fail the request if logging fails
+      }
+    }
+
     res.json({
       success: true,
       messageId: result.messageId,
@@ -197,6 +323,32 @@ async function sendCustomEmail(req, res, next) {
 
   } catch (error) {
     console.error('Send custom email error:', error);
+    
+    // Check for OAuth2 authentication errors
+    if (error.message && (
+      error.message.includes('Invalid login') || 
+      error.message.includes('No OAuth2 tokens found') ||
+      error.message.includes('OAuth2 token') ||
+      error.message.includes('invalid_grant')
+    )) {
+      return res.status(401).json({
+        error: 'Gmail disconnected',
+        message: 'Your Gmail account is disconnected. Please reconnect in Settings to send emails.',
+        code: 'GMAIL_DISCONNECTED',
+        action: 'reconnect_gmail'
+      });
+    }
+    
+    // Check for email service not configured
+    if (error.message && error.message.includes('Email service not configured')) {
+      return res.status(503).json({
+        error: 'Email service not configured',
+        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+        code: 'EMAIL_NOT_CONFIGURED',
+        action: 'connect_gmail'
+      });
+    }
+    
     next(error);
   }
 }
@@ -232,6 +384,32 @@ async function testEmailConfig(req, res, next) {
 
   } catch (error) {
     console.error('Test email error:', error);
+    
+    // Check for OAuth2 authentication errors
+    if (error.message && (
+      error.message.includes('Invalid login') || 
+      error.message.includes('No OAuth2 tokens found') ||
+      error.message.includes('OAuth2 token') ||
+      error.message.includes('invalid_grant')
+    )) {
+      return res.status(401).json({
+        error: 'Gmail disconnected',
+        message: 'Your Gmail account is disconnected. Please reconnect in Settings to send emails.',
+        code: 'GMAIL_DISCONNECTED',
+        action: 'reconnect_gmail'
+      });
+    }
+    
+    // Check for email service not configured
+    if (error.message && error.message.includes('Email service not configured')) {
+      return res.status(503).json({
+        error: 'Email service not configured',
+        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+        code: 'EMAIL_NOT_CONFIGURED',
+        action: 'connect_gmail'
+      });
+    }
+    
     next(error);
   }
 }

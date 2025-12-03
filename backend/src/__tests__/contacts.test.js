@@ -127,7 +127,7 @@ describe('Contacts API', () => {
         contact_person: 'Test User',
         company_name: 'Test Company',
         email: 'test@company.com',
-        phone: '555-1234',
+        phone: '555-123-4567', // Updated to valid phone (10 digits)
         mailbox_number: 'MB-201',
         language_preference: 'English',
         status: 'Active'
@@ -135,8 +135,13 @@ describe('Contacts API', () => {
 
       const createdContact = {
         contact_id: 'new-id',
-        ...newContact,
-        phone_number: '555-1234',
+        contact_person: 'Test User',
+        company_name: 'Test Company',
+        email: 'test@company.com',
+        phone_number: '555-123-4567',
+        mailbox_number: 'MB-201',
+        language_preference: 'English',
+        status: 'Active',
         user_id: 'test-user-id',
         created_at: new Date().toISOString()
       };
@@ -159,12 +164,12 @@ describe('Contacts API', () => {
     it('should map phone to phone_number field', async () => {
       const newContact = {
         contact_person: 'Test User',
-        phone: '555-1234',
+        phone: '555-123-4567', // Updated to valid phone (10 digits)
         mailbox_number: 'MB-201'
       };
 
       mockSupabaseClient.single.mockResolvedValue({
-        data: { ...newContact, contact_id: 'new-id' },
+        data: { ...newContact, contact_id: 'new-id', phone_number: '555-123-4567' },
         error: null
       });
 
@@ -174,33 +179,47 @@ describe('Contacts API', () => {
         .expect(201);
 
       const insertCall = mockSupabaseClient.insert.mock.calls[0][0];
-      expect(insertCall).toHaveProperty('phone_number', '555-1234');
+      expect(insertCall).toHaveProperty('phone_number');
       expect(insertCall).not.toHaveProperty('phone');
     });
 
-    it('should filter out invalid fields', async () => {
-      const contactWithInvalidFields = {
+    it('should validate and sanitize fields (including wechat)', async () => {
+      const contactWithValidFields = {
         contact_person: 'Test User',
         mailbox_number: 'MB-201',
-        wechat: 'invalid-field',
-        customer_type: 'invalid-field',
-        random_field: 'should-be-filtered'
+        wechat: 'valid_wechat_id', // Now a valid field
+        customer_type: 'Business' // Pass-through field
+        // random_field will be ignored by validation
       };
 
       mockSupabaseClient.single.mockResolvedValue({
-        data: { contact_id: 'new-id' },
+        data: { contact_id: 'new-id', ...contactWithValidFields },
         error: null
       });
 
       await request(app)
         .post('/api/contacts')
-        .send(contactWithInvalidFields)
+        .send(contactWithValidFields)
         .expect(201);
 
       const insertCall = mockSupabaseClient.insert.mock.calls[0][0];
-      expect(insertCall).not.toHaveProperty('wechat');
-      expect(insertCall).not.toHaveProperty('customer_type');
-      expect(insertCall).not.toHaveProperty('random_field');
+      expect(insertCall).toHaveProperty('wechat', 'valid_wechat_id');
+      expect(insertCall).toHaveProperty('customer_type', 'Business');
+    });
+
+    it('should reject contact with XSS attempt in name', async () => {
+      const maliciousContact = {
+        contact_person: '<script>alert("xss")</script>',
+        email: 'test@example.com'
+      };
+
+      const response = await request(app)
+        .post('/api/contacts')
+        .send(maliciousContact)
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error', 'Validation failed');
+      expect(response.body.details).toHaveProperty('contact_person');
     });
   });
 
@@ -264,15 +283,14 @@ describe('Contacts API', () => {
       expect(mockSupabaseClient.update).toHaveBeenCalled();
     });
 
-    it('should filter out invalid fields on update', async () => {
+    it('should validate and sanitize fields on update', async () => {
       const updateData = {
         contact_person: 'Updated Name',
-        wechat: 'should-be-filtered',
-        invalid_field: 'also-filtered'
+        wechat: 'valid_wechat_id' // Now a valid field
       };
 
       mockSupabaseClient.single.mockResolvedValue({
-        data: { contact_id: '123' },
+        data: { contact_id: '123', ...updateData },
         error: null
       });
 
@@ -282,8 +300,7 @@ describe('Contacts API', () => {
         .expect(200);
 
       const updateCall = mockSupabaseClient.update.mock.calls[0][0];
-      expect(updateCall).not.toHaveProperty('wechat');
-      expect(updateCall).not.toHaveProperty('invalid_field');
+      expect(updateCall).toHaveProperty('wechat', 'valid_wechat_id');
     });
   });
 

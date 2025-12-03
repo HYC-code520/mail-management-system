@@ -27,23 +27,48 @@ if (process.env.SMTP_USER && process.env.SMTP_PASS) {
 }
 
 /**
- * Create OAuth2 transporter for a specific user
- * @param {string} userId - User ID
- * @returns {Promise<Object>} - Nodemailer transporter
+ * Send email using Gmail API directly (bypasses SMTP blocks)
+ * @param {Object} params
+ * @param {string} params.to - Recipient email
+ * @param {string} params.subject - Email subject
+ * @param {string} params.htmlContent - HTML email body
+ * @param {string} params.textContent - Plain text fallback
+ * @param {string} params.userId - User ID
+ * @returns {Promise<Object>} - Send result
  */
-async function createOAuth2Transporter(userId) {
+async function sendEmailWithGmailApi({ to, subject, htmlContent, textContent, userId }) {
   const oauth2Client = await getValidOAuthClient(userId);
-  const gmailAddress = await getUserGmailAddress(userId);
-  const accessToken = oauth2Client.credentials.access_token;
+  const gmail = google.gmail({ version: 'v1', auth: oauth2Client });
+  const fromAddress = await getUserGmailAddress(userId);
 
-  return nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-      type: 'OAuth2',
-      user: gmailAddress,
-      accessToken: accessToken
-    }
+  // Create email content
+  const emailContent = [
+    `From: "${process.env.SMTP_FROM_NAME || 'MeiWay Mail Service'}" <${fromAddress}>`,
+    `To: ${to}`,
+    `Subject: ${subject}`,
+    `Content-Type: text/html; charset=utf-8`,
+    `MIME-Version: 1.0`,
+    ``,
+    htmlContent,
+  ].join('\n');
+
+  // Encode email to base64url format
+  const encodedEmail = Buffer.from(emailContent)
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+
+  // Send via Gmail API
+  const res = await gmail.users.messages.send({
+    userId: 'me',
+    requestBody: {
+      raw: encodedEmail,
+    },
   });
+
+  console.log('✅ Email sent via Gmail API:', res.data.id, 'to:', to);
+  return { success: true, messageId: res.data.id };
 }
 
 /**
@@ -57,33 +82,32 @@ async function createOAuth2Transporter(userId) {
  * @returns {Promise<Object>} - Send result
  */
 async function sendEmail({ to, subject, htmlContent, textContent, userId }) {
-  let transporter;
-  let fromAddress;
-
   try {
-    // Try OAuth2 first if userId is provided
+    // Try Gmail API first if userId is provided
     if (userId) {
       try {
-        transporter = await createOAuth2Transporter(userId);
-        fromAddress = await getUserGmailAddress(userId);
-        console.log('📧 Using OAuth2 to send email');
-      } catch (oauthError) {
-        console.warn('⚠️  OAuth2 not available, falling back to SMTP:', oauthError.message);
-        transporter = null;
+        console.log('📧 Attempting to send via Gmail API with OAuth2...');
+        return await sendEmailWithGmailApi({ to, subject, htmlContent, textContent, userId });
+      } catch (apiError) {
+        console.warn('⚠️  Gmail API sending failed, falling back to SMTP:', apiError.message);
+        // If OAuth error, re-throw so frontend knows to reconnect
+        if (apiError.message.includes('No OAuth tokens found') || 
+            apiError.message.includes('invalid_grant') ||
+            apiError.message.includes('invalid_client')) {
+          throw new Error('Gmail connection expired. Please reconnect Gmail in Settings.');
+        }
       }
     }
 
-    // Fall back to SMTP if OAuth2 not available
-    if (!transporter) {
-      if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-        throw new Error('Email service not configured. Please set SMTP credentials or connect Gmail via OAuth2.');
-      }
-      transporter = smtpTransporter;
-      fromAddress = process.env.SMTP_USER;
-      console.log('📧 Using SMTP to send email');
+    // Fall back to SMTP if Gmail API not available
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      throw new Error('Email service not configured. Please connect Gmail via OAuth2 or set SMTP credentials.');
     }
 
-    const info = await transporter.sendMail({
+    console.log('📧 Using SMTP fallback to send email');
+    const fromAddress = process.env.SMTP_USER;
+
+    const info = await smtpTransporter.sendMail({
       from: `"${process.env.SMTP_FROM_NAME || 'MeiWay Mail Service'}" <${fromAddress}>`,
       to: to,
       subject: subject,
@@ -91,7 +115,7 @@ async function sendEmail({ to, subject, htmlContent, textContent, userId }) {
       html: htmlContent
     });
 
-    console.log('✅ Email sent:', info.messageId, 'to:', to);
+    console.log('✅ Email sent via SMTP:', info.messageId, 'to:', to);
     return {
       success: true,
       messageId: info.messageId

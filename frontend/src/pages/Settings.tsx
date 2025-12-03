@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, RefreshCw, Info } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '../lib/api-client';
 
@@ -67,34 +67,67 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <RefreshCw className="w-8 h-8 text-brand animate-spin" />
+      <div className="max-w-7xl mx-auto px-6 py-8">
+        <div className="animate-pulse space-y-8">
+          <div className="h-8 bg-gray-200 rounded w-48"></div>
+          <div className="h-64 bg-gray-100 rounded-lg"></div>
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* Header */}
+    <div className="max-w-7xl mx-auto px-6 py-8">
+      {/* Header - Matches Dashboard Style */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-2">Manage your account settings and integrations</p>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Settings</h1>
+        <p className="text-gray-600">Manage your account settings and integrations</p>
       </div>
 
-      {/* Gmail Integration Section */}
-      <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-        <div className="p-6 border-b border-gray-200">
+      {/* Gmail Integration Section - Matches Dashboard Card Style */}
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+        {/* Card Header */}
+        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-blue-50 to-indigo-50">
           <div className="flex items-center gap-3">
-            <Mail className="w-6 h-6 text-brand" />
+            <div className="p-2 bg-blue-100 rounded-lg">
+              <Mail className="w-5 h-5 text-blue-600" />
+            </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">Gmail Integration</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Connect your Gmail account to send email notifications directly from the app
+              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                Gmail Integration
+                
+                {/* Info Icon with Tooltip */}
+                <div className="relative group inline-block">
+                  <Info className="w-5 h-5 text-gray-400 hover:text-gray-600 cursor-help transition-colors" />
+                  
+                  {/* Tooltip */}
+                  <div className="absolute left-0 top-full mt-2 px-4 py-3 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 w-80 z-50 pointer-events-none">
+                    <div className="space-y-2.5">
+                      <div>
+                        <p className="font-semibold text-gray-900 mb-1">🔒 Secure OAuth2 Connection</p>
+                        <p>We use Google's secure OAuth2 protocol. Your Gmail password is never shared with our app.</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 mb-1">✓ Permissions</p>
+                        <p>We only request permission to send emails on your behalf. We cannot read your existing emails.</p>
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900 mb-1">→ Disconnect Anytime</p>
+                        <p>You can disconnect your Gmail account at any time from this page.</p>
+                      </div>
+                    </div>
+                    <div className="absolute bottom-full left-6 border-4 border-transparent border-b-gray-200"></div>
+                  </div>
+                </div>
+              </h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Connect your Gmail account to send email notifications
               </p>
             </div>
           </div>
         </div>
 
+        {/* Card Content */}
         <div className="p-6">
           {/* Connection Status */}
           <div className="flex items-start gap-4">
@@ -116,15 +149,15 @@ export default function SettingsPage() {
                     Your Gmail account is connected and ready to send emails.
                   </p>
                   {gmailStatus.gmailAddress && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
-                      <p className="text-sm font-medium text-green-900">Connected Account:</p>
-                      <p className="text-green-700 font-mono mt-1">{gmailStatus.gmailAddress}</p>
+                    <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+                      <p className="text-sm font-semibold text-green-900 mb-1">Connected Account</p>
+                      <p className="text-green-700 font-mono text-sm">{gmailStatus.gmailAddress}</p>
                     </div>
                   )}
                   <button
                     onClick={handleDisconnectGmail}
                     disabled={connecting}
-                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg border border-gray-300 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
                   >
                     {connecting ? 'Disconnecting...' : 'Disconnect Gmail'}
                   </button>
@@ -137,41 +170,37 @@ export default function SettingsPage() {
                   <p className="text-gray-600 mb-4">
                     Connect your Gmail account to enable email notifications. This is a secure OAuth2 connection - we never store your password.
                   </p>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-medium text-blue-900 mb-2">What you'll be able to do:</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• Send email notifications to customers directly from the app</li>
-                      <li>• Use pre-built templates with automatic customer info</li>
-                      <li>• Track which emails have been sent</li>
-                      <li>• No more copy-pasting into Gmail manually</li>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-5 mb-6">
+                    <h4 className="font-semibold text-blue-900 mb-3 text-sm">What you'll be able to do:</h4>
+                    <ul className="text-sm text-blue-800 space-y-2">
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 mt-0.5">•</span>
+                        <span>Send email notifications to customers directly from the app</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 mt-0.5">•</span>
+                        <span>Use pre-built templates with automatic customer info</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 mt-0.5">•</span>
+                        <span>Track which emails have been sent</span>
+                      </li>
+                      <li className="flex items-start gap-2">
+                        <span className="text-blue-600 mt-0.5">•</span>
+                        <span>No more copy-pasting into Gmail manually</span>
+                      </li>
                     </ul>
                   </div>
                   <button
                     onClick={handleConnectGmail}
                     disabled={connecting}
-                    className="px-6 py-3 bg-brand hover:bg-brand-dark text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
                   >
                     <Mail className="w-5 h-5" />
                     {connecting ? 'Connecting...' : 'Connect Gmail Account'}
                   </button>
                 </>
               )}
-            </div>
-          </div>
-
-          {/* Info Section */}
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h4 className="font-medium text-gray-900 mb-3">About Gmail Integration</h4>
-            <div className="text-sm text-gray-600 space-y-2">
-              <p>
-                <strong>Secure OAuth2 Connection:</strong> We use Google's secure OAuth2 protocol. Your Gmail password is never shared with our app.
-              </p>
-              <p>
-                <strong>Permissions:</strong> We only request permission to send emails on your behalf. We cannot read your existing emails.
-              </p>
-              <p>
-                <strong>Disconnect Anytime:</strong> You can disconnect your Gmail account at any time from this page.
-              </p>
             </div>
           </div>
         </div>

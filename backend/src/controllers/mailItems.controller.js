@@ -34,7 +34,22 @@ exports.getMailItems = async (req, res, next) => {
       return res.status(500).json({ error: 'Failed to fetch mail items' });
     }
 
-    res.json(data);
+    // Enrich mail items with notification count
+    const enrichedData = await Promise.all(
+      data.map(async (item) => {
+        const { count } = await supabase
+          .from('notification_history')
+          .select('*', { count: 'exact', head: true })
+          .eq('mail_item_id', item.mail_item_id);
+        
+        return {
+          ...item,
+          notification_count: count || 0
+        };
+      })
+    );
+
+    res.json(enrichedData);
   } catch (error) {
     next(error);
   }
