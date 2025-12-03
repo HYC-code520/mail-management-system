@@ -99,7 +99,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess, s
 
       if (response.templates && response.templates.length > 0) {
         let templateToSelect = response.templates[0];
-        const found = response.templates.find(t => t.template_type === suggestedTemplateType);
+        const found = response.templates.find((t: Template) => t.template_type === suggestedTemplateType);
         if (found) {
           templateToSelect = found;
         }
@@ -152,7 +152,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess, s
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId);
-    const template = templates.find(t => t.template_id === templateId);
+    const template = templates.find((t: Template) => t.template_id === templateId);
     if (template) {
       previewTemplate(template);
     }
