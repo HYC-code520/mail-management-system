@@ -279,11 +279,12 @@ export default function ContactsPage() {
       case 'mailbox':
         comparison = (a.mailbox_number || '').localeCompare(b.mailbox_number || '');
         break;
-      case 'name':
+      case 'name': {
         const nameA = a.contact_person || a.company_name || '';
         const nameB = b.contact_person || b.company_name || '';
         comparison = nameA.localeCompare(nameB);
         break;
+      }
       case 'status':
         comparison = (a.status || '').localeCompare(b.status || '');
         break;

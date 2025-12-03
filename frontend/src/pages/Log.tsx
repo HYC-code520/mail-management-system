@@ -654,19 +654,21 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       case 'status':
         comparison = a.status.localeCompare(b.status);
         break;
-      case 'customer':
+      case 'customer': {
         const nameA = a.contacts?.contact_person || a.contacts?.company_name || '';
         const nameB = b.contacts?.contact_person || b.contacts?.company_name || '';
         comparison = nameA.localeCompare(nameB);
         break;
+      }
       case 'type':
         comparison = a.item_type.localeCompare(b.item_type);
         break;
-      case 'quantity':
+      case 'quantity': {
         const qtyA = a.quantity || 1;
         const qtyB = b.quantity || 1;
         comparison = qtyA - qtyB;
         break;
+      }
     }
     
     return sortDirection === 'asc' ? comparison : -comparison;

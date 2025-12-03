@@ -29,7 +29,7 @@ export function validateContactPerson(name: string): { isValid: boolean; error?:
     return { isValid: false, error: 'Name contains invalid characters (HTML tags not allowed)' };
   }
   
-  if (!/^[a-zA-Z\s\-'.]+$/.test(name)) {
+  if (!/^[a-zA-Z\s'.'-]+$/.test(name)) {
     return { isValid: false, error: 'Name can only contain letters, spaces, hyphens, apostrophes, and periods' };
   }
   
@@ -58,7 +58,7 @@ export function validateCompanyName(name: string): { isValid: boolean; error?: s
   }
   
   // Allow letters, numbers, spaces, &, -, ., ', ,, ()
-  if (!/^[a-zA-Z0-9\s&\-'.,()]+$/.test(name)) {
+  if (!/^[a-zA-Z0-9\s&'.,()-]+$/.test(name)) {
     return { isValid: false, error: 'Company name contains invalid characters' };
   }
   
@@ -118,7 +118,7 @@ export function validateUnitNumber(unitNumber: string): { isValid: boolean; erro
     return { isValid: false, error: 'Cannot contain spaces' };
   }
   
-  if (!/^[a-zA-Z0-9\-]+$/.test(unitNumber)) {
+  if (!/^[a-zA-Z0-9-]+$/.test(unitNumber)) {
     return { isValid: false, error: 'Can only contain letters, numbers, and hyphens' };
   }
   

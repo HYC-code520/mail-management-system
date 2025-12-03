@@ -163,19 +163,21 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
       case 'type':
         comparison = a.item_type.localeCompare(b.item_type);
         break;
-      case 'customer':
+      case 'customer': {
         const nameA = a.contacts?.contact_person || a.contacts?.company_name || '';
         const nameB = b.contacts?.contact_person || b.contacts?.company_name || '';
         comparison = nameA.localeCompare(nameB);
         break;
+      }
       case 'status':
         comparison = a.status.localeCompare(b.status);
         break;
-      case 'quantity':
+      case 'quantity': {
         const qtyA = (a as any).quantity || 1;
         const qtyB = (b as any).quantity || 1;
         comparison = qtyA - qtyB;
         break;
+      }
     }
     
     return sortDirection === 'asc' ? comparison : -comparison;
