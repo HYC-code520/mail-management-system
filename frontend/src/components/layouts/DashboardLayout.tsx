@@ -13,11 +13,6 @@ export default function DashboardLayout() {
   const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
   const [gmailAddress, setGmailAddress] = useState<string | null>(null);
 
-  // Check Gmail connection status on mount and when location changes
-  useEffect(() => {
-    checkGmailStatus();
-  }, [location.pathname]); // Re-check when navigating between pages
-
   const checkGmailStatus = async () => {
     try {
       const response = await api.oauth.getGmailStatus();
@@ -28,6 +23,11 @@ export default function DashboardLayout() {
       setGmailConnected(false);
     }
   };
+
+  // Check Gmail connection status on mount and when location changes
+  useEffect(() => {
+    checkGmailStatus();
+  }, [location.pathname]); // Re-check when navigating between pages
 
   const handleSignOut = async () => {
     try {
