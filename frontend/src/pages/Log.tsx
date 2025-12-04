@@ -402,9 +402,21 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         // Only consider it a "real" status change if normalized values differ
         const statusActuallyChanged = normalizedOldStatus !== normalizedNewStatus;
         
+        // Check if quantity changed
+        const oldQuantity = editingMailItem.quantity || 1;
+        const newQuantity = formData.quantity;
+        const quantityChanged = oldQuantity !== newQuantity;
+        
         // If status changed, require staff name
         if (statusActuallyChanged && !formData.performed_by.trim()) {
           toast.error('Please select who made this status change');
+          setSaving(false);
+          return;
+        }
+        
+        // If quantity changed, require staff name
+        if (quantityChanged && !formData.performed_by.trim()) {
+          toast.error('Please select who made this quantity change');
           setSaving(false);
           return;
         }
@@ -419,7 +431,20 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         
         await api.mailItems.update(editingMailItem.mail_item_id, updateData);
         
-        // Only log to action history if status ACTUALLY changed (not just name migration)
+        // Log quantity change to action history
+        if (quantityChanged) {
+          await api.actionHistory.create({
+            mail_item_id: editingMailItem.mail_item_id,
+            action_type: 'updated',
+            action_description: `Quantity changed from ${oldQuantity} to ${newQuantity}`,
+            previous_value: oldQuantity.toString(),
+            new_value: newQuantity.toString(),
+            performed_by: formData.performed_by,
+            notes: formData.edit_notes.trim() || null
+          });
+        }
+        
+        // Log status change to action history if status ACTUALLY changed (not just name migration)
         if (statusActuallyChanged) {
           const statusDescriptions: { [key: string]: string } = {
             'Received': 'Status changed to Received',
@@ -1696,13 +1721,20 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
             </select>
           </div>
 
-          {/* Show staff and notes fields if status changed */}
-          {editingMailItem && formData.status !== editingMailItem.status && (
+          {/* Show staff and notes fields if status or quantity changed */}
+          {editingMailItem && (formData.status !== editingMailItem.status || formData.quantity !== (editingMailItem.quantity || 1)) && (
             <>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800 font-medium mb-3">
-                  Status is being changed from "{editingMailItem.status}" to "{formData.status}"
-                </p>
+                {formData.status !== editingMailItem.status && (
+                  <p className="text-sm text-blue-800 font-medium mb-3">
+                    Status is being changed from "{editingMailItem.status}" to "{formData.status}"
+                  </p>
+                )}
+                {formData.quantity !== (editingMailItem.quantity || 1) && (
+                  <p className="text-sm text-blue-800 font-medium mb-3">
+                    Quantity is being changed from {editingMailItem.quantity || 1} to {formData.quantity}
+                  </p>
+                )}
                 
                 {/* Who performed this action */}
                 <div className="mb-3">
@@ -1731,7 +1763,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     name="edit_notes"
                     value={formData.edit_notes}
                     onChange={handleChange}
-                    placeholder="Add any notes about this status change..."
+                    placeholder="Add any notes about this change..."
                     rows={2}
                     className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
