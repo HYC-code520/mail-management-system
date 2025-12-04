@@ -229,12 +229,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       // Must be same date
       if (itemDate !== todayStr) return false;
       
-      // Ignore completed mail
-      const isNotCompleted = item.status !== 'Picked Up' && 
-                             item.status !== 'Forward' &&
-                             item.status !== 'Scanned';
+      // CRITICAL: Only allow adding to mail that hasn't been notified yet
+      // Once mail is notified, customer expects that quantity - new mail needs new notification
+      const canAddTo = item.status === 'Received';
       
-      return isNotCompleted;
+      console.log('Can add to existing?', canAddTo, '(status:', item.status, ')');
+      
+      return canAddTo;
     });
 
     console.log('Found existing mail:', existingMail ? 'YES' : 'NO');
@@ -294,14 +295,17 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       } else {
         console.log('Creating new mail item...');
         
-        // Create new mail item
+        // Create new mail item with current timestamp
+        const now = new Date();
+        const timestamp = now.toISOString(); // Use actual current time
+        
         await api.mailItems.create({
           contact_id: selectedContact!.contact_id,
           item_type: itemType,
           description: note,
           status: 'Received',
           quantity: quantity,
-          received_date: `${date}T12:00:00-05:00` // Use noon NY time to avoid timezone conversion issues
+          received_date: timestamp
         });
 
         console.log('Successfully created new mail!');
@@ -1213,7 +1217,20 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                       </button>
                     </td>
                     <td className="py-3 px-4 text-gray-900">
-                      {new Date(item.received_date).toISOString().split('T')[0]}
+                      <span 
+                        title={`Logged at: ${new Date(item.received_date).toLocaleString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          second: '2-digit',
+                          hour12: true
+                        })}`}
+                        className="cursor-help border-b border-dotted border-gray-400"
+                      >
+                        {new Date(item.received_date).toISOString().split('T')[0]}
+                      </span>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2 text-gray-700">

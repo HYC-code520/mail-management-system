@@ -23,6 +23,128 @@
 
 ## Error Log
 
+**Timestamp:** `2025-12-04 11:30:00 - 11:45:00`  
+**Category:** `INTEGRATION + UX`  
+**Status:** `SOLVED`  
+**Error Message:** New mail not appearing in "Needs Follow-Up" section after adding to existing notified mail  
+**Context:** User logs Mail #1, notifies customer (status → "Notified"), then logs Mail #2. System prompts to add to existing log. After adding, quantity increases but mail disappears from "Needs Follow-Up" because status stays "Notified".
+
+**Root Cause Analysis:**  
+**Business Logic Flaw**: Duplicate detection was checking if mail was "not completed" (any status except Picked Up, Forward, Scanned) and allowing quantity addition. This caused issues when:
+1. Mail #1 → Status: "Received" (OK to consolidate - customer not notified yet)
+2. Mail #1 → Status: "Notified" (customer told about X items)
+3. Mail #2 arrives → Added to Mail #1 → Status stays "Notified"
+4. ❌ **Problem**: Customer was notified about 2 items but now there are 3+ items - no new notification triggered!
+
+**Solution Implemented:**  
+Updated duplicate detection logic to **ONLY allow adding to mail with "Received" status**:
+
+```javascript
+// ❌ OLD LOGIC - Too permissive
+const isNotCompleted = item.status !== 'Picked Up' && 
+                       item.status !== 'Forward' &&
+                       item.status !== 'Scanned';
+
+// ✅ NEW LOGIC - Only allow adding to unreported mail
+const canAddTo = item.status === 'Received';
+```
+
+**Business Rules Now:**
+- **Status: "Received"** → ✅ Allow adding quantity (customer not notified yet, can consolidate)
+- **Status: "Notified"** → ❌ Create new row (customer expects X items, new mail needs new notification)
+- **Status: "Picked Up"** → ❌ Create new row (already resolved)
+- **Status: "Forward"** → ❌ Create new row (already processed)
+
+**Files Modified:**
+1. `frontend/src/pages/Log.tsx` - Updated duplicate detection (line 212-236)
+2. `frontend/src/pages/__tests__/Log.addToExisting.test.tsx` - Updated all tests to use `canAddTo = item.status === 'Received'`
+
+**Prevention Strategy:**
+1. **Status-Based Logic**: Always check mail status before allowing quantity changes
+2. **Customer Expectations**: Once notified, quantity is "locked" - new mail = new notification
+3. **Test Coverage**: Added test for "Notified" status in duplicate detection tests
+4. **Documentation**: Document the "Received-only" rule in code comments
+
+**Tests Added:**
+- ✅ Test: Should ignore notified mail when checking for duplicates
+- ✅ Test: Should only detect duplicate for "Received" status
+- ✅ Updated all 8 existing duplicate detection tests
+
+**User Impact:**
+- ✅ New mail after notification now appears in "Needs Follow-Up"
+- ✅ Staff will be prompted to notify customer about new mail
+- ✅ Customer receives accurate information about mail quantity
+
+---
+
+**Timestamp:** `2025-12-04 11:00:00 - 11:30:00`  
+**Category:** `DEPLOYMENT + BUILD + INTEGRATION`  
+**Status:** `SOLVED`  
+**Error Message:** `Error sending email: Error: Contact not found` and email template variables not replaced (showing `{Name}`, `{BoxNumber}`, `{Type}`, `{Date}` instead of actual values)  
+**Context:** User attempting to send emails from localhost after implementing Edit Contact feature and direct email functionality. Backend was querying non-existent database columns and using incorrect template variable format.  
+
+**Root Cause Analysis:**  
+1. **Database Column Mismatch**: Backend `email.controller.js` was querying `name` field which doesn't exist in contacts table. Actual columns are `contact_person` and `company_name`
+2. **Column Name Inconsistency**: Backend was querying `preferred_language` but actual column is `language_preference`
+3. **Variable Name Mismatch**: Backend was sending variables as `CUSTOMER_NAME`, `MAILBOX_NUMBER`, `MAIL_TYPE`, `RECEIVED_DATE` but templates use `{Name}`, `{BoxNumber}`, `{Type}`, `{Date}`
+4. **Template Format Mismatch**: Backend `email.service.js` was only looking for `{{VARIABLE}}` (double curly braces) but templates in database use `{VARIABLE}` (single curly braces)
+5. **Edit Contact Feature Missing**: Edit Contact button and modal were accidentally removed from `ContactDetail.tsx` during previous refactoring, making it impossible to update contact emails
+
+**Solution Implemented:**  
+1. **Fixed Database Queries** (`backend/src/controllers/email.controller.js`):
+   - Changed `.select('email, name, mailbox_number, preferred_language')` to `.select('email, contact_person, company_name, mailbox_number, language_preference')`
+   - Updated variable mapping: `contact.name` → `contact.contact_person || contact.company_name`
+
+2. **Fixed Variable Names** (`backend/src/controllers/email.controller.js`):
+   ```javascript
+   const variables = {
+     Name: contact.contact_person || contact.company_name || 'Customer',  // was CUSTOMER_NAME
+     BoxNumber: contact.mailbox_number || '',                             // was MAILBOX_NUMBER
+     Type: mailItem.item_type || '',                                       // was MAIL_TYPE
+     Date: new Date(mailItem.received_date).toLocaleDateString(...)       // was RECEIVED_DATE
+   };
+   ```
+
+3. **Fixed Template Replacement** (`backend/src/services/email.service.js`):
+   - Updated `sendTemplateEmail()` to support BOTH `{{VARIABLE}}` and `{VARIABLE}` formats
+   - Added regex for single curly braces: `new RegExp(\`{${key}}\`, 'g')`
+
+4. **Restored Edit Contact Feature** (`frontend/src/pages/ContactDetail.tsx`):
+   - Added Edit Contact button to page header (black background to match theme)
+   - Implemented full Edit Contact modal with all contact fields
+   - Added phone number auto-formatting (917-822-5751)
+   - Integrated form validation from `utils/validation.ts`
+   - Re-enabled Edit Contact tests in `ContactDetail.test.tsx`
+
+5. **Added Clickable Rows** (`frontend/src/pages/Contacts.tsx`):
+   - Made entire contact table rows clickable to navigate to profile
+   - Added `cursor-pointer` class for UX
+   - Added `onClick={(e) => e.stopPropagation()` to action buttons to prevent row click when clicking buttons
+
+**Prevention Strategy:**  
+1. **Database Schema Documentation**: Create `SCHEMA.md` documenting all table columns with exact names to prevent future mismatches
+2. **Template Variable Standards**: Standardize on single curly braces `{VARIABLE}` for all templates, update documentation
+3. **Integration Tests for Email Sending**: 
+   - Test that all template variables are correctly replaced
+   - Test that database queries use correct column names
+   - Test email sending with real contact data
+4. **Backend Column Name Constants**: Create constants file for database column names to avoid typos
+5. **Feature Removal Checklist**: Before removing UI features, check for dependencies (SendEmailModal was linking to Edit Contact)
+6. **Backend Restart Protocol**: Document that backend must be restarted after code changes (nodemon doesn't catch all changes)
+
+**Tests Added:**  
+1. `backend/src/__tests__/email.controller.test.js` - Email variable replacement tests (TO BE ADDED)
+2. `backend/src/__tests__/template-variables.test.js` - Template format tests for both `{VAR}` and `{{VAR}}` (TO BE ADDED)
+3. `frontend/src/pages/__tests__/ContactDetail.test.tsx` - Re-enabled Edit Contact tests (9 tests passing)
+4. `frontend/src/components/__tests__/EmailTemplateVariables.test.tsx` - Test variable names match between backend and templates (TO BE ADDED)
+
+**Additional Changes:**
+- Added debug logging to email controller to help diagnose variable replacement issues
+- Updated Edit Contact button color to black (`bg-black hover:bg-gray-800`) to match app theme
+- Fixed clickable rows in Contacts page for better UX
+
+---
+
 **Timestamp:** `2025-11-19 20:00:00 - 21:00:00`  
 **Category:** `DEPLOYMENT`  
 **Status:** `SOLVED`  

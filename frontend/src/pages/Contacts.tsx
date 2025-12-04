@@ -432,7 +432,11 @@ export default function ContactsPage() {
               </thead>
               <tbody>
                 {sortedContacts.map((contact) => (
-                  <tr key={contact.contact_id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                  <tr 
+                    key={contact.contact_id} 
+                    onClick={() => navigate(`/dashboard/contacts/${contact.contact_id}`)}
+                    className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                  >
                     <td className="py-4 px-6">
                       <div className="font-medium text-gray-900">
                         {contact.contact_person || contact.company_name || 'Unnamed'}
@@ -463,7 +467,7 @@ export default function ContactsPage() {
                       </span>
                     </td>
                     <td className="py-4 px-6">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         {!showArchived && (
                           <>
                             <button

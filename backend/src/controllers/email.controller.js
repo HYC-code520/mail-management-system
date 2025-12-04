@@ -29,11 +29,14 @@ async function sendNotificationEmail(req, res, next) {
     // 1. Get contact info
     const { data: contact, error: contactError } = await supabase
       .from('contacts')
-      .select('email, name, mailbox_number, preferred_language')
+      .select('email, contact_person, company_name, mailbox_number, language_preference')
       .eq('contact_id', contact_id)
       .single();
 
+    console.log('📧 Contact query result:', { contact, contactError });
+
     if (contactError || !contact) {
+      console.error('❌ Contact not found error:', contactError);
       return res.status(404).json({ error: 'Contact not found' });
     }
 
@@ -63,9 +66,9 @@ async function sendNotificationEmail(req, res, next) {
       
       if (mailItem) {
         mailItemDetails = {
-          MAIL_TYPE: mailItem.item_type || '',
+          Type: mailItem.item_type || '',
           TRACKING_NUMBER: mailItem.tracking_number || '',
-          RECEIVED_DATE: new Date(mailItem.received_date).toLocaleDateString('en-US', { 
+          Date: new Date(mailItem.received_date).toLocaleDateString('en-US', { 
             year: 'numeric', 
             month: 'long', 
             day: 'numeric' 
@@ -78,12 +81,15 @@ async function sendNotificationEmail(req, res, next) {
 
     // 4. Build variables for template substitution
     const variables = {
-      CUSTOMER_NAME: contact.name || 'Customer',
-      MAILBOX_NUMBER: contact.mailbox_number || '',
+      Name: contact.contact_person || contact.company_name || 'Customer',
+      BoxNumber: contact.mailbox_number || '',
       CONTACT_EMAIL: contact.email || '',
       ...mailItemDetails,
       ...(custom_variables || {}) // Allow custom variables from frontend
     };
+
+    console.log('🔧 Template variables being sent:', variables);
+    console.log('📝 Template body:', template.message_body);
 
     // 5. Send email (with OAuth2 if user has connected Gmail)
     const result = await sendTemplateEmail({

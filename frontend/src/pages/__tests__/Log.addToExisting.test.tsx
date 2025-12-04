@@ -72,7 +72,7 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
     vi.clearAllMocks();
   });
 
-  it('should detect duplicate mail for same customer on same day', () => {
+  it('should detect duplicate mail for same customer on same day with Received status', () => {
     const formData = {
       contact_id: 'contact-1',
       received_date: todayDate,
@@ -80,16 +80,17 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
 
     const mailItems = [existingMailItem];
 
-    // Check if duplicate exists
+    // Check if duplicate exists - ONLY for "Received" status
     const duplicate = mailItems.find((item) => {
       const isSameCustomer = item.contact_id === formData.contact_id;
       const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
-      const isActive = !['Picked Up', 'Forwarded', 'Scanned', 'Abandoned'].includes(item.status);
-      return isSameCustomer && isSameDate && isActive;
+      const canAddTo = item.status === 'Received'; // Only allow adding to "Received" status
+      return isSameCustomer && isSameDate && canAddTo;
     });
 
     expect(duplicate).toBeDefined();
     expect(duplicate?.mail_item_id).toBe('existing-mail-1');
+    expect(duplicate?.status).toBe('Received');
   });
 
   it('should correctly calculate new total quantity when adding to existing', () => {
@@ -116,8 +117,33 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
     const duplicate = mailItems.find((item) => {
       const isSameCustomer = item.contact_id === formData.contact_id;
       const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
-      const isActive = !['Picked Up', 'Forwarded', 'Scanned', 'Abandoned'].includes(item.status);
-      return isSameCustomer && isSameDate && isActive;
+      const canAddTo = item.status === 'Received';
+      return isSameCustomer && isSameDate && canAddTo;
+    });
+
+    expect(duplicate).toBeUndefined();
+  });
+
+  it('should ignore notified mail when checking for duplicates', () => {
+    const notifiedMail = {
+      ...existingMailItem,
+      status: 'Notified',
+    };
+
+    const formData = {
+      contact_id: 'contact-1',
+      received_date: todayDate,
+    };
+
+    const mailItems = [notifiedMail];
+
+    // CRITICAL: Once notified, don't allow adding to existing
+    // Customer was told about X items, new mail needs new notification
+    const duplicate = mailItems.find((item) => {
+      const isSameCustomer = item.contact_id === formData.contact_id;
+      const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
+      const canAddTo = item.status === 'Received'; // Only "Received" status allowed
+      return isSameCustomer && isSameDate && canAddTo;
     });
 
     expect(duplicate).toBeUndefined();
@@ -139,8 +165,8 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
     const duplicate = mailItems.find((item) => {
       const isSameCustomer = item.contact_id === formData.contact_id;
       const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
-      const isActive = !['Picked Up', 'Forwarded', 'Scanned', 'Abandoned'].includes(item.status);
-      return isSameCustomer && isSameDate && isActive;
+      const canAddTo = item.status === 'Received';
+      return isSameCustomer && isSameDate && canAddTo;
     });
 
     expect(duplicate).toBeUndefined();
@@ -162,8 +188,8 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
     const duplicate = mailItems.find((item) => {
       const isSameCustomer = item.contact_id === formData.contact_id;
       const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
-      const isActive = !['Picked Up', 'Forwarded', 'Scanned', 'Abandoned'].includes(item.status);
-      return isSameCustomer && isSameDate && isActive;
+      const canAddTo = item.status === 'Received';
+      return isSameCustomer && isSameDate && canAddTo;
     });
 
     expect(duplicate).toBeUndefined();
@@ -185,8 +211,8 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
     const duplicate = mailItems.find((item) => {
       const isSameCustomer = item.contact_id === formData.contact_id;
       const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
-      const isActive = !['Picked Up', 'Forwarded', 'Scanned', 'Abandoned'].includes(item.status);
-      return isSameCustomer && isSameDate && isActive;
+      const canAddTo = item.status === 'Received';
+      return isSameCustomer && isSameDate && canAddTo;
     });
 
     expect(duplicate).toBeUndefined();
@@ -203,8 +229,8 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
     const duplicate = mailItems.find((item) => {
       const isSameCustomer = item.contact_id === formData.contact_id;
       const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
-      const isActive = !['Picked Up', 'Forwarded', 'Scanned', 'Abandoned'].includes(item.status);
-      return isSameCustomer && isSameDate && isActive;
+      const canAddTo = item.status === 'Received';
+      return isSameCustomer && isSameDate && canAddTo;
     });
 
     expect(duplicate).toBeUndefined();
@@ -221,8 +247,8 @@ describe('Add to Existing Mail Feature - Logic Tests', () => {
     const duplicate = mailItems.find((item) => {
       const isSameCustomer = item.contact_id === formData.contact_id;
       const isSameDate = item.received_date?.split('T')[0] === formData.received_date.split('T')[0];
-      const isActive = !['Picked Up', 'Forwarded', 'Scanned', 'Abandoned'].includes(item.status);
-      return isSameCustomer && isSameDate && isActive;
+      const canAddTo = item.status === 'Received';
+      return isSameCustomer && isSameDate && canAddTo;
     });
 
     expect(duplicate).toBeUndefined();

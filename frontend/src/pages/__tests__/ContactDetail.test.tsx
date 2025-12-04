@@ -53,7 +53,7 @@ const mockMailHistory = [
   },
 ];
 
-describe.skip('ContactDetailPage - Edit Contact Feature (DEPRECATED - Feature Removed)', () => {
+describe('ContactDetailPage - Edit Contact Feature', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     (api.contacts.getById as any).mockResolvedValue(mockContact);
@@ -92,7 +92,7 @@ describe.skip('ContactDetailPage - Edit Contact Feature (DEPRECATED - Feature Re
     // Modal should open - check for form fields
     await waitFor(() => {
       expect(screen.getByPlaceholderText(/John Doe/i)).toBeInTheDocument();
-      expect(screen.getByPlaceholderText(/email@example.com/i)).toBeInTheDocument();
+      expect(screen.getByPlaceholderText(/customer@example.com/i)).toBeInTheDocument();
     });
   });
 
@@ -115,7 +115,7 @@ describe.skip('ContactDetailPage - Edit Contact Feature (DEPRECATED - Feature Re
     await waitFor(() => {
       const nameInput = screen.getByDisplayValue('John Doe');
       const companyInput = screen.getByDisplayValue('Acme Corp');
-      const emailInput = screen.getByPlaceholderText(/email@example.com/i) as HTMLInputElement;
+      const emailInput = screen.getByPlaceholderText(/customer@example.com/i) as HTMLInputElement;
       
       expect(nameInput).toBeInTheDocument();
       expect(companyInput).toBeInTheDocument();
@@ -265,7 +265,7 @@ describe.skip('ContactDetailPage - Edit Contact Feature (DEPRECATED - Feature Re
   });
 });
 
-describe.skip('ContactDetailPage - Contact without Email (DEPRECATED - Feature Removed)', () => {
+describe('ContactDetailPage - Contact without Email (NOW WITH EDIT CONTACT)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const contactWithoutEmail = { ...mockContact, email: null };
@@ -309,12 +309,12 @@ describe.skip('ContactDetailPage - Contact without Email (DEPRECATED - Feature R
 
     await waitFor(() => {
       // Look for the form input specifically in the modal
-      const emailInputs = screen.getAllByPlaceholderText(/email@example.com/i);
+      const emailInputs = screen.getAllByPlaceholderText(/customer@example.com/i);
       expect(emailInputs.length).toBeGreaterThan(0);
     });
 
     // Add email
-    const emailInput = screen.getByPlaceholderText(/email@example.com/i) as HTMLInputElement;
+    const emailInput = screen.getByPlaceholderText(/customer@example.com/i) as HTMLInputElement;
     expect(emailInput.value).toBe('');
     
     fireEvent.change(emailInput, { target: { value: 'newemail@example.com' } });
