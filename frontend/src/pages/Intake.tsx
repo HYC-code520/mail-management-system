@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Save, Bell, Mail, Package, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
@@ -45,16 +45,7 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
     loadTodaysEntries();
   }, []);
 
-  useEffect(() => {
-    if (searchQuery) {
-      void searchContacts();
-    } else {
-      setSearchResults([]);
-      setShowDropdown(false);
-    }
-  }, [searchQuery]); // searchContacts is stable, no need to include
-
-  const searchContacts = async () => {
+  const searchContacts = useCallback(async () => {
     try {
       const contacts = await api.contacts.getAll();
       const filtered = contacts.filter((c: Contact) => {
@@ -75,7 +66,16 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
     } catch (err) {
       console.error('Error searching contacts:', err);
     }
-  };
+  }, [searchQuery]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      void searchContacts();
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+    }
+  }, [searchQuery, searchContacts]);
 
   const loadTodaysEntries = async () => {
     try {

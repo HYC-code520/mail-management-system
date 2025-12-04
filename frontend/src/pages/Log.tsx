@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, Bell, CheckCircle, FileText, Send, AlertTriangle, Eye, MoreVertical, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
@@ -144,16 +144,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   };
 
   // Add form: Search contacts
-  useEffect(() => {
-    if (searchQuery) {
-      void searchContacts();
-    } else {
-      setSearchResults([]);
-      setShowDropdown(false);
-    }
-  }, [searchQuery, showAddForm]); // searchContacts is stable, no need to include
-
-  const searchContacts = async () => {
+  const searchContacts = useCallback(async () => {
     try {
       const filtered = contacts.filter((c: Contact) => {
         const isActive = (c as any).status !== 'No';
@@ -168,7 +159,16 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     } catch (err) {
       console.error('Error searching contacts:', err);
     }
-  };
+  }, [contacts, searchQuery]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      void searchContacts();
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+    }
+  }, [searchQuery, showAddForm, searchContacts]);
 
   const handleSelectContact = (contact: Contact) => {
     // Warn if selecting a Pending customer
@@ -412,6 +412,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         }
         
         // Update the mail item (exclude performed_by and edit_notes from the update payload)
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { performed_by: _performed_by, edit_notes: _edit_notes, ...updateData } = formData;
         
         // If received_date is being updated and it's a date-only string, add timezone
@@ -488,6 +489,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const quickStatusUpdate = async (mailItemId: string, newStatus: string, currentStatus?: string) => {
     // Store the previous status for undo
     const previousStatus = currentStatus || 'Received';
@@ -531,6 +533,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const openQuickNotifyModal = (item: MailItem) => {
     setNotifyingMailItem(item);
     setIsQuickNotifyModalOpen(true);
@@ -1343,7 +1346,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         <div className="relative">
                           <button
                             id={`more-btn-${item.mail_item_id}`}
-                            onClick={(e) => {
+                            onClick={(_e) => {
                               setOpenDropdownId(openDropdownId === item.mail_item_id ? null : item.mail_item_id);
                             }}
                             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
