@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, waitFor } from '@testing-library/react';
+import { render } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import LogPage from '../Log';
 import { api } from '../../lib/api-client';
@@ -67,6 +67,7 @@ describe('Mail Log - Quantity Change Tracking', () => {
     (api.actionHistory.getByMailItem as any).mockResolvedValue([]);
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const renderLogPage = () => {
     return render(
       <BrowserRouter>
