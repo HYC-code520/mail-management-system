@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { X, Send, Loader2, Mail, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api-client';
@@ -50,14 +50,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess, s
   const [currentEmail, setCurrentEmail] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      loadTemplates();
-      loadLatestContactEmail();
-    }
-  }, [isOpen, suggestedTemplateType]);
-
-  const loadLatestContactEmail = async () => {
+  const loadLatestContactEmail = useCallback(async () => {
     if (mailItem.contacts?.contact_id) {
       try {
         const contactData = await api.contacts.getById(mailItem.contacts.contact_id);
@@ -69,7 +62,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess, s
     } else {
       setCurrentEmail(mailItem.contacts?.email || null);
     }
-  };
+  }, [mailItem.contacts?.contact_id, mailItem.contacts?.email]);
 
   const handleEditContact = () => {
     if (mailItem.contacts?.contact_id) {
@@ -80,41 +73,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess, s
     }
   };
 
-  const loadTemplates = async () => {
-    setLoadingTemplates(true);
-    try {
-      const response = await api.templates.getAll();
-      setTemplates(response.templates || []);
-      
-      const notificationCount = mailItem.notification_count || 0;
-      let suggestedTemplateType: string;
-      
-      if (notificationCount === 0) {
-        suggestedTemplateType = "Initial";
-      } else if (notificationCount === 1) {
-        suggestedTemplateType = "Reminder";
-      } else {
-        suggestedTemplateType = "Final";
-      }
-
-      if (response.templates && response.templates.length > 0) {
-        let templateToSelect = response.templates[0];
-        const found = response.templates.find((t: Template) => t.template_type === suggestedTemplateType);
-        if (found) {
-          templateToSelect = found;
-        }
-        setSelectedTemplateId(templateToSelect.template_id);
-        previewTemplate(templateToSelect);
-      }
-    } catch (error) {
-      console.error('Error loading templates:', error);
-      toast.error('Failed to load email templates');
-    } finally {
-      setLoadingTemplates(false);
-    }
-  };
-
-  const previewTemplate = (template: Template) => {
+  const previewTemplate = useCallback((template: Template) => {
     const customerName = mailItem.contacts?.contact_person || mailItem.contacts?.company_name || 'Customer';
     const mailboxNumber = mailItem.contacts?.mailbox_number || 'N/A';
     const receivedDate = new Date(mailItem.received_date).toLocaleDateString('en-US', {
@@ -148,7 +107,48 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess, s
 
     setSubject(subjectPreview);
     setMessage(messagePreview);
-  };
+  }, [mailItem.contacts?.contact_person, mailItem.contacts?.company_name, mailItem.contacts?.mailbox_number, mailItem.item_type, mailItem.received_date, mailItem.quantity, mailItem.tracking_number]);
+
+  const loadTemplates = useCallback(async () => {
+    setLoadingTemplates(true);
+    try {
+      const response = await api.templates.getAll();
+      setTemplates(response.templates || []);
+      
+      const notificationCount = mailItem.notification_count || 0;
+      let suggestedTemplateType: string;
+      
+      if (notificationCount === 0) {
+        suggestedTemplateType = "Initial";
+      } else if (notificationCount === 1) {
+        suggestedTemplateType = "Reminder";
+      } else {
+        suggestedTemplateType = "Final";
+      }
+
+      if (response.templates && response.templates.length > 0) {
+        let templateToSelect = response.templates[0];
+        const found = response.templates.find((t: Template) => t.template_type === suggestedTemplateType);
+        if (found) {
+          templateToSelect = found;
+        }
+        setSelectedTemplateId(templateToSelect.template_id);
+        previewTemplate(templateToSelect);
+      }
+    } catch (error) {
+      console.error('Error loading templates:', error);
+      toast.error('Failed to load email templates');
+    } finally {
+      setLoadingTemplates(false);
+    }
+  }, [mailItem.notification_count, previewTemplate]);
+
+  useEffect(() => {
+    if (isOpen) {
+      void loadTemplates(); // Explicitly ignore the promise
+      void loadLatestContactEmail(); // Explicitly ignore the promise
+    }
+  }, [isOpen, suggestedTemplateType, loadTemplates, loadLatestContactEmail]);
 
   const handleTemplateChange = (templateId: string) => {
     setSelectedTemplateId(templateId);

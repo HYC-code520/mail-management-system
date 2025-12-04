@@ -15,6 +15,7 @@ import TemplatesPage from './pages/Templates.tsx';
 import MailManagementPage from './pages/MailManagement.tsx';
 import IntakePage from './pages/Intake.tsx';
 import LogPage from './pages/Log.tsx';
+import TodoListPage from './pages/TodoList.tsx';
 import DesignSystemPage from './pages/DesignSystem.tsx';
 import SettingsPage from './pages/Settings.tsx';
 
@@ -50,6 +51,7 @@ function App() {
             <Route path="mail-items" element={<MailItemsPage />} />
             <Route path="mail-items/new" element={<NewMailItemPage />} />
             <Route path="templates" element={<TemplatesPage />} />
+            <Route path="todos" element={<TodoListPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="design-system" element={<DesignSystemPage />} />
           </Route>

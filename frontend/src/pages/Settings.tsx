@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Mail, CheckCircle, XCircle, RefreshCw, Info, ChevronDown, AlertCircle } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, Info, ChevronDown, AlertCircle } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '../lib/api-client';
 

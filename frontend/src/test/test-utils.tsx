@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { render, RenderOptions } from '@testing-library/react';
 import { ReactElement, ReactNode, createContext } from 'react';
 import { BrowserRouter } from 'react-router-dom';

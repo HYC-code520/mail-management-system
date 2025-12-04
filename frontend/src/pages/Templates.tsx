@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Copy, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '../lib/api-client.ts';
@@ -51,11 +51,7 @@ export default function TemplatesPage() {
     default_channel: 'Email'
   });
 
-  useEffect(() => {
-    loadTemplates();
-  }, []);
-
-  const loadTemplates = async () => {
+  const loadTemplates = useCallback(async () => {
     try {
       const response = await api.templates.getAll();
       const templateList = response.templates || [];
@@ -69,7 +65,11 @@ export default function TemplatesPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [selectedTemplate]);
+
+  useEffect(() => {
+    void loadTemplates();
+  }, [loadTemplates]);
 
   const openCreateModal = () => {
     setEditingTemplate(null);

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, Bell, CheckCircle, FileText, Send, AlertTriangle, Eye, MoreVertical, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
@@ -7,7 +7,7 @@ import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
-import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
+import { getTodayNY } from '../utils/timezone.ts';
 
 interface MailItem {
   mail_item_id: string;
@@ -44,16 +44,6 @@ interface ActionHistory {
   performed_by: string;
   notes?: string;
   action_timestamp: string;
-}
-
-interface CustomerGroup {
-  contact_id: string;
-  customerName: string;
-  mailboxNumber?: string;
-  mailItems: MailItem[];
-  totalQuantity: number;
-  oldestDate: string;
-  statusCounts: Record<string, number>;
 }
 
 interface LogPageProps {
@@ -154,16 +144,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   };
 
   // Add form: Search contacts
-  useEffect(() => {
-    if (showAddForm && searchQuery.length >= 2) {
-      searchContacts();
-    } else {
-      setSearchResults([]);
-      setShowDropdown(false);
-    }
-  }, [searchQuery, showAddForm]);
-
-  const searchContacts = async () => {
+  const searchContacts = useCallback(async () => {
     try {
       const filtered = contacts.filter((c: Contact) => {
         const isActive = (c as any).status !== 'No';
@@ -178,7 +159,16 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     } catch (err) {
       console.error('Error searching contacts:', err);
     }
-  };
+  }, [contacts, searchQuery]);
+
+  useEffect(() => {
+    if (searchQuery) {
+      void searchContacts();
+    } else {
+      setSearchResults([]);
+      setShowDropdown(false);
+    }
+  }, [searchQuery, showAddForm, searchContacts]);
 
   const handleSelectContact = (contact: Contact) => {
     // Warn if selecting a Pending customer
@@ -402,6 +392,11 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         // Only consider it a "real" status change if normalized values differ
         const statusActuallyChanged = normalizedOldStatus !== normalizedNewStatus;
         
+        // Check if quantity changed
+        const oldQuantity = editingMailItem.quantity || 1;
+        const newQuantity = formData.quantity;
+        const quantityChanged = oldQuantity !== newQuantity;
+        
         // If status changed, require staff name
         if (statusActuallyChanged && !formData.performed_by.trim()) {
           toast.error('Please select who made this status change');
@@ -409,8 +404,16 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           return;
         }
         
+        // If quantity changed, require staff name
+        if (quantityChanged && !formData.performed_by.trim()) {
+          toast.error('Please select who made this quantity change');
+          setSaving(false);
+          return;
+        }
+        
         // Update the mail item (exclude performed_by and edit_notes from the update payload)
-        const { performed_by, edit_notes, ...updateData } = formData;
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { performed_by: _performed_by, edit_notes: _edit_notes, ...updateData } = formData;
         
         // If received_date is being updated and it's a date-only string, add timezone
         if (updateData.received_date && /^\d{4}-\d{2}-\d{2}$/.test(updateData.received_date)) {
@@ -419,7 +422,20 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         
         await api.mailItems.update(editingMailItem.mail_item_id, updateData);
         
-        // Only log to action history if status ACTUALLY changed (not just name migration)
+        // Log quantity change to action history
+        if (quantityChanged) {
+          await api.actionHistory.create({
+            mail_item_id: editingMailItem.mail_item_id,
+            action_type: 'updated',
+            action_description: `Quantity changed from ${oldQuantity} to ${newQuantity}`,
+            previous_value: oldQuantity.toString(),
+            new_value: newQuantity.toString(),
+            performed_by: formData.performed_by,
+            notes: formData.edit_notes.trim() || null
+          });
+        }
+        
+        // Log status change to action history if status ACTUALLY changed (not just name migration)
         if (statusActuallyChanged) {
           const statusDescriptions: { [key: string]: string } = {
             'Received': 'Status changed to Received',
@@ -473,6 +489,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const quickStatusUpdate = async (mailItemId: string, newStatus: string, currentStatus?: string) => {
     // Store the previous status for undo
     const previousStatus = currentStatus || 'Received';
@@ -516,6 +533,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const openQuickNotifyModal = (item: MailItem) => {
     setNotifyingMailItem(item);
     setIsQuickNotifyModalOpen(true);
@@ -1328,7 +1346,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         <div className="relative">
                           <button
                             id={`more-btn-${item.mail_item_id}`}
-                            onClick={(e) => {
+                            onClick={(_e) => {
                               setOpenDropdownId(openDropdownId === item.mail_item_id ? null : item.mail_item_id);
                             }}
                             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
@@ -1696,13 +1714,20 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
             </select>
           </div>
 
-          {/* Show staff and notes fields if status changed */}
-          {editingMailItem && formData.status !== editingMailItem.status && (
+          {/* Show staff and notes fields if status or quantity changed */}
+          {editingMailItem && (formData.status !== editingMailItem.status || formData.quantity !== (editingMailItem.quantity || 1)) && (
             <>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <p className="text-sm text-blue-800 font-medium mb-3">
-                  Status is being changed from "{editingMailItem.status}" to "{formData.status}"
-                </p>
+                {formData.status !== editingMailItem.status && (
+                  <p className="text-sm text-blue-800 font-medium mb-3">
+                    Status is being changed from "{editingMailItem.status}" to "{formData.status}"
+                  </p>
+                )}
+                {formData.quantity !== (editingMailItem.quantity || 1) && (
+                  <p className="text-sm text-blue-800 font-medium mb-3">
+                    Quantity is being changed from {editingMailItem.quantity || 1} to {formData.quantity}
+                  </p>
+                )}
                 
                 {/* Who performed this action */}
                 <div className="mb-3">
@@ -1731,7 +1756,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     name="edit_notes"
                     value={formData.edit_notes}
                     onChange={handleChange}
-                    placeholder="Add any notes about this status change..."
+                    placeholder="Add any notes about this change..."
                     rows={2}
                     className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />

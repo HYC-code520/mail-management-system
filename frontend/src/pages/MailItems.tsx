@@ -4,6 +4,7 @@ import { api } from '../lib/api-client.ts';
 
 export default function MailItemsPage() {
   const navigate = useNavigate();
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [searchParams] = useSearchParams();
   const [mailItems, setMailItems] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

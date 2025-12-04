@@ -1,5 +1,5 @@
 import { useState, FormEvent } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Mail } from 'lucide-react';
 import { supabase } from '../lib/supabase.ts';
 import { toast } from 'react-hot-toast';
