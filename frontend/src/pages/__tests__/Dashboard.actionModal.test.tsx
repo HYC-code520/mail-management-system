@@ -26,7 +26,7 @@ vi.mock('../../lib/api-client', () => ({
 vi.mock('../../utils/timezone', () => ({
   getTodayNY: () => '2025-11-25',
   toNYDateString: (date: string) => date.split('T')[0],
-  getNYDate: (date?: Date) => new Date('2025-11-25T00:00:00-05:00'),
+  getNYDate: (_date?: Date) => new Date('2025-11-25T00:00:00-05:00'),
   getDaysAgoNY: (days: number) => {
     const d = new Date('2025-11-25T00:00:00-05:00');
     d.setDate(d.getDate() - days);
