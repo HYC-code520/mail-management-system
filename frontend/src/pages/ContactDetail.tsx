@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Mail, Package, Bell, ChevronRight, Send, Edit } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
@@ -81,14 +81,7 @@ export default function ContactDetailPage() {
     status: 'Pending'
   });
 
-  useEffect(() => {
-    if (id) {
-      loadContactDetails();
-      loadMailHistory();
-    }
-  }, [id]);
-
-  const loadContactDetails = async () => {
+  const loadContactDetails = useCallback(async () => {
     try {
       const data = await api.contacts.getById(id!);
       setContact(data);
@@ -98,16 +91,23 @@ export default function ContactDetailPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const loadMailHistory = async () => {
+  const loadMailHistory = useCallback(async () => {
     try {
       const data = await api.mailItems.getAll(id);
       setMailHistory(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error('Error loading mail history:', err);
     }
-  };
+  }, [id]);
+
+  useEffect(() => {
+    if (id) {
+      void loadContactDetails(); // Explicitly ignore the promise
+      void loadMailHistory(); // Explicitly ignore the promise
+    }
+  }, [id, loadContactDetails, loadMailHistory]);
 
   const loadNotificationHistoryForMailItem = async (mailItemId: string) => {
     try {

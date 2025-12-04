@@ -64,10 +64,15 @@ describe('Timezone Utilities', () => {
       vi.useRealTimers();
     });
 
-    it.skip('should handle 0 days ago (today) - SKIPPED: Date drift in CI', () => {
+    it('should handle 0 days ago (today) with fixed time', () => {
+      // Mock a specific date to avoid timezone drift in CI
+      const mockDate = new Date('2025-12-04T15:00:00-05:00'); // 3 PM EST on Dec 4
+      vi.setSystemTime(mockDate);
+      
       const result = getDaysAgoNY(0);
-      const today = getTodayNY();
-      expect(result).toBe(today);
+      expect(result).toBe('2025-12-04'); // Should be today (Dec 4)
+      
+      vi.useRealTimers();
     });
   });
 
@@ -116,12 +121,17 @@ describe('Timezone Utilities', () => {
       }
     });
 
-    it.skip('should include today as the last entry - SKIPPED: Date drift in CI', () => {
+    it('should include today as the last entry with fixed time', () => {
+      // Mock a specific date to avoid timezone drift in CI
+      const mockDate = new Date('2025-12-04T15:00:00-05:00'); // 3 PM EST on Dec 4
+      vi.setSystemTime(mockDate);
+      
       const result = getChartDateRange(7);
       const lastEntry = result[result.length - 1];
-      const today = getTodayNY();
       
-      expect(lastEntry.dateStr).toBe(today);
+      expect(lastEntry.dateStr).toBe('2025-12-04'); // Last entry should be today (Dec 4)
+      
+      vi.useRealTimers();
     });
 
     it('should work for different ranges', () => {

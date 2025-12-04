@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
@@ -48,29 +48,22 @@ export default function ContactsPage() {
     status: 'Pending'
   });
 
-  useEffect(() => {
-    loadContacts();
-  }, []);
-
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
     try {
       const data = await api.contacts.getAll();
       const contactsList = Array.isArray(data) ? data : [];
-      setAllContacts(contactsList); // Store all contacts
-      
-      // Filter based on showArchived toggle
-      const filteredContacts = showArchived 
-        ? contactsList.filter(c => c.status === 'No') // Show only archived
-        : contactsList.filter(c => c.status !== 'No'); // Show only active
-      
-      setContacts(filteredContacts);
+      setAllContacts(contactsList); // Store all contacts - filtering happens in useEffect
     } catch (err) {
       console.error('Error loading contacts:', err);
       toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
     }
-  };
+  }, []); // No dependencies - just loads data once
+
+  useEffect(() => {
+    void loadContacts(); // Explicitly ignore the promise
+  }, [loadContacts]);
 
   // Re-filter when showArchived toggle changes
   useEffect(() => {

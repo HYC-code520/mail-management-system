@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Package, UserPlus, FileText, Clock, AlertCircle, CheckCircle2, TrendingUp, ChevronDown, ChevronUp, AlertTriangle, MoreVertical, Send } from 'lucide-react';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -54,8 +54,8 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState('All Status');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter] = useState('All Status');
+  const [searchTerm] = useState('');
   const [isFollowUpExpanded, setIsFollowUpExpanded] = useState(true);
   const [followUpDisplayCount, setFollowUpDisplayCount] = useState(10); // Show 10 initially
   
@@ -94,9 +94,161 @@ export default function DashboardPage() {
     status: 'Pending'
   });
 
+  const loadDashboardData = useCallback(async () => {
+    try {
+      const [contacts, mailItems] = await Promise.all([
+        api.contacts.getAll(),
+        api.mailItems.getAll()
+      ]);
+
+      // Get today's date in NY timezone
+      const today = getTodayNY();
+      const now = new Date();
+      
+      // Filter active customers (not archived)
+      const activeContacts = contacts.filter((c: Contact) => c.status !== 'No');
+      
+      // Get customers added today (NY timezone)
+      const newCustomersToday = activeContacts.filter((c: Contact) => {
+        if (!c.created_at) return false;
+        const createdDateNY = toNYDateString(c.created_at);
+        return createdDateNY === today;
+      }).length;
+      
+      // Get recent customers (last 5)
+      const recentCustomers = activeContacts
+        .sort((a: Contact, b: Contact) => 
+          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
+        )
+        .slice(0, 5);
+      
+      // Calculate overdue mail (7+ days old from received_date, not picked up yet)
+      const sevenDaysAgo = new Date(now);
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      
+      const overdueMail = mailItems
+        .filter((item: MailItem) => {
+          // Only count mail that's still pending pickup (not completed statuses)
+          if (item.status === 'Picked Up' || 
+              item.status === 'Forward' || 
+              item.status === 'Scanned Document' || 
+              item.status === 'Scanned' || 
+              item.status === 'Abandoned Package' ||
+              item.status === 'Abandoned') {
+            return false;
+          }
+          // Check if received_date is 7+ days old
+          const receivedDate = new Date(item.received_date);
+          return receivedDate < sevenDaysAgo;
+        })
+        .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
+
+      // Calculate completed today (picked up today) - NY timezone
+      const completedToday = mailItems
+        .filter((item: MailItem) => {
+          if (item.status === 'Picked Up' && item.pickup_date) {
+            const pickupDateNY = toNYDateString(item.pickup_date);
+            return pickupDateNY === today;
+          }
+          return false;
+        })
+        .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
+
+      // Find mail that needs follow-up
+      const twoDaysAgo = new Date(now);
+      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
+      
+      const needsFollowUp = mailItems.filter((item: MailItem) => {
+        // Urgent: Notified for more than 2 days (use last_notified date, not received_date)
+        if (item.status === 'Notified' && item.last_notified) {
+          const notifiedDate = new Date(item.last_notified);
+          return notifiedDate < twoDaysAgo;
+        }
+        // Action needed: Still in Received status
+        if (item.status === 'Received') {
+          return true;
+        }
+        return false;
+      }).sort((a: MailItem, b: MailItem) => {
+        // Sort by date - oldest first (most urgent)
+        const dateA = a.last_notified || a.received_date;
+        const dateB = b.last_notified || b.received_date;
+        return new Date(dateA).getTime() - new Date(dateB).getTime();
+      }); // Don't limit here - let the UI handle display count
+
+      // Calculate mail volume based on selected time range (NY timezone)
+      const mailVolumeData = getChartDateRange(chartTimeRange).map(({ dateStr, displayDate }) => {
+        // Filter items for this specific date using NY timezone
+        const count = mailItems
+          .filter((item: MailItem) => {
+            if (!item.received_date) return false;
+            // Convert to NY date string for consistent comparison
+            const itemDateNY = toNYDateString(item.received_date);
+            return itemDateNY === dateStr;
+          })
+          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
+        
+        return {
+          date: displayDate,
+          count
+        };
+      });
+
+      // Calculate customer growth based on selected time range (NY timezone)
+      const customerGrowthData = getChartDateRange(chartTimeRange).map(({ dateStr, displayDate }) => {
+        // Count NEW customers added on THIS SPECIFIC DAY (NY timezone)
+        const newCustomersOnDate = activeContacts.filter((c: Contact) => {
+          if (!c.created_at) return false;
+          const createdDateNY = toNYDateString(c.created_at);
+          return createdDateNY === dateStr;
+        }).length;
+        
+        return {
+          date: displayDate,
+          customers: newCustomersOnDate
+        };
+      });
+      
+      console.log('Customer Growth Data (new per day):', customerGrowthData);
+      console.log('Data points:', customerGrowthData.length);
+      console.log('Active Contacts:', activeContacts.length);
+      
+      setStats({
+        todaysMail: mailItems
+          .filter((item: MailItem) => {
+            if (!item.received_date) return false;
+            const receivedDateNY = toNYDateString(item.received_date);
+            return receivedDateNY === today;
+          })
+          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0),
+        pendingPickups: mailItems
+          .filter((item: MailItem) => 
+            // All mail waiting to be picked up (in the shop)
+            item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending'
+          )
+          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0),
+        remindersDue: mailItems.filter((item: MailItem) => 
+          item.status === 'Received'
+        ).length,
+        overdueMail,
+        completedToday,
+        recentMailItems: mailItems.slice(0, 6),
+        recentCustomers,
+        newCustomersToday,
+        needsFollowUp,
+        mailVolumeData,
+        customerGrowthData
+      });
+    } catch (err) {
+      console.error('Error loading dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
+  }, [chartTimeRange]); // Dependency: reload when time range changes
+
   useEffect(() => {
-    loadDashboardData();
-  }, [chartTimeRange]); // Reload when time range changes
+    void loadDashboardData(); // Explicitly ignore the promise
+  }, [loadDashboardData]); // Properly includes loadDashboardData
 
   // Helper function to get notification context based on notification history
   const getNotificationContext = (mailItem: MailItem) => {
@@ -293,162 +445,10 @@ export default function DashboardPage() {
     }
   };
 
-  const loadDashboardData = async () => {
-    try {
-      const [contacts, mailItems] = await Promise.all([
-        api.contacts.getAll(),
-        api.mailItems.getAll()
-      ]);
-
-      // Get today's date in NY timezone
-      const today = getTodayNY();
-      const now = new Date();
-      
-      // Filter active customers (not archived)
-      const activeContacts = contacts.filter((c: Contact) => c.status !== 'No');
-      
-      // Get customers added today (NY timezone)
-      const newCustomersToday = activeContacts.filter((c: Contact) => {
-        if (!c.created_at) return false;
-        const createdDateNY = toNYDateString(c.created_at);
-        return createdDateNY === today;
-      }).length;
-      
-      // Get recent customers (last 5)
-      const recentCustomers = activeContacts
-        .sort((a: Contact, b: Contact) => 
-          new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
-        )
-        .slice(0, 5);
-      
-      // Calculate overdue mail (7+ days old from received_date, not picked up yet)
-      const sevenDaysAgo = new Date(now);
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-      
-      const overdueMail = mailItems
-        .filter((item: MailItem) => {
-          // Only count mail that's still pending pickup (not completed statuses)
-          if (item.status === 'Picked Up' || 
-              item.status === 'Forward' || 
-              item.status === 'Scanned Document' || 
-              item.status === 'Scanned' || 
-              item.status === 'Abandoned Package' ||
-              item.status === 'Abandoned') {
-            return false;
-          }
-          // Check if received_date is 7+ days old
-          const receivedDate = new Date(item.received_date);
-          return receivedDate < sevenDaysAgo;
-        })
-        .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
-
-      // Calculate completed today (picked up today) - NY timezone
-      const completedToday = mailItems
-        .filter((item: MailItem) => {
-          if (item.status === 'Picked Up' && item.pickup_date) {
-            const pickupDateNY = toNYDateString(item.pickup_date);
-            return pickupDateNY === today;
-          }
-          return false;
-        })
-        .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
-
-      // Find mail that needs follow-up
-      const twoDaysAgo = new Date(now);
-      twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
-      
-      const needsFollowUp = mailItems.filter((item: MailItem) => {
-        // Urgent: Notified for more than 2 days (use last_notified date, not received_date)
-        if (item.status === 'Notified' && item.last_notified) {
-          const notifiedDate = new Date(item.last_notified);
-          return notifiedDate < twoDaysAgo;
-        }
-        // Action needed: Still in Received status
-        if (item.status === 'Received') {
-          return true;
-        }
-        return false;
-      }).sort((a: MailItem, b: MailItem) => {
-        // Sort by date - oldest first (most urgent)
-        const dateA = a.last_notified || a.received_date;
-        const dateB = b.last_notified || b.received_date;
-        return new Date(dateA).getTime() - new Date(dateB).getTime();
-      }); // Don't limit here - let the UI handle display count
-
-      // Calculate mail volume based on selected time range (NY timezone)
-      const mailVolumeData = getChartDateRange(chartTimeRange).map(({ dateStr, displayDate }) => {
-        // Filter items for this specific date using NY timezone
-        const count = mailItems
-          .filter((item: MailItem) => {
-            if (!item.received_date) return false;
-            // Convert to NY date string for consistent comparison
-            const itemDateNY = toNYDateString(item.received_date);
-            return itemDateNY === dateStr;
-          })
-          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0);
-        
-        return {
-          date: displayDate,
-          count
-        };
-      });
-
-      // Calculate customer growth based on selected time range (NY timezone)
-      const customerGrowthData = getChartDateRange(chartTimeRange).map(({ dateStr, displayDate }) => {
-        // Count NEW customers added on THIS SPECIFIC DAY (NY timezone)
-        const newCustomersOnDate = activeContacts.filter((c: Contact) => {
-          if (!c.created_at) return false;
-          const createdDateNY = toNYDateString(c.created_at);
-          return createdDateNY === dateStr;
-        }).length;
-        
-        return {
-          date: displayDate,
-          customers: newCustomersOnDate
-        };
-      });
-      
-      console.log('Customer Growth Data (new per day):', customerGrowthData);
-      console.log('Data points:', customerGrowthData.length);
-      console.log('Active Contacts:', activeContacts.length);
-      
-      setStats({
-        todaysMail: mailItems
-          .filter((item: MailItem) => {
-            if (!item.received_date) return false;
-            const receivedDateNY = toNYDateString(item.received_date);
-            return receivedDateNY === today;
-          })
-          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0),
-        pendingPickups: mailItems
-          .filter((item: MailItem) => 
-            // All mail waiting to be picked up (in the shop)
-            item.status === 'Received' || item.status === 'Notified' || item.status === 'Pending'
-          )
-          .reduce((sum: number, item: MailItem) => sum + (item.quantity || 1), 0),
-        remindersDue: mailItems.filter((item: MailItem) => 
-          item.status === 'Received'
-        ).length,
-        overdueMail,
-        completedToday,
-        recentMailItems: mailItems.slice(0, 6),
-        recentCustomers,
-        newCustomersToday,
-        needsFollowUp,
-        mailVolumeData,
-        customerGrowthData
-      });
-    } catch (err) {
-      console.error('Error loading dashboard data:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const openQuickNotifyModal = (item: MailItem) => {
-    setNotifyingMailItem(item);
-    setIsQuickNotifyModalOpen(true);
-  };
+  // const openQuickNotifyModal = (item: MailItem) => {
+  //   setNotifyingMailItem(item);
+  //   setIsQuickNotifyModalOpen(true);
+  // };
 
   const openSendEmailModal = (item: MailItem) => {
     setEmailingMailItem(item);
@@ -488,14 +488,14 @@ export default function DashboardPage() {
     );
   }
 
-  const handleSort = (column: 'date' | 'type' | 'customer' | 'status') => {
-    if (sortColumn === column) {
-      setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortColumn(column);
-      setSortDirection(column === 'date' ? 'desc' : 'asc');
-    }
-  };
+  // const handleSort = (column: 'date' | 'type' | 'customer' | 'status') => {
+  //   if (sortColumn === column) {
+  //     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
+  //   } else {
+  //     setSortColumn(column);
+  //     setSortDirection(column === 'date' ? 'desc' : 'asc');
+  //   }
+  // };
 
   const filteredItems = stats?.recentMailItems.filter((item: any) => {
     const matchesStatus = statusFilter === 'All Status' || item.status === statusFilter;
