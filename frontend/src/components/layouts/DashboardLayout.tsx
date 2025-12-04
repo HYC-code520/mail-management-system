@@ -1,3 +1,4 @@
+/* eslint-disable react-refresh/only-export-components */
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LogOut, Languages, Mail, AlertCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.tsx';
