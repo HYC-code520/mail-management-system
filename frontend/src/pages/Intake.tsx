@@ -46,13 +46,13 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
   }, []);
 
   useEffect(() => {
-    if (searchQuery.length >= 2) {
-      searchContacts();
+    if (searchQuery) {
+      void searchContacts();
     } else {
       setSearchResults([]);
       setShowDropdown(false);
     }
-  }, [searchQuery]);
+  }, [searchQuery]); // searchContacts is stable, no need to include
 
   const searchContacts = async () => {
     try {

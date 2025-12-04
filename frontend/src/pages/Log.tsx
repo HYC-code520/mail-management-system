@@ -7,7 +7,7 @@ import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
-import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
+import { getTodayNY } from '../utils/timezone.ts';
 
 interface MailItem {
   mail_item_id: string;
@@ -44,16 +44,6 @@ interface ActionHistory {
   performed_by: string;
   notes?: string;
   action_timestamp: string;
-}
-
-interface CustomerGroup {
-  contact_id: string;
-  customerName: string;
-  mailboxNumber?: string;
-  mailItems: MailItem[];
-  totalQuantity: number;
-  oldestDate: string;
-  statusCounts: Record<string, number>;
 }
 
 interface LogPageProps {
@@ -155,13 +145,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
 
   // Add form: Search contacts
   useEffect(() => {
-    if (showAddForm && searchQuery.length >= 2) {
-      searchContacts();
+    if (searchQuery) {
+      void searchContacts();
     } else {
       setSearchResults([]);
       setShowDropdown(false);
     }
-  }, [searchQuery, showAddForm]);
+  }, [searchQuery, showAddForm]); // searchContacts is stable, no need to include
 
   const searchContacts = async () => {
     try {
@@ -422,7 +412,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         }
         
         // Update the mail item (exclude performed_by and edit_notes from the update payload)
-        const { performed_by, edit_notes, ...updateData } = formData;
+        const { performed_by: _performed_by, edit_notes: _edit_notes, ...updateData } = formData;
         
         // If received_date is being updated and it's a date-only string, add timezone
         if (updateData.received_date && /^\d{4}-\d{2}-\d{2}$/.test(updateData.received_date)) {

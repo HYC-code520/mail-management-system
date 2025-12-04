@@ -62,8 +62,10 @@ export default function DashboardPage() {
   // Chart time range state
   const [chartTimeRange, setChartTimeRange] = useState<7 | 14 | 30>(7); // Default to 7 days
   
-  // Sorting states
+  // Sorting states (for future feature)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sortColumn, setSortColumn] = useState<'date' | 'type' | 'customer' | 'status'>('date');
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Add Customer Modal states
@@ -497,6 +499,7 @@ export default function DashboardPage() {
   //   }
   // };
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const filteredItems = stats?.recentMailItems.filter((item: any) => {
     const matchesStatus = statusFilter === 'All Status' || item.status === statusFilter;
     const matchesSearch = searchTerm === '' || 
@@ -505,6 +508,7 @@ export default function DashboardPage() {
     return matchesStatus && matchesSearch;
   }) || [];
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const sortedItems = [...filteredItems].sort((a, b) => {
     let comparison = 0;
     
