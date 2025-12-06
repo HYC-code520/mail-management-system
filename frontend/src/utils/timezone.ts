@@ -84,3 +84,16 @@ export function getChartDateRange(days: number): Array<{ dateStr: string; displa
   return result;
 }
 
+/**
+ * Get current timestamp in ISO format (for logging mail with actual time)
+ * This preserves the actual time the action was performed
+ */
+export function getNYTimestamp(): string {
+  // Get the current time
+  const now = new Date();
+  
+  // Format it as an ISO string (includes full timestamp)
+  // The server will store this as-is in the database
+  return now.toISOString();
+}
+

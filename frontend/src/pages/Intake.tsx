@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Search, Save, Bell, Mail, Package, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
+import { getTodayNY, getNYTimestamp } from '../utils/timezone';
 
 interface Contact {
   contact_id: string;
@@ -26,7 +27,7 @@ interface IntakePageProps {
 }
 
 export default function IntakePage({ embedded = false }: IntakePageProps) {
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(getTodayNY());
   const [itemType, setItemType] = useState('Letter');
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
@@ -80,7 +81,7 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
   const loadTodaysEntries = async () => {
     try {
       const mailItems = await api.mailItems.getAll();
-      const today = new Date().toISOString().split('T')[0];
+      const today = getTodayNY();
       const todaysItems = mailItems.filter((item: any) => 
         item.received_date?.startsWith(today)
       );
@@ -107,12 +108,14 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
     setLoading(true);
 
     try {
+      // Send the actual current timestamp to capture when mail was logged
       await api.mailItems.create({
         contact_id: selectedContact.contact_id,
         item_type: itemType,
         description: note,
         status: 'Received',
-        quantity: quantity
+        quantity: quantity,
+        received_date: getNYTimestamp()
       });
 
       toast.success(`${quantity} mail item(s) added successfully!`);
@@ -122,7 +125,7 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
       setNote('');
       setSearchQuery('');
       setSelectedContact(null);
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(getTodayNY());
       
       loadTodaysEntries();
     } catch (err) {
@@ -194,7 +197,7 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
       )}
 
       {/* Add New Mail Form */}
-      <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-6 mb-8 shadow-sm">
+      <form onSubmit={handleSubmit} className="bg-white border border-gray-200 rounded-lg p-6 mb-8 shadow-sm" aria-label="Add new mail form">
         <h2 className="text-xl font-bold text-gray-900 mb-6">Add New Mail</h2>
 
         <div className="grid grid-cols-3 gap-4 mb-6">

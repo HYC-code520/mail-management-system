@@ -458,13 +458,14 @@ export default function ContactDetailPage() {
                         <td className="py-4 px-6 text-gray-900">
                           <span 
                             title={`Logged at: ${new Date(item.received_date).toLocaleString('en-US', {
+                              timeZone: 'America/New_York',
                               month: 'short',
                               day: 'numeric',
                               year: 'numeric',
                               hour: 'numeric',
                               minute: '2-digit',
-                              second: '2-digit',
-                              hour12: true
+                              hour12: true,
+                              timeZoneName: 'short'
                             })}`}
                             className="cursor-help border-b border-dotted border-gray-400"
                           >

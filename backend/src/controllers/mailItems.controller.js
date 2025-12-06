@@ -88,9 +88,17 @@ exports.createMailItem = async (req, res, next) => {
       quantity: quantity || 1
     };
 
-    // Only include received_date if provided (otherwise use database default)
+    // Handle received_date
     if (received_date) {
-      mailItemData.received_date = received_date;
+      // If it's a date-only string (YYYY-MM-DD), use the database default (NOW())
+      // This preserves the actual time the mail was logged
+      if (/^\d{4}-\d{2}-\d{2}$/.test(received_date)) {
+        // Don't set received_date, let database use NOW() to capture actual time
+        // The date-only string is just for filtering purposes
+      } else {
+        // If a full timestamp is provided, use it
+        mailItemData.received_date = received_date;
+      }
     }
 
     const { data: mailItem, error } = await supabase

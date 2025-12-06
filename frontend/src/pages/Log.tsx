@@ -7,7 +7,7 @@ import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
-import { getTodayNY } from '../utils/timezone.ts';
+import { getTodayNY, getNYTimestamp } from '../utils/timezone.ts';
 
 interface MailItem {
   mail_item_id: string;
@@ -285,17 +285,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       } else {
         console.log('Creating new mail item...');
         
-        // Create new mail item with current timestamp
-        const now = new Date();
-        const timestamp = now.toISOString(); // Use actual current time
-        
+        // Send the actual current timestamp to capture when mail was logged
         await api.mailItems.create({
           contact_id: selectedContact!.contact_id,
           item_type: itemType,
           description: note,
           status: 'Received',
           quantity: quantity,
-          received_date: timestamp
+          received_date: getNYTimestamp()
         });
 
         console.log('Successfully created new mail!');
@@ -311,6 +308,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       setDate(getTodayNY()); // Use NY timezone
       setShowDuplicatePrompt(false);
       setExistingTodayMail(null);
+      
+      // Small delay before reloading to ensure database has committed the timestamp
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       // Reload mail items
       loadMailItems();
@@ -1237,13 +1237,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     <td className="py-3 px-4 text-gray-900">
                       <span 
                         title={`Logged at: ${new Date(item.received_date).toLocaleString('en-US', {
+                          timeZone: 'America/New_York',
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
                           hour: 'numeric',
                           minute: '2-digit',
-                          second: '2-digit',
-                          hour12: true
+                          hour12: true,
+                          timeZoneName: 'short'
                         })}`}
                         className="cursor-help border-b border-dotted border-gray-400"
                       >
