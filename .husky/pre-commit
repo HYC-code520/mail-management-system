@@ -9,11 +9,28 @@ echo "🧪 Running backend tests before commit..."
 cd "$REPO_ROOT/backend" && npm test
 
 if [ $? -ne 0 ]; then
-  echo "❌ Tests failed! Commit aborted."
+  echo "❌ Backend tests failed! Commit aborted."
   echo "💡 If you're seeing '@jest/test-sequencer' error due to macOS sandbox:"
   echo "   Run: git commit --no-verify"
   echo "   CI will test properly on GitHub Actions."
   exit 1
 fi
 
-echo "✅ All tests passed! Proceeding with commit..."
+echo "✅ Backend tests passed!"
+echo ""
+echo "🧪 Running frontend tests (warn-only mode)..."
+
+# Change to frontend directory and run tests
+cd "$REPO_ROOT/frontend" && npm test
+
+if [ $? -ne 0 ]; then
+  echo ""
+  echo "⚠️  Frontend tests have failures, but allowing commit to proceed."
+  echo "💡 GitHub Actions CI/CD will run full test suite."
+  echo "💡 Check CI results after pushing to catch any real issues."
+  echo ""
+else
+  echo "✅ Frontend tests passed!"
+fi
+
+echo "✅ Proceeding with commit..."
