@@ -65,6 +65,7 @@ const mockContacts = [
 describe('ScanSession', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    localStorage.clear(); // Clear any saved session state!
     (api.contacts.getAll as any).mockResolvedValue(mockContacts);
   });
 
@@ -116,7 +117,7 @@ describe('ScanSession', () => {
       await user.click(startButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/Scan Next Item/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /Scan Next Item/i })).toBeInTheDocument();
       });
     });
 
