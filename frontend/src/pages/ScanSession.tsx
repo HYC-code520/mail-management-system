@@ -30,7 +30,8 @@ export default function ScanSessionPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [quickScanMode, setQuickScanMode] = useState(false); // NEW: Quick scan mode for bulk scanning
+  const [quickScanMode, setQuickScanMode] = useState(false); // Quick scan mode for bulk scanning
+  const [processingQueue, setProcessingQueue] = useState(0); // Count of items being processed in background
   
   // Confirm modal state
   const [pendingItem, setPendingItem] = useState<ScannedItem | null>(null);
@@ -113,119 +114,62 @@ export default function ScanSessionPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    // In Quick Scan Mode: Process in background, allow next photo immediately!
+    if (quickScanMode) {
+      // Increment queue counter
+      setProcessingQueue(prev => prev + 1);
+      
+      // Process photo in background (non-blocking!)
+      processPhotoBackground(file);
+      
+      // Reset input so same file can be selected again
+      event.target.value = '';
+      
+      // Immediately trigger next photo capture!
+      setTimeout(() => {
+        if (fileInputRef.current) {
+          fileInputRef.current.click();
+        }
+      }, 50); // Tiny delay to let file input reset
+      
+      return;
+    }
+
+    // Normal mode: Process and wait
     await processPhoto(file);
 
     // Reset input so same file can be selected again
     event.target.value = '';
   };
 
+  const processPhotoBackground = async (photoBlob: Blob) => {
+    try {
+      // Process photo without blocking UI
+      const result = await processPhotoInternal(photoBlob);
+      
+      // If high confidence, auto-add to session
+      if (result && result.confidence >= 0.7 && result.matchedContact) {
+        confirmScan(result);
+      } else if (result) {
+        // Low confidence: Show modal
+        setPendingItem(result);
+      }
+    } catch (error) {
+      console.error('❌ Background processing failed:', error);
+      toast.error('Failed to process one photo. Continue scanning!', { duration: 2000 });
+    } finally {
+      // Decrement queue counter
+      setProcessingQueue(prev => Math.max(0, prev - 1));
+    }
+  };
+
   const processPhoto = async (photoBlob: Blob) => {
     setIsProcessing(true);
-
     try {
-      // DEBUG: Log photo details
-      console.log('📷 Photo received:', {
-        size: (photoBlob.size / 1024).toFixed(2) + ' KB',
-        type: photoBlob.type,
-      });
-      
-      // DEBUG: Create preview URL so we can see what we're processing
-      const previewUrl = URL.createObjectURL(photoBlob);
-      console.log('👁️ Preview image:', previewUrl);
-      console.log('💡 TIP: Copy the URL above and paste in browser to see the photo being processed');
-
-      // STRATEGY: Use Smart AI Matching with Gemini first (does BOTH extraction + matching!)
-      // If it fails, fall back to Tesseract + fuzzy matching
-      
-      console.log('🤖 Step 1: Trying smart AI matching with Gemini...');
-      toast.loading('AI is analyzing the mail...', { id: 'processing', duration: 3000 });
-      
-      const smartResult = await smartMatchWithGemini(photoBlob, contacts);
-      
-      console.log('🔍 Gemini result:', {
-        extractedText: smartResult.extractedText,
-        matchedContact: smartResult.matchedContact?.contact_person || smartResult.matchedContact?.company_name,
-        confidence: (smartResult.confidence * 100).toFixed(0) + '%',
-        error: smartResult.error
-      });
-
-      // Check if Gemini API failed completely
-      if (smartResult.error) {
-        console.warn('⚠️ Gemini API error:', smartResult.error);
-        toast.loading('API unavailable, using offline OCR...', { id: 'processing', duration: 2000 });
+      const result = await processPhotoInternal(photoBlob);
+      if (result) {
+        setPendingItem(result);
       }
-
-      let finalText = smartResult.extractedText;
-      let finalContact = smartResult.matchedContact;
-      let finalConfidence = smartResult.confidence;
-      let matchReason = smartResult.reason;
-
-      // If Gemini smart matching failed or returned low confidence, try fallback
-      if (!smartResult.matchedContact || smartResult.confidence < CONFIDENCE_THRESHOLD || smartResult.error) {
-        console.log(`⚠️ Gemini ${smartResult.error ? 'failed' : `confidence low (${(smartResult.confidence * 100).toFixed(0)}%)`}, trying fallback...`);
-        toast.loading('Trying offline OCR...', { id: 'processing', duration: 2000 });
-
-        // Fallback: Tesseract OCR + Fuzzy Matching
-        const tesseractResult = await extractRecipientName(photoBlob);
-        console.log('📝 Tesseract extracted:', tesseractResult.text);
-        
-        const fuzzyMatch = matchContactByName(tesseractResult.text, contacts);
-        console.log('🎯 Fuzzy match result:', fuzzyMatch ? `${fuzzyMatch.contact.contact_person || fuzzyMatch.contact.company_name} (${(fuzzyMatch.confidence * 100).toFixed(0)}%)` : 'No match');
-
-        if (fuzzyMatch && fuzzyMatch.confidence > finalConfidence) {
-          finalText = tesseractResult.text;
-          finalContact = fuzzyMatch.contact;
-          finalConfidence = fuzzyMatch.confidence;
-          matchReason = `Offline OCR matched on ${fuzzyMatch.matchedField}`;
-          console.log('✅ Fallback found better match!');
-        }
-      }
-
-      toast.dismiss('processing');
-
-      if (!finalText || finalText.length < 2) {
-        toast.error('Could not read any text from photo. Please try again with better lighting.');
-        return; // Don't throw, just return to keep UI responsive
-      }
-
-      // Create scanned item
-      const item: ScannedItem = {
-        id: `item-${Date.now()}`,
-        photoBlob,
-        photoPreviewUrl: URL.createObjectURL(photoBlob),
-        extractedText: finalText,
-        matchedContact: finalContact,
-        confidence: finalConfidence,
-        itemType: 'Letter', // Default
-        status: finalContact 
-          ? (finalConfidence >= CONFIDENCE_THRESHOLD ? 'matched' : 'uncertain')
-          : 'failed',
-        scannedAt: new Date().toISOString(),
-      };
-
-      console.log(`✅ Match complete: confidence ${(item.confidence * 100).toFixed(0)}%`, matchReason);
-
-      // Quick Scan Mode: Auto-accept high confidence matches (>= 70%)
-      if (quickScanMode && finalConfidence >= 0.7 && finalContact) {
-        console.log('🚀 Quick scan: Auto-accepting high confidence match');
-        confirmScan(item);
-        
-        // Provide haptic feedback for successful scan
-        if (navigator.vibrate) {
-          navigator.vibrate([50, 30, 50]); // Double vibration for success
-        }
-        
-        // Auto-trigger next photo immediately (no delay!)
-        setTimeout(() => {
-          if (fileInputRef.current) {
-            fileInputRef.current.click();
-          }
-        }, 100); // Reduced from 300ms to 100ms for faster flow
-        return;
-      }
-
-      // Normal mode OR low confidence: Show confirmation modal
-      setPendingItem(item);
     } catch (error) {
       console.error('❌ Photo processing failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -233,6 +177,100 @@ export default function ScanSessionPage() {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const processPhotoInternal = async (photoBlob: Blob): Promise<ScannedItem | null> => {
+    // DEBUG: Log photo details
+    console.log('📷 Photo received:', {
+      size: (photoBlob.size / 1024).toFixed(2) + ' KB',
+      type: photoBlob.type,
+    });
+    
+    // DEBUG: Create preview URL so we can see what we're processing
+    const previewUrl = URL.createObjectURL(photoBlob);
+    console.log('👁️ Preview image:', previewUrl);
+    console.log('💡 TIP: Copy the URL above and paste in browser to see the photo being processed');
+
+    // STRATEGY: Use Smart AI Matching with Gemini first (does BOTH extraction + matching!)
+    // If it fails, fall back to Tesseract + fuzzy matching
+    
+    console.log('🤖 Step 1: Trying smart AI matching with Gemini...');
+    if (!quickScanMode) {
+      toast.loading('AI is analyzing the mail...', { id: 'processing', duration: 3000 });
+    }
+    
+    const smartResult = await smartMatchWithGemini(photoBlob, contacts);
+    
+    console.log('🔍 Gemini result:', {
+      extractedText: smartResult.extractedText,
+      matchedContact: smartResult.matchedContact?.contact_person || smartResult.matchedContact?.company_name,
+      confidence: (smartResult.confidence * 100).toFixed(0) + '%',
+      error: smartResult.error
+    });
+
+    // Check if Gemini API failed completely
+    if (smartResult.error) {
+      console.warn('⚠️ Gemini API error:', smartResult.error);
+      if (!quickScanMode) {
+        toast.loading('API unavailable, using offline OCR...', { id: 'processing', duration: 2000 });
+      }
+    }
+
+    let finalText = smartResult.extractedText;
+    let finalContact = smartResult.matchedContact;
+    let finalConfidence = smartResult.confidence;
+    let matchReason = smartResult.reason;
+
+    // If Gemini smart matching failed or returned low confidence, try fallback
+    if (!smartResult.matchedContact || smartResult.confidence < CONFIDENCE_THRESHOLD || smartResult.error) {
+      console.log(`⚠️ Gemini ${smartResult.error ? 'failed' : `confidence low (${(smartResult.confidence * 100).toFixed(0)}%)`}, trying fallback...`);
+      if (!quickScanMode) {
+        toast.loading('Trying offline OCR...', { id: 'processing', duration: 2000 });
+      }
+
+      // Fallback: Tesseract OCR + Fuzzy Matching
+      const tesseractResult = await extractRecipientName(photoBlob);
+      console.log('📝 Tesseract extracted:', tesseractResult.text);
+      
+      const fuzzyMatch = matchContactByName(tesseractResult.text, contacts);
+      console.log('🎯 Fuzzy match result:', fuzzyMatch ? `${fuzzyMatch.contact.contact_person || fuzzyMatch.contact.company_name} (${(fuzzyMatch.confidence * 100).toFixed(0)}%)` : 'No match');
+
+      if (fuzzyMatch && fuzzyMatch.confidence > finalConfidence) {
+        finalText = tesseractResult.text;
+        finalContact = fuzzyMatch.contact;
+        finalConfidence = fuzzyMatch.confidence;
+        matchReason = `Offline OCR matched on ${fuzzyMatch.matchedField}`;
+        console.log('✅ Fallback found better match!');
+      }
+    }
+
+    toast.dismiss('processing');
+
+    if (!finalText || finalText.length < 2) {
+      if (!quickScanMode) {
+        toast.error('Could not read any text from photo. Please try again with better lighting.');
+      }
+      return null; // Return null instead of throwing
+    }
+
+    // Create scanned item
+    const item: ScannedItem = {
+      id: `item-${Date.now()}-${Math.random()}`, // Add random to prevent collisions
+      photoBlob,
+      photoPreviewUrl: URL.createObjectURL(photoBlob),
+      extractedText: finalText,
+      matchedContact: finalContact,
+      confidence: finalConfidence,
+      itemType: 'Letter', // Default
+      status: finalContact 
+        ? (finalConfidence >= CONFIDENCE_THRESHOLD ? 'matched' : 'uncertain')
+        : 'failed',
+      scannedAt: new Date().toISOString(),
+    };
+
+    console.log(`✅ Match complete: confidence ${(item.confidence * 100).toFixed(0)}%`, matchReason);
+
+    return item;
   };
 
   const confirmScan = (item: ScannedItem) => {
@@ -576,21 +614,27 @@ export default function ScanSessionPage() {
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-6 z-20">
         <div className="max-w-4xl mx-auto">
           {/* Floating Counter Badge (visible in Quick Scan Mode) */}
-          {quickScanMode && session.items.length > 0 && (
-            <div className="mb-3 flex items-center justify-center">
-              <div className="bg-green-600 text-white px-6 py-2 rounded-full shadow-lg animate-pulse">
+          {quickScanMode && (session.items.length > 0 || processingQueue > 0) && (
+            <div className="mb-3 flex items-center justify-center gap-3">
+              <div className="bg-green-600 text-white px-6 py-2 rounded-full shadow-lg">
                 <span className="text-2xl font-bold">{session.items.length}</span>
-                <span className="text-sm ml-2">items scanned</span>
+                <span className="text-sm ml-2">scanned</span>
               </div>
+              {processingQueue > 0 && (
+                <div className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg animate-pulse">
+                  <Loader className="w-4 h-4 inline mr-2" />
+                  <span className="text-sm">{processingQueue} processing...</span>
+                </div>
+              )}
             </div>
           )}
           
           <button
             onClick={handleCameraClick}
-            disabled={isProcessing}
+            disabled={isProcessing && !quickScanMode}
             className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-lg font-semibold rounded-xl transition-colors flex items-center justify-center gap-3"
           >
-            {isProcessing ? (
+            {isProcessing && !quickScanMode ? (
               <>
                 <Loader className="w-6 h-6 animate-spin" />
                 Processing...
@@ -598,10 +642,16 @@ export default function ScanSessionPage() {
             ) : (
               <>
                 <Camera className="w-6 h-6" />
-                {quickScanMode ? 'Scan Next (Auto-Continue)' : 'Scan Next Item'}
+                {quickScanMode ? '📸 Scan (Keep Going!)' : 'Scan Next Item'}
               </>
             )}
           </button>
+          
+          {quickScanMode && processingQueue === 0 && session.items.length > 0 && (
+            <p className="text-center text-sm text-gray-600 mt-2">
+              ✅ All photos processed! Keep scanning or end session.
+            </p>
+          )}
         </div>
         <input
           ref={fileInputRef}
