@@ -12,7 +12,7 @@ interface Contact {
 interface MatchResult {
   contact: Contact;
   confidence: number;
-  matchedField: 'contact_person' | 'company_name';
+  matchedField: 'contact_person' | 'company_name' | 'mailbox_number';
 }
 
 /**
@@ -55,6 +55,23 @@ export function matchContactByName(
     .toLowerCase()
     .replace(/\s+/g, ' ') // Normalize spaces
     .trim();
+
+  // Check for exact mailbox number match first (highest confidence)
+  for (const contact of contacts) {
+    if (contact.mailbox_number && contact.mailbox_number.toLowerCase() === normalizedExtracted) {
+      console.log('✅ Exact mailbox match found:', {
+        extracted: extractedText,
+        matched: contact.mailbox_number,
+        confidence: '1.00',
+        field: 'mailbox_number',
+      });
+      return {
+        contact,
+        confidence: 1.0,
+        matchedField: 'mailbox_number',
+      };
+    }
+  }
 
   // Try multiple variations of the extracted text for better matching
   const searchVariations = [
@@ -113,7 +130,7 @@ export function matchContactByName(
   const confidence = bestConfidence;
 
   // Determine which field was matched
-  let matchedField: 'contact_person' | 'company_name' = 'contact_person';
+  let matchedField: 'contact_person' | 'company_name' | 'mailbox_number' = 'contact_person';
   if (contact.company_name && !contact.contact_person) {
     matchedField = 'company_name';
   } else if (contact.company_name && contact.contact_person) {

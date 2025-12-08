@@ -330,20 +330,20 @@ export default function TodoList() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Tasks</h1>
-        <p className="text-gray-600">Manage your daily tasks and priorities</p>
+      <div className="mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Tasks</h1>
+        <p className="text-sm md:text-base text-gray-600">Manage your daily tasks and priorities</p>
       </div>
 
       {/* Add New Todo Form */}
-      <div className="mb-8">
+      <div className="mb-6 md:mb-8">
         <div className="flex items-center gap-2 mb-3">
           <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-          <h2 className="text-lg font-semibold text-gray-900">Add New Task</h2>
+          <h2 className="text-base md:text-lg font-semibold text-gray-900">Add New Task</h2>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
         <form onSubmit={handleAddTodo} className="space-y-4">
           <div>
             <input
@@ -368,46 +368,46 @@ export default function TodoList() {
             />
           </div>
           
-          <div className="flex gap-4 flex-wrap">
-            <div className="flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-gray-500" />
+          <div className="flex flex-col md:flex-row gap-3 md:gap-4 flex-wrap">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
               <input
                 type="date"
                 value={newTodoDate}
                 onChange={(e) => setNewTodoDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <Folder className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Folder className="w-4 h-4 text-gray-500 flex-shrink-0" />
               <input
                 type="text"
                 value={newTodoCategory}
                 onChange={(e) => setNewTodoCategory(e.target.value)}
                 placeholder="Category (optional)"
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
 
-            <div className="flex items-center gap-2">
-              <Flag className="w-4 h-4 text-gray-500" />
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Flag className="w-4 h-4 text-gray-500 flex-shrink-0" />
               <select
                 value={newTodoPriority}
                 onChange={(e) => setNewTodoPriority(Number(e.target.value))}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value={0}>Normal</option>
                 <option value={1}>Priority</option>
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-gray-700">Staff:</span>
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <span className="text-sm font-medium text-gray-700 flex-shrink-0">Staff:</span>
               <select
                 value={newTodoStaff}
                 onChange={(e) => setNewTodoStaff(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="Merlin">Merlin</option>
                 <option value="Madison">Madison</option>
@@ -487,9 +487,9 @@ export default function TodoList() {
                 {groupedTodos[dateKey].map((todo) => (
                   <div
                     key={todo.todo_id}
-                    className="px-6 py-4 hover:bg-gray-50 transition-colors group"
+                    className="px-4 md:px-6 py-3 md:py-4 hover:bg-gray-50 transition-colors group"
                   >
-                    <div className="flex items-start gap-4">
+                    <div className="flex items-start gap-3">
                       {/* Checkbox */}
                       <button
                         onClick={() => handleToggleComplete(todo)}
@@ -509,7 +509,7 @@ export default function TodoList() {
                         <div className="flex items-start gap-2">
                           {getPriorityIcon(todo.priority)}
                           <p
-                            className={`text-base ${
+                            className={`text-sm md:text-base break-words ${
                               todo.is_completed
                                 ? 'line-through text-gray-400'
                                 : 'text-gray-900'
@@ -521,26 +521,43 @@ export default function TodoList() {
                         
                         {/* Notes/Description (if exists) */}
                         {todo.notes && (
-                          <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap pl-6">
+                          <div className="mt-2 text-xs md:text-sm text-gray-600 whitespace-pre-wrap pl-6">
                             {todo.notes}
                           </div>
                         )}
                         
-                        {/* Metadata: Category only */}
-                        <div className="flex items-center gap-2 mt-1">
+                        {/* Metadata: Category + User info on mobile */}
+                        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-2">
                           {todo.category && (
-                            <span className="inline-block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">
+                            <span className="inline-block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full w-fit">
                               {todo.category}
                             </span>
+                          )}
+                          
+                          {/* Show who last edited on mobile (move from right side) */}
+                          {todo.last_edited_by_name && (
+                            <div className="flex items-center gap-1.5 text-xs text-gray-500 md:hidden">
+                              <div 
+                                className={`w-5 h-5 rounded-full ${getUserColor(todo.last_edited_by_name)} flex items-center justify-center text-white text-[10px] font-semibold`}
+                                title={`Last edited by ${todo.last_edited_by_name}`}
+                              >
+                                {getInitials(todo.last_edited_by_name)}
+                              </div>
+                              <span className="truncate">
+                                {todo.created_by_email === todo.last_edited_by_email 
+                                  ? 'created' 
+                                  : 'edited'} {new Date(todo.updated_at || todo.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>
 
-                      {/* Right side: Creator info + Action Buttons */}
-                      <div className="flex items-center gap-3">
-                        {/* Show who last edited (like Apple Notes) */}
+                      {/* Right side: Creator info (desktop only) + Action Buttons */}
+                      <div className="flex items-start gap-2 md:gap-3 flex-shrink-0">
+                        {/* Show who last edited (desktop only) */}
                         {todo.last_edited_by_name && (
-                          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+                          <div className="hidden md:flex items-center gap-1.5 text-xs text-gray-500">
                             <div 
                               className={`w-5 h-5 rounded-full ${getUserColor(todo.last_edited_by_name)} flex items-center justify-center text-white text-[10px] font-semibold`}
                               title={`Last edited by ${todo.last_edited_by_name}`}
@@ -555,22 +572,22 @@ export default function TodoList() {
                           </div>
                         )}
                         
-                        {/* Action Buttons */}
+                        {/* Action Buttons - always visible on mobile, hover on desktop */}
                         <div className="flex items-center gap-2">
                         {/* Edit Button */}
                         <button
                           onClick={() => openEditModal(todo)}
-                          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
+                          className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
                         >
-                          <Edit2 className="w-5 h-5" />
+                          <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
                         
                         {/* Delete Button */}
                         <button
                           onClick={() => handleDeleteTodo(todo.todo_id)}
-                          className="flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700"
+                          className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700"
                         >
-                          <Trash2 className="w-5 h-5" />
+                          <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
                         </button>
                         </div>
                       </div>
