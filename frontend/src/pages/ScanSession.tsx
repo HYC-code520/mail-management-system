@@ -32,6 +32,7 @@ export default function ScanSessionPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [quickScanMode, setQuickScanMode] = useState(false); // Quick scan mode for bulk scanning
   const [processingQueue, setProcessingQueue] = useState(0); // Count of items being processed in background
+  const [autoTriggerEnabled, setAutoTriggerEnabled] = useState(true); // Prevent infinite loops
   
   // Confirm modal state
   const [pendingItem, setPendingItem] = useState<ScannedItem | null>(null);
@@ -112,25 +113,34 @@ export default function ScanSessionPage() {
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file) {
+      console.warn('⚠️ No file selected');
+      return;
+    }
+
+    console.log(`📸 File selected: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
 
     // In Quick Scan Mode: Process in background, allow next photo immediately!
     if (quickScanMode) {
-      // Increment queue counter
-      setProcessingQueue(prev => prev + 1);
+      console.log('⚡ Quick Scan Mode: Processing in background...');
+      
+      // Increment queue counter BEFORE processing
+      setProcessingQueue(prev => {
+        const newCount = prev + 1;
+        console.log(`📊 Queue count: ${newCount}`);
+        return newCount;
+      });
       
       // Process photo in background (non-blocking!)
-      processPhotoBackground(file);
+      processPhotoBackground(file).catch(err => {
+        console.error('❌ Background processing error:', err);
+      });
       
       // Reset input so same file can be selected again
       event.target.value = '';
       
-      // Immediately trigger next photo capture!
-      setTimeout(() => {
-        if (fileInputRef.current) {
-          fileInputRef.current.click();
-        }
-      }, 50); // Tiny delay to let file input reset
+      // DON'T auto-trigger - let user control when to take next photo
+      // This prevents infinite loops and gives user time to position next mail
       
       return;
     }
@@ -143,23 +153,43 @@ export default function ScanSessionPage() {
   };
 
   const processPhotoBackground = async (photoBlob: Blob) => {
+    console.log('🔄 Background processing started');
     try {
       // Process photo without blocking UI
       const result = await processPhotoInternal(photoBlob);
       
+      console.log('✅ Background processing complete:', {
+        hasResult: !!result,
+        confidence: result?.confidence,
+        contact: result?.matchedContact?.contact_person || result?.matchedContact?.company_name
+      });
+      
       // If high confidence, auto-add to session
       if (result && result.confidence >= 0.7 && result.matchedContact) {
+        console.log('🚀 Auto-accepting high confidence match');
         confirmScan(result);
+        
+        // Haptic feedback
+        if (navigator.vibrate) {
+          navigator.vibrate([50, 30, 50]);
+        }
       } else if (result) {
         // Low confidence: Show modal
+        console.log('⚠️ Low confidence, showing modal');
         setPendingItem(result);
+      } else {
+        console.warn('⚠️ No result from processing');
       }
     } catch (error) {
       console.error('❌ Background processing failed:', error);
       toast.error('Failed to process one photo. Continue scanning!', { duration: 2000 });
     } finally {
       // Decrement queue counter
-      setProcessingQueue(prev => Math.max(0, prev - 1));
+      setProcessingQueue(prev => {
+        const newCount = Math.max(0, prev - 1);
+        console.log(`📊 Queue decremented to: ${newCount}`);
+        return newCount;
+      });
     }
   };
 
