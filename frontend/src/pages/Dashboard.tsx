@@ -490,12 +490,12 @@ export default function DashboardPage() {
         {/* Optional: Keep skeleton underneath for better UX */}
         <div className="animate-pulse space-y-8 opacity-50 mt-8">
           <div className="h-8 bg-gray-200 rounded w-48"></div>
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="h-32 bg-gray-100 rounded-lg"></div>
             ))}
           </div>
-          <div className="grid grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <div className="h-64 bg-gray-100 rounded-lg"></div>
             <div className="h-64 bg-gray-100 rounded-lg"></div>
           </div>
@@ -560,7 +560,7 @@ export default function DashboardPage() {
           <div className="w-1 h-6 bg-green-600 rounded-full"></div>
           <h2 className="text-lg font-semibold text-gray-900">Quick Actions</h2>
         </div>
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <button
             onClick={() => navigate('/dashboard/templates')}
             className="flex items-center justify-center gap-3 px-6 py-4 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
@@ -585,8 +585,8 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Stats Cards - 4 columns */}
-      <div className="grid grid-cols-4 gap-6 mb-8">
+      {/* Stats Cards - Responsive grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
         {/* Today's Mail */}
         <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
           <div className="flex justify-between items-start mb-4">
@@ -636,10 +636,10 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/* Two-Column Layout: Needs Follow-Up + Charts */}
-      <div className="grid grid-cols-5 gap-6 mb-8 items-start">
-        {/* Left Column: Needs Follow-Up (60% width = 3 cols) */}
-        <div className="col-span-3 h-full">
+      {/* Responsive Layout: Stack on mobile, side-by-side on desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8 items-start">
+        {/* Needs Follow-Up - Full width on mobile, 60% on desktop */}
+        <div className="lg:col-span-3 h-full">
           {/* Needs Follow-Up Widget - HIGH PRIORITY */}
           {stats && stats.needsFollowUp.length > 0 && (
             <div className="bg-gray-50 border-2 border-gray-300 rounded-lg h-full">
@@ -906,8 +906,8 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Right Column: Charts (40% width = 2 cols) */}
-        <div className="col-span-2 space-y-6 h-full">
+        {/* Charts - Full width on mobile, 40% on desktop */}
+        <div className="lg:col-span-2 space-y-6 h-full">
           {/* Time Range Toggle - Shared for both charts */}
           <div className="flex items-center justify-center gap-2 bg-gray-100 p-1 rounded-lg">
             <button
@@ -1042,7 +1042,7 @@ export default function DashboardPage() {
       >
         <form onSubmit={handleAddCustomerSubmit} className="space-y-6">
           {/* Name & Company */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Name <span className="text-red-500">*</span>
@@ -1070,7 +1070,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Mailbox & Language */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">
                 Mailbox # <span className="text-red-500">*</span>
@@ -1101,7 +1101,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Email & Phone */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
               <input
@@ -1128,7 +1128,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Unit & Service Tier */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">Unit #</label>
               <input

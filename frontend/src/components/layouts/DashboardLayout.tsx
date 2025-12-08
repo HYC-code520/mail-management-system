@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Languages, Mail, AlertCircle } from 'lucide-react';
+import { LogOut, Languages, Mail, AlertCircle, Menu, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { useState, useEffect, useCallback } from 'react';
@@ -12,6 +12,7 @@ export default function DashboardLayout() {
   const [currentLanguage, setCurrentLanguage] = useState<'EN' | 'CN' | 'BOTH'>('EN');
   const [gmailConnected, setGmailConnected] = useState<boolean | null>(null);
   const [gmailAddress, setGmailAddress] = useState<string | null>(null);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Gmail status check function - defined before useEffect
   const checkGmailStatus = useCallback(async () => {
@@ -57,16 +58,16 @@ export default function DashboardLayout() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Top Bar */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="flex justify-between items-center py-4">
+      <div className="bg-white border-b border-gray-200 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 md:px-6">
+          <div className="flex justify-between items-center py-3 md:py-4">
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center">
-              <h1 className="text-2xl font-bold text-brand">Mei Way Mail Plus</h1>
+              <h1 className="text-lg md:text-2xl font-bold text-brand">Mei Way Mail Plus</h1>
             </Link>
 
-            {/* Language Toggle & User */}
-            <div className="flex items-center gap-4">
+            {/* Desktop: Language Toggle & User */}
+            <div className="hidden lg:flex items-center gap-4">
               {/* Gmail Status Indicator */}
               {gmailConnected !== null && (
                 <Link
@@ -142,10 +143,23 @@ export default function DashboardLayout() {
                 </button>
               </div>
             </div>
+
+            {/* Mobile: Hamburger Menu Button */}
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? (
+                <X className="w-6 h-6 text-gray-700" />
+              ) : (
+                <Menu className="w-6 h-6 text-gray-700" />
+              )}
+            </button>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex gap-1 bg-gray-100 rounded-full p-1 w-fit mb-6">
+          {/* Desktop: Navigation Tabs */}
+          <div className="hidden lg:flex gap-1 bg-gray-100 rounded-full p-1 w-fit mb-6">
             <Link
               to="/dashboard"
               className={`px-6 py-2 rounded-full font-medium transition-all ${
@@ -157,7 +171,6 @@ export default function DashboardLayout() {
               Dashboard
             </Link>
             
-            {/* Mail Log Tab - Single Link */}
             <Link
               to="/dashboard/mail"
               className={`px-6 py-2 rounded-full font-medium transition-all ${
@@ -219,10 +232,124 @@ export default function DashboardLayout() {
             >
               Settings
             </Link>
-            {/* Design tab temporarily hidden - route still exists at /dashboard/design-system */}
           </div>
         </div>
       </div>
+
+      {/* Mobile Menu Overlay */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-40" onClick={() => setMobileMenuOpen(false)}>
+          <div 
+            className="absolute top-0 right-0 w-80 max-w-[85vw] h-full bg-white shadow-xl overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="p-6 space-y-6">
+              {/* User Info */}
+              <div className="pb-4 border-b border-gray-200">
+                <p className="text-sm font-medium text-gray-900 break-words">{user?.email}</p>
+                {gmailConnected !== null && (
+                  <p className={`text-xs mt-1 ${gmailConnected ? 'text-green-600' : 'text-red-600'}`}>
+                    {gmailConnected ? '✓ Gmail Connected' : '✗ Gmail Not Connected'}
+                  </p>
+                )}
+              </div>
+
+              {/* Navigation Links */}
+              <nav className="space-y-2">
+                <Link
+                  to="/dashboard"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    location.pathname === '/dashboard'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/dashboard/mail"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    location.pathname.startsWith('/dashboard/mail')
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Mail Log
+                </Link>
+                <Link
+                  to="/dashboard/contacts"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    isActive('/dashboard/contacts')
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Customers
+                </Link>
+                <Link
+                  to="/dashboard/templates"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    location.pathname === '/dashboard/templates'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Email Templates
+                </Link>
+                <Link
+                  to="/dashboard/todos"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    location.pathname === '/dashboard/todos'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Tasks
+                </Link>
+                <Link
+                  to="/dashboard/scan"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    location.pathname === '/dashboard/scan'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  📱 Scan Mail
+                </Link>
+                <Link
+                  to="/dashboard/settings"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    location.pathname === '/dashboard/settings'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Settings
+                </Link>
+              </nav>
+
+              {/* Sign Out Button */}
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  void handleSignOut();
+                }}
+                className="w-full flex items-center justify-center gap-2 px-4 py-3 text-sm bg-red-50 hover:bg-red-100 text-red-700 rounded-lg border border-red-200 transition-colors font-medium"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <main>
