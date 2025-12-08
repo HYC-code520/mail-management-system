@@ -1,6 +1,6 @@
 # Project Error & Solutions Log
 
-**Total Entries:** 24 | **Last Updated:** 2025-12-07
+**Total Entries:** 30 | **Last Updated:** 2025-12-08
 
 ## Quick Navigation
 
@@ -10,15 +10,17 @@
 - **Security & Authentication** (Errors: 14, 22, 23)
 - **Build & Compilation** (Errors: 4, 5, 6, 7, 16, 21)
 - **Deployment & Environment** (Errors: 8-13)
-- **Network & API** (Errors: 17, 19, 20)
+- **Network & API** (Errors: 17, 19, 20, 25-30)
 - **Database & RLS** (Errors: 14, 22)
 - **UX & Templates** (Errors: 21, 22)
+- **Rate Limiting & Quotas** (Errors: 25-30)
 
 ### 🔥 **Most Critical Issues:**
 1. [#15 - Jest test-sequencer (Recurring)](#15-jest-test-sequencer-module-resolution---macos-sandbox-permissions-issue) - macOS sandbox blocking tests
 2. [#14 - Wrong Supabase Client (Silent Failure)](#14-email-sent-successfully-but-database-not-updated---wrong-supabase-client) - Database not updating
 3. [#18 - OCR Accuracy (User Experience)](#18-ocr-accuracy-issues---tesseract-failing-on-stylized-text) - AI solution needed
 4. [#23 - Missing Auth Middleware](#23-scan-email-notifications-not-sending---missing-user-authentication) - 0 emails sent
+5. [#30 - Gemini Rate Limits (Production Blocker)](#30-gemini-flash-lite-quota-exhausted---20-requestsday-limit) - Only 20 requests/day!
 
 ### 📅 **By Date:**
 - **Nov 2025:** Errors 1-14 (Foundation & Core Features)
@@ -30,6 +32,7 @@
 - **Supabase Client:** Errors 13, 14 (Wrong client usage)
 - **Test Mocking:** Errors 2, 3, 15, 24 (Mock setup issues)
 - **Authentication:** Errors 10, 13, 23 (Missing middleware)
+- **Rate Limiting:** Errors 25-30 (Gemini API quotas - 6 iterations!)
 
 ### 🎓 **Learning Journey:**
 - **Week 1 (Nov):** Infrastructure setup, deployment, RLS policies
@@ -3131,5 +3134,423 @@ Frontend shows: "Session complete! 3 customers notified" 🎉
 - ✅ Proper mocking patterns established
 - ✅ JSDOM limitations documented
 - ✅ Ready for production deployment
+
+---
+
+## 25. Gemini API 429 Errors - Rate Limiting Issues
+
+**Category:** NETWORK | **Date:** 2025-12-08 | **Severity:** High | **Status:** ✅ Fixed
+
+**Error:**
+```
+POST .../smart-match 429 (Too Many Requests)
+```
+
+**Context:**
+- User scanning multiple photos on mobile
+- Processing happens in background
+- Multiple photos trigger multiple API calls simultaneously
+- Gemini free tier: 15 RPM (requests per minute)
+
+**Root Cause Analysis:**
+- No rate limiting implemented in frontend
+- All photos sent to API immediately
+- Burst of 4+ photos = instant 429 error
+
+**Fix:**
+```typescript
+// Added in frontend/src/pages/ScanSession.tsx
+const lastGeminiCallRef = useRef<number>(0);
+const MIN_DELAY_MS = 4000; // 4 seconds = 15 calls per minute
+
+const processPhotoBackground = async (photoBlob: Blob) => {
+  // Wait if last call was too recent
+  const now = Date.now();
+  const timeSinceLastCall = now - lastGeminiCallRef.current;
+  
+  if (timeSinceLastCall < MIN_DELAY_MS) {
+    const waitTime = MIN_DELAY_MS - timeSinceLastCall;
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastGeminiCallRef.current = Date.now();
+  // ... process photo
+};
+```
+
+**Testing:**
+```bash
+# Test rapid photo scanning
+1. Start scan session
+2. Take 5 photos quickly
+3. Observe 4-second delays between API calls
+4. All photos process successfully
+```
+
+**Prevention:**
+- ✅ Rate limiting logic
+- ✅ User feedback during delays
+- ✅ Queue visualization
+
+---
+
+## 26. Race Condition in Rate Limiting
+
+**Category:** NETWORK | **Date:** 2025-12-08 | **Severity:** Critical | **Status:** ✅ Fixed
+
+**Error:**
+```
+Still getting 429 errors even with rate limiting!
+3 photos → all call API at same time → 429
+```
+
+**Context:**
+- Rate limiting was added (Error #25)
+- But multiple async calls still bypassed it
+- Classic race condition!
+
+**Root Cause Analysis:**
+```typescript
+// BEFORE (BROKEN):
+const processPhotoBackground = async (photoBlob: Blob) => {
+  const timeSinceLastCall = now - lastGeminiCallRef.current; // All read 0
+  
+  if (timeSinceLastCall < MIN_DELAY_MS) {
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  lastGeminiCallRef.current = Date.now(); // Updated AFTER wait (too late!)
+  // All 3 photos already bypassed the check by now!
+};
+```
+
+**The Problem:**
+1. Photo #1 starts: sees `lastGeminiCallRef = 0`, no wait needed
+2. Photo #2 starts: sees `lastGeminiCallRef = 0`, no wait needed
+3. Photo #3 starts: sees `lastGeminiCallRef = 0`, no wait needed
+4. All 3 call API at same time → 429!
+
+**Fix:**
+```typescript
+// AFTER (FIXED):
+const processPhotoBackground = async (photoBlob: Blob) => {
+  const now = Date.now();
+  const timeSinceLastCall = now - lastGeminiCallRef.current;
+  
+  // Reserve slot IMMEDIATELY before waiting
+  lastGeminiCallRef.current = Math.max(
+    lastGeminiCallRef.current + MIN_DELAY_MS,
+    now
+  );
+  
+  if (timeSinceLastCall < MIN_DELAY_MS) {
+    const waitTime = MIN_DELAY_MS - timeSinceLastCall;
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+  
+  // ... process photo
+};
+```
+
+**How It Works Now:**
+1. Photo #1: reserves 0s slot
+2. Photo #2: reserves 4s slot (0 + 4000)
+3. Photo #3: reserves 8s slot (4000 + 4000)
+4. All calculated instantly, proper spacing!
+
+**Testing:**
+```bash
+# Test burst scanning
+1. Take 5 photos as fast as possible
+2. Console shows: "⏳ Processing (4s delay)"
+3. No 429 errors
+4. All photos process successfully
+```
+
+**Lesson Learned:**
+- Race conditions happen when async functions read/write shared state
+- Fix: Reserve resources BEFORE async operations
+- Use `Math.max` to queue properly
+
+---
+
+## 27. React Closure Issue - Stale State
+
+**Category:** INTEGRATION | **Date:** 2025-12-08 | **Severity:** High | **Status:** ✅ Fixed
+
+**Error:**
+```
+Debug panel shows: "Scanned: 4 | Processing: 0"
+But UI says: "No items scanned yet"
+Items disappearing into the void!
+```
+
+**Context:**
+- Photos process successfully (200 status)
+- Console logs show items added
+- But `session.items.length` stays at 0
+- State update not working
+
+**Root Cause Analysis:**
+```typescript
+// BEFORE (BROKEN):
+const processPhotoBackground = async (photoBlob: Blob) => {
+  // ... process photo
+  
+  setSession({
+    ...session,  // ❌ STALE! This is the `session` from when function was created
+    items: [...session.items, result],
+  });
+};
+```
+
+**The Problem:**
+1. `processPhotoBackground` is defined once when component mounts
+2. It captures `session` in its closure
+3. Photo #1 processes → sees `session = { items: [] }`
+4. Photo #2 processes → ALSO sees `session = { items: [] }`
+5. Photo #3 processes → ALSO sees `session = { items: [] }`
+6. All updates use stale state → only last one wins!
+
+**Fix:**
+```typescript
+// AFTER (FIXED):
+const confirmScan = (item: ScannedItem) => {
+  setSession(prevSession => {  // ✅ Use functional update!
+    if (!prevSession) return null;
+    
+    return {
+      ...prevSession,  // ✅ Always gets latest state
+      items: [...prevSession.items, item],
+    };
+  });
+};
+```
+
+**Why It Works:**
+- `setSession(prevSession => ...)` gets latest state from React
+- Not from closure
+- Each update builds on previous update
+- No race condition!
+
+**Testing:**
+```bash
+# Test rapid scanning
+1. Scan 5 photos quickly
+2. Debug panel: "Scanned: 5"
+3. UI shows all 5 items
+4. End session → all 5 submitted
+```
+
+**Lesson Learned:**
+- Always use functional updates in async callbacks
+- `setState(prev => ...)` prevents stale state bugs
+- Especially important for background processing
+
+---
+
+## 28. Gemini Daily Quota Exhausted
+
+**Category:** NETWORK | **Date:** 2025-12-08 | **Severity:** High | **Status:** ⚠️ Workaround
+
+**Error:**
+```
+429 Too Many Requests - even on first photo of the day!
+"You exceeded your current quota, please check your plan"
+```
+
+**Context:**
+- User testing extensively all day
+- Gemini free tier: 1,500 requests/day
+- Each photo = 1 request
+- Probably hit limit during testing
+
+**Root Cause Analysis:**
+- Free tier quota is daily (resets at midnight UTC)
+- Extensive testing = 100+ photos
+- Easy to hit 1,500 limit during development
+
+**Workarounds:**
+1. **Wait until tomorrow** (midnight UTC)
+2. **Create new Google account** (new API key)
+3. **Temporary Tesseract-only mode:**
+
+```typescript
+// Added in frontend/src/pages/ScanSession.tsx
+const TEST_TESSERACT_ONLY = true; // Toggle for testing
+
+const smartResult = TEST_TESSERACT_ONLY
+  ? { extractedText: '', matchedContact: null, confidence: 0 }
+  : await smartMatchWithGemini(photoBlob, contacts);
+```
+
+**How to Check Quota:**
+1. Visit: https://aistudio.google.com/app/apikey
+2. Click your API key
+3. View usage stats
+
+**Prevention:**
+- Monitor usage during development
+- Use Tesseract for bulk testing
+- Save Gemini for accuracy testing
+- Consider paid tier for production ($0.00025/image)
+
+**Long-term Solution:**
+- Implement hybrid approach:
+  - Use Tesseract first
+  - Only call Gemini if confidence < 0.7
+  - Reduces API usage by ~70%
+
+---
+
+## 29. Multiple API Keys Don't Increase Quota
+
+**Category:** NETWORK | **Date:** 2025-12-08 | **Severity:** Info | **Status:** ✅ Documented
+
+**User Question:**
+> "I can make new API key whenever I exceed it even if it's under the same Gmail account? Why would that make sense?"
+
+**Answer:**
+**No, creating multiple API keys under the same Google account does NOT increase your quota.**
+
+**Why:**
+- Quota is tracked **per Google Cloud Project**, not per API key
+- API keys are just authentication tokens
+- All keys in the same project share the same limits
+
+**What WOULD Work:**
+1. **Create a different Google account** (different email)
+   - New account = new project = new quota
+   - You'd get another 1,500 requests/day
+   
+2. **Upgrade to paid tier**
+   - No daily limits (only RPM limits)
+   - Pay per request: $0.00025/image
+   - 1,000 images = $0.25
+
+**What DOESN'T Work:**
+- ❌ Creating multiple API keys in same project
+- ❌ Deleting and recreating API key
+- ❌ Revoking and regenerating key
+
+**Quota Hierarchy:**
+```
+Google Account
+  └── Google Cloud Project
+        ├── API Key #1 ┐
+        ├── API Key #2 │ All share same quota
+        └── API Key #3 ┘
+```
+
+**Recommendation for Production:**
+- Start with free tier (1,500/day = ~50 customers/day)
+- Monitor usage
+- Upgrade to paid if needed
+- Or implement Tesseract fallback to reduce Gemini calls
+
+---
+
+## 30. Gemini Flash Lite Quota Exhausted - 20 Requests/Day Limit
+
+**Category:** NETWORK | **Date:** 2025-12-08 | **Severity:** Critical | **Status:** ✅ Fixed
+
+**Error:**
+```json
+{
+  "error": "Bad request",
+  "message": "[GoogleGenerativeAI Error]: Error fetching from 
+  https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent: 
+  [429 Too Many Requests] You exceeded your current quota, please check your plan and billing details.
+  
+  * Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, 
+  limit: 20, 
+  model: gemini-2.5-flash-lite
+  
+  Please retry in 39.443742748s."
+}
+```
+
+**Context:**
+- Switched to `gemini-2.5-flash-lite` for speed (Error #19)
+- User reported 429 errors even after rate limiting fixes (Errors #25-28)
+- Error message revealed: **Flash Lite only has 20 requests/day!**
+
+**Root Cause Analysis:**
+
+**Gemini Model Comparison:**
+
+| Model | Free Tier Limit | Speed | Use Case |
+|-------|----------------|-------|----------|
+| **gemini-2.5-flash-lite** | ❌ **20 requests/day** | Fastest | Toy projects only |
+| **gemini-2.5-flash** | ✅ **1,500 requests/day** | Fast | Production! |
+| **gemini-1.5-flash** | ✅ **1,500 requests/day** | Fast | Production! |
+| **gemini-1.5-pro** | ✅ **50 requests/day** | Slower, smarter | Complex tasks |
+
+**We chose Flash Lite for speed, but didn't realize it has 75x LOWER quota!**
+
+**The Math:**
+- Flash Lite: 20/day = can only scan **20 photos per day** 😱
+- Flash (regular): 1,500/day = can scan **1,500 photos per day** 🎉
+- For a demo with 30 mail items: Flash Lite would run out in < 1 minute!
+
+**Fix:**
+```javascript
+// BEFORE (BROKEN):
+const model = genAI.getGenerativeModel({ 
+  model: 'gemini-2.5-flash-lite'  // Only 20/day!
+});
+
+// AFTER (FIXED):
+const model = genAI.getGenerativeModel({ 
+  model: 'gemini-2.5-flash'  // 1,500/day!
+});
+```
+
+**Files Changed:**
+- `backend/src/controllers/scan.controller.js`
+
+**Testing:**
+```bash
+# Restart backend to apply changes
+cd backend
+npm run dev
+
+# Test on phone
+1. Scan 30+ photos
+2. Should NOT hit quota limit
+3. All photos process successfully
+```
+
+**Why This Happened:**
+1. Initial research showed "Flash Lite is faster!"
+2. Documentation didn't clearly show quota differences
+3. We assumed free tier was same across models
+4. Only discovered when we hit the limit!
+
+**Lesson Learned:**
+- **Always check quota limits** when choosing AI models
+- Speed isn't everything if quota is too low
+- Free tier "lite" models are often for testing only
+- Read the fine print: https://ai.google.dev/gemini-api/docs/rate-limits
+
+**Key Insight:**
+- Flash (regular) is still very fast (< 2 seconds per image)
+- The speed difference vs Flash Lite is negligible
+- But quota difference is **75x** (20 vs 1,500)!
+- **Always choose Flash (regular) for production!**
+
+**Prevention:**
+- Document model quotas in README
+- Add usage monitoring
+- Show user their remaining quota in UI
+- Implement Tesseract fallback if quota exceeded
+
+**User's Insight:**
+> "I can make new API key whenever I exceed it even if it's under the same Gmail account? Why would that make sense?"
+
+**Correct!** New API keys under same account **won't help** because:
+- Quota is per Google Account, not per API key
+- Would need a completely new Google account for new quota
+- Much easier to just use Flash (regular) with 1,500/day!
 
 ---

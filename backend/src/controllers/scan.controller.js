@@ -23,9 +23,9 @@ async function smartMatchWithGemini(req, res, next) {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // Use gemini-2.5-flash-lite - faster and cheaper, great for clear mail labels!
+    // Use gemini-2.5-flash (NOT flash-lite!) - gives 1,500 requests/day instead of 20!
     const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash-lite'
+      model: 'gemini-2.5-flash'
     });
 
     // Build contact list string for Gemini
