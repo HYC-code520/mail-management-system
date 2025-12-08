@@ -51,6 +51,23 @@ export default function TemplatesPage() {
     default_channel: 'Email'
   });
 
+  // Group templates by category
+  const groupedTemplates = React.useMemo(() => {
+    const scanTemplates = templates.filter(t => t.template_name.startsWith('Scan:'));
+    const standardTemplates = templates.filter(t => 
+      t.is_default && !t.template_name.startsWith('Scan:')
+    );
+    const customTemplates = templates.filter(t => 
+      !t.is_default && !t.template_name.startsWith('Scan:')
+    );
+
+    return {
+      scan: scanTemplates,
+      standard: standardTemplates,
+      custom: customTemplates
+    };
+  }, [templates]);
+
   const loadTemplates = useCallback(async () => {
     try {
       const response = await api.templates.getAll();
@@ -254,45 +271,133 @@ export default function TemplatesPage() {
                 <h3 className="font-semibold text-gray-900">Email Templates</h3>
               </div>
               <div className="p-2">
-                <div className="space-y-1">
-                  {templates.map((template) => (
-                    <div key={template.template_id} className="relative group">
-                      <button
-                        onClick={() => setSelectedTemplate(template)}
-                        className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
-                          selectedTemplate?.template_id === template.template_id
-                            ? 'bg-gray-100 text-gray-900 font-medium'
-                            : 'text-gray-700 hover:bg-gray-50'
-                        }`}
-                      >
-                        {template.template_name}
-                        {template.is_default && (
-                          <span className="ml-2 text-xs text-gray-500">(default)</span>
-                        )}
-                      </button>
-                      <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
-                        <button
-                          onClick={() => openEditModal(template)}
-                          className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                          title="Edit"
-                        >
-                          <Edit className="w-3 h-3" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(template)}
-                          disabled={deletingTemplateId === template.template_id || template.is_default}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
-                          title={template.is_default ? "Cannot delete default templates" : "Delete"}
-                        >
-                          {deletingTemplateId === template.template_id ? (
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                          ) : (
-                            <Trash2 className="w-3 h-3" />
-                          )}
-                        </button>
+                <div className="space-y-4">
+                  {/* Scan Templates Section */}
+                  {groupedTemplates.scan.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        📱 Scan Templates
+                      </div>
+                      <div className="space-y-1">
+                        {groupedTemplates.scan.map((template) => (
+                          <div key={template.template_id} className="relative group">
+                            <button
+                              onClick={() => setSelectedTemplate(template)}
+                              className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
+                                selectedTemplate?.template_id === template.template_id
+                                  ? 'bg-blue-50 text-blue-900 font-medium border border-blue-200'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span>{template.template_name.replace('Scan: ', '')}</span>
+                                <span className="text-xs text-gray-400">auto</span>
+                              </div>
+                            </button>
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                              <button
+                                onClick={() => openEditModal(template)}
+                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
+                                title="Edit"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  ))}
+                  )}
+
+                  {/* Standard Templates Section */}
+                  {groupedTemplates.standard.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        🔔 Standard Templates
+                      </div>
+                      <div className="space-y-1">
+                        {groupedTemplates.standard.map((template) => (
+                          <div key={template.template_id} className="relative group">
+                            <button
+                              onClick={() => setSelectedTemplate(template)}
+                              className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
+                                selectedTemplate?.template_id === template.template_id
+                                  ? 'bg-gray-100 text-gray-900 font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              <div className="flex items-center justify-between">
+                                <span>{template.template_name}</span>
+                                <span className="text-xs text-gray-400">default</span>
+                              </div>
+                            </button>
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                              <button
+                                onClick={() => openEditModal(template)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Edit"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Custom Templates Section */}
+                  {groupedTemplates.custom.length > 0 && (
+                    <div>
+                      <div className="px-3 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                        ✨ Custom Templates
+                      </div>
+                      <div className="space-y-1">
+                        {groupedTemplates.custom.map((template) => (
+                          <div key={template.template_id} className="relative group">
+                            <button
+                              onClick={() => setSelectedTemplate(template)}
+                              className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
+                                selectedTemplate?.template_id === template.template_id
+                                  ? 'bg-gray-100 text-gray-900 font-medium'
+                                  : 'text-gray-700 hover:bg-gray-50'
+                              }`}
+                            >
+                              {template.template_name}
+                            </button>
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                              <button
+                                onClick={() => openEditModal(template)}
+                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                title="Edit"
+                              >
+                                <Edit className="w-3 h-3" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(template)}
+                                disabled={deletingTemplateId === template.template_id}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                title="Delete"
+                              >
+                                {deletingTemplateId === template.template_id ? (
+                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-3 h-3" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Empty State for Custom Templates */}
+                  {groupedTemplates.custom.length === 0 && (
+                    <div className="px-3 py-2 text-xs text-gray-400 italic">
+                      No custom templates yet
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -189,5 +189,26 @@ export const api = {
     bulkUpdate: (todos: Array<{ todo_id: string; sort_order?: number; is_completed?: boolean }>) => 
       apiClient.patch('/todos/bulk', { todos }),
   },
+
+  scan: {
+    bulkSubmit: (items: Array<{
+      contact_id: string;
+      item_type: 'Letter' | 'Package';
+      scanned_at: string;
+    }>) => 
+      apiClient.post('/scan/bulk-submit', { items }),
+    
+    smartMatch: (data: {
+      image: string;
+      mimeType: string;
+      contacts: Array<{
+        contact_id: string;
+        contact_person?: string;
+        company_name?: string;
+        mailbox_number?: string;
+      }>;
+    }) =>
+      apiClient.post('/scan/smart-match', data),
+  },
 };
 

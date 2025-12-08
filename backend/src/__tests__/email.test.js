@@ -149,20 +149,23 @@ describe('Email API - Error Handling', () => {
 
   describe('POST /api/emails/send - Template Email with Error Handling', () => {
     beforeEach(() => {
-      // Mock Supabase contact query
-      supabase.from.mockReturnValue({
-        select: jest.fn().mockReturnThis(),
-        eq: jest.fn().mockReturnThis(),
-        single: jest.fn().mockResolvedValue({
-          data: {
-            contact_id: 'contact-123',
-            email: 'customer@example.com',
-            name: 'John Doe',
-            mailbox_number: '123'
-          },
-          error: null
+      // Mock user-scoped Supabase client
+      const mockUserClient = {
+        from: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnThis(),
+          eq: jest.fn().mockReturnThis(),
+          single: jest.fn().mockResolvedValue({
+            data: {
+              contact_id: 'contact-123',
+              email: 'customer@example.com',
+              name: 'John Doe',
+              mailbox_number: '123'
+            },
+            error: null
+          })
         })
-      });
+      };
+      getSupabaseClient.mockReturnValue(mockUserClient);
     });
 
     it('should return GMAIL_DISCONNECTED error when sending template email fails', async () => {

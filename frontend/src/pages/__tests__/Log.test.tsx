@@ -46,8 +46,16 @@ describe('LogPage - Date Functionality', () => {
     ]);
   });
 
+  beforeEach(() => {
+    // Mock system time to December 8, 2025 12:00 PM EST
+    // This ensures consistent dates across all timezones (local and CI)
+    const mockDate = new Date('2025-12-08T12:00:00-05:00');
+    vi.setSystemTime(mockDate);
+  });
+
   afterEach(() => {
     vi.clearAllMocks();
+    vi.useRealTimers(); // Restore real time
   });
 
   /**

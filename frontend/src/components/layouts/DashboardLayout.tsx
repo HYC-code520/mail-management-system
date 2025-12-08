@@ -200,6 +200,16 @@ export default function DashboardLayout() {
               Tasks
             </Link>
             <Link
+              to="/dashboard/scan"
+              className={`px-6 py-2 rounded-full font-medium transition-all ${
+                location.pathname === '/dashboard/scan'
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              📱 Scan
+            </Link>
+            <Link
               to="/dashboard/settings"
               className={`px-6 py-2 rounded-full font-medium transition-all ${
                 location.pathname === '/dashboard/settings'

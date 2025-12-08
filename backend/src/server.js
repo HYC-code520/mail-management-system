@@ -21,13 +21,14 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    // Allow localhost, ngrok URLs, and Vercel URLs
+    // Allow localhost, ngrok URLs, Vercel URLs, and local network IPs
     if (origin.includes('localhost') || 
         origin.includes('127.0.0.1') ||
         origin.includes('ngrok-free.app') || 
         origin.includes('ngrok.io') ||
         origin.includes('ngrok.app') ||
-        origin.includes('vercel.app')) {
+        origin.includes('vercel.app') ||
+        /^http:\/\/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(:\d+)?$/.test(origin)) {
       return callback(null, true);
     }
     
@@ -48,8 +49,9 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 // Body parsing middleware
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Increase limit for image uploads (base64 images can be large)
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Logging middleware (development only)
 if (process.env.NODE_ENV === 'development') {
@@ -79,10 +81,11 @@ app.use((req, res) => {
 // Error handling (must be last)
 app.use(errorHandler);
 
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Backend server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
   console.log(`🔗 Health check: http://localhost:${PORT}/health`);
+  console.log(`🌐 Network: http://0.0.0.0:${PORT} (accessible from local network)`);
 });
 
 module.exports = app;

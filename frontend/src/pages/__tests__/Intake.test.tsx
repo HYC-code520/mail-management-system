@@ -468,7 +468,6 @@ describe('IntakePage', () => {
 
   describe('Sorting', () => {
     it('sorts entries by customer name', async () => {
-      const user = userEvent.setup();
       const todaysMail = [
         {
           mail_item_id: '1',
