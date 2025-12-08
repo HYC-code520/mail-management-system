@@ -122,6 +122,17 @@ export default function ScanSessionPage() {
     setIsProcessing(true);
 
     try {
+      // DEBUG: Log photo details
+      console.log('📷 Photo received:', {
+        size: (photoBlob.size / 1024).toFixed(2) + ' KB',
+        type: photoBlob.type,
+      });
+      
+      // DEBUG: Create preview URL so we can see what we're processing
+      const previewUrl = URL.createObjectURL(photoBlob);
+      console.log('👁️ Preview image:', previewUrl);
+      console.log('💡 TIP: Copy the URL above and paste in browser to see the photo being processed');
+
       // STRATEGY: Use Smart AI Matching with Gemini first (does BOTH extraction + matching!)
       // If it fails, fall back to Tesseract + fuzzy matching
       

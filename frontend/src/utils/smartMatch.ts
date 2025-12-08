@@ -36,20 +36,21 @@ export async function smartMatchWithGemini(
 ): Promise<SmartMatchResult> {
   try {
     // Compress image before sending (reduce payload size)
-    console.log(`📸 Original image size: ${(photoBlob.size / 1024).toFixed(2)} KB`);
+    console.log(`📸 Original image: ${(photoBlob.size / 1024).toFixed(2)} KB, type: ${photoBlob.type}`);
     
     // For testing: Skip compression if image is already small enough
     let compressedBlob;
     if (photoBlob.size > 2 * 1024 * 1024) { // If > 2MB
       compressedBlob = await compressImage(photoBlob, 1600, 0.9);
-      console.log(`📦 Compressed image size: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
+      console.log(`📦 Compressed to: ${(compressedBlob.size / 1024).toFixed(2)} KB`);
     } else {
       compressedBlob = photoBlob;
-      console.log(`📦 Skipping compression (image already small enough)`);
+      console.log(`📦 No compression needed (< 2MB)`);
     }
     
     // Convert blob to base64
     const base64Image = await blobToBase64(compressedBlob);
+    console.log(`🔄 Base64 conversion: ${(base64Image.length / 1024).toFixed(2)} KB`);
     
     // Remove data URL prefix if present
     const base64Data = base64Image.includes(',') 
@@ -64,7 +65,7 @@ export async function smartMatchWithGemini(
       mailbox_number: c.mailbox_number,
     }));
 
-    console.log(`🤖 Calling smart match with ${contacts.length} contacts...`);
+    console.log(`🤖 Calling backend /api/scan/smart-match with ${contacts.length} contacts...`);
 
     // Call backend API using api client
     const data = await api.scan.smartMatch({
@@ -73,10 +74,10 @@ export async function smartMatchWithGemini(
       contacts: simplifiedContacts,
     });
 
-    console.log('✅ Smart match result:', {
+    console.log('✅ Backend response:', {
       extracted: data.extractedText,
       matched: data.matchedContact?.contact_person || data.matchedContact?.company_name || 'None',
-      confidence: `${Math.round(data.confidence * 100)}%`,
+      confidence: `${Math.round((data.confidence || 0) * 100)}%`,
       reason: data.reason,
     });
 
@@ -87,7 +88,11 @@ export async function smartMatchWithGemini(
       reason: data.reason,
     };
   } catch (error) {
-    console.error('❌ Smart matching failed:', error);
+    console.error('❌ Smart matching error:', error);
+    console.error('Error details:', {
+      message: error instanceof Error ? error.message : 'Unknown',
+      stack: error instanceof Error ? error.stack : undefined,
+    });
     return {
       extractedText: '',
       matchedContact: null,
