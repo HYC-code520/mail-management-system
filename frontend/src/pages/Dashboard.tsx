@@ -7,6 +7,7 @@ import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
+import LoadingSpinner from '../components/LoadingSpinner.tsx';
 import toast from 'react-hot-toast';
 import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 
@@ -478,12 +479,25 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="animate-pulse space-y-8">
+        {/* Loading spinner with message */}
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <LoadingSpinner 
+            message="Loading dashboard data..." 
+            size="lg"
+          />
+        </div>
+        
+        {/* Optional: Keep skeleton underneath for better UX */}
+        <div className="animate-pulse space-y-8 opacity-50 mt-8">
           <div className="h-8 bg-gray-200 rounded w-48"></div>
           <div className="grid grid-cols-4 gap-6">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="h-32 bg-gray-100 rounded-lg"></div>
             ))}
+          </div>
+          <div className="grid grid-cols-2 gap-6">
+            <div className="h-64 bg-gray-100 rounded-lg"></div>
+            <div className="h-64 bg-gray-100 rounded-lg"></div>
           </div>
         </div>
       </div>

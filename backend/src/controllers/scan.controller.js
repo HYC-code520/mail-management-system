@@ -91,7 +91,7 @@ Now analyze the image and provide your response:`;
     const result = await model.generateContent([prompt, ...imageParts]);
     const responseText = result.response.text().trim();
 
-    console.log('📄 Gemini Response:', responseText);
+    console.log('📄 Gemini Response:', responseText.substring(0, 200) + '...');
 
     // Parse Gemini's response
     const extractedMatch = responseText.match(/EXTRACTED:\s*(.+)/i);
@@ -99,10 +99,14 @@ Now analyze the image and provide your response:`;
     const confidenceMatch = responseText.match(/CONFIDENCE:\s*(\d+)/i);
     const reasonMatch = responseText.match(/REASON:\s*(.+)/i);
 
+    if (!extractedMatch && !matchedMatch) {
+      console.warn('⚠️ Gemini response format unexpected:', responseText);
+    }
+
     const extractedText = extractedMatch ? extractedMatch[1].trim() : '';
     const matchedIndexStr = matchedMatch ? matchedMatch[1].trim() : 'NONE';
     const confidence = confidenceMatch ? parseInt(confidenceMatch[1], 10) / 100 : 0;
-    const reason = reasonMatch ? reasonMatch[1].trim() : '';
+    const reason = reasonMatch ? reasonMatch[1].trim() : 'No reason provided';
 
     // Map matched index to actual contact
     let matchedContact = null;

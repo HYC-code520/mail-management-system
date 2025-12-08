@@ -129,6 +129,19 @@ export default function ScanSessionPage() {
       toast.loading('AI is analyzing the mail...', { id: 'processing', duration: 3000 });
       
       const smartResult = await smartMatchWithGemini(photoBlob, contacts);
+      
+      console.log('🔍 Gemini result:', {
+        extractedText: smartResult.extractedText,
+        matchedContact: smartResult.matchedContact?.contact_person || smartResult.matchedContact?.company_name,
+        confidence: (smartResult.confidence * 100).toFixed(0) + '%',
+        error: smartResult.error
+      });
+
+      // Check if Gemini API failed completely
+      if (smartResult.error) {
+        console.warn('⚠️ Gemini API error:', smartResult.error);
+        toast.loading('API unavailable, using offline OCR...', { id: 'processing', duration: 2000 });
+      }
 
       let finalText = smartResult.extractedText;
       let finalContact = smartResult.matchedContact;
@@ -136,19 +149,22 @@ export default function ScanSessionPage() {
       let matchReason = smartResult.reason;
 
       // If Gemini smart matching failed or returned low confidence, try fallback
-      if (!smartResult.matchedContact || smartResult.confidence < CONFIDENCE_THRESHOLD) {
-        console.log(`⚠️ Gemini confidence low or no match (${(smartResult.confidence * 100).toFixed(0)}%), trying fallback...`);
-        toast.loading('Trying alternative matching...', { id: 'processing', duration: 2000 });
+      if (!smartResult.matchedContact || smartResult.confidence < CONFIDENCE_THRESHOLD || smartResult.error) {
+        console.log(`⚠️ Gemini ${smartResult.error ? 'failed' : `confidence low (${(smartResult.confidence * 100).toFixed(0)}%)`}, trying fallback...`);
+        toast.loading('Trying offline OCR...', { id: 'processing', duration: 2000 });
 
         // Fallback: Tesseract OCR + Fuzzy Matching
         const tesseractResult = await extractRecipientName(photoBlob);
+        console.log('📝 Tesseract extracted:', tesseractResult.text);
+        
         const fuzzyMatch = matchContactByName(tesseractResult.text, contacts);
+        console.log('🎯 Fuzzy match result:', fuzzyMatch ? `${fuzzyMatch.contact.contact_person || fuzzyMatch.contact.company_name} (${(fuzzyMatch.confidence * 100).toFixed(0)}%)` : 'No match');
 
         if (fuzzyMatch && fuzzyMatch.confidence > finalConfidence) {
           finalText = tesseractResult.text;
           finalContact = fuzzyMatch.contact;
           finalConfidence = fuzzyMatch.confidence;
-          matchReason = `Fallback fuzzy match on ${fuzzyMatch.matchedField}`;
+          matchReason = `Offline OCR matched on ${fuzzyMatch.matchedField}`;
           console.log('✅ Fallback found better match!');
         }
       }
@@ -156,7 +172,8 @@ export default function ScanSessionPage() {
       toast.dismiss('processing');
 
       if (!finalText || finalText.length < 2) {
-        throw new Error('No text extracted from photo');
+        toast.error('Could not read any text from photo. Please try again with better lighting.');
+        return; // Don't throw, just return to keep UI responsive
       }
 
       // Create scanned item
@@ -179,8 +196,9 @@ export default function ScanSessionPage() {
       // Show confirmation modal
       setPendingItem(item);
     } catch (error) {
-      console.error('Photo processing failed:', error);
-      toast.error('Failed to process photo. Please try again.');
+      console.error('❌ Photo processing failed:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to process photo: ${errorMessage}. Please try again.`);
     } finally {
       setIsProcessing(false);
     }

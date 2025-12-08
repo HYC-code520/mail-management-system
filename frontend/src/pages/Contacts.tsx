@@ -4,6 +4,7 @@ import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit, ArrowUpDown,
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
+import LoadingSpinner from '../components/LoadingSpinner.tsx';
 import { validateContactForm } from '../utils/validation.ts';
 
 interface Contact {
@@ -289,7 +290,13 @@ export default function ContactsPage() {
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="animate-pulse space-y-6">
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <LoadingSpinner 
+            message="Loading contacts..." 
+            size="lg"
+          />
+        </div>
+        <div className="animate-pulse space-y-6 opacity-50 mt-8">
           <div className="h-8 bg-gray-200 rounded w-48"></div>
           <div className="h-96 bg-gray-100 rounded-lg"></div>
         </div>
