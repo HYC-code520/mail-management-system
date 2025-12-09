@@ -214,5 +214,10 @@ export const api = {
   stats: {
     getDashboardStats: (timeRange: 7 | 14 | 30 = 7) => apiClient.get(`/stats/dashboard?timeRange=${timeRange}`),
   },
+
+  translation: {
+    translateText: (text: string) => apiClient.post('/translate', { text }),
+    getStatus: () => apiClient.get('/translate/status'),
+  },
 };
 

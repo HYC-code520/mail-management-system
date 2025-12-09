@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Copy, Plus, Edit, Trash2, Loader2 } from 'lucide-react';
+import { Copy, Plus, Edit, Trash2, Loader2, Languages } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
@@ -41,6 +41,7 @@ export default function TemplatesPage() {
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
   const [saving, setSaving] = useState(false);
   const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const [translating, setTranslating] = useState(false);
   
   // Form data - using separate fields for English and Chinese
   const [formData, setFormData] = useState({
@@ -135,6 +136,34 @@ export default function TemplatesPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleTranslate = async () => {
+    // Validate English text exists
+    if (!formData.english_text.trim()) {
+      toast.error('Please enter English text first');
+      return;
+    }
+
+    setTranslating(true);
+
+    try {
+      const response = await api.translation.translateText(formData.english_text);
+      
+      if (response.success && response.translatedText) {
+        // Update Chinese text field with translation
+        setFormData(prev => ({ ...prev, chinese_text: response.translatedText }));
+        toast.success('Translation completed successfully!');
+      } else {
+        toast.error('Translation failed. Please try again.');
+      }
+    } catch (err) {
+      console.error('Translation error:', err);
+      const errorMessage = (err as Error).message || 'Translation failed. Please try again.';
+      toast.error(errorMessage);
+    } finally {
+      setTranslating(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -598,7 +627,28 @@ export default function TemplatesPage() {
 
           {/* English Text */}
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">English Text *</label>
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-sm font-medium text-gray-900">English Text *</label>
+              <button
+                type="button"
+                onClick={handleTranslate}
+                disabled={!formData.english_text.trim() || translating}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Translate to Chinese using Amazon Translate"
+              >
+                {translating ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Translating...</span>
+                  </>
+                ) : (
+                  <>
+                    <Languages className="w-4 h-4" />
+                    <span>Translate to Chinese</span>
+                  </>
+                )}
+              </button>
+            </div>
             <textarea
               name="english_text"
               value={formData.english_text}

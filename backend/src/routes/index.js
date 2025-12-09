@@ -13,6 +13,7 @@ const todosRoutes = require('./todos.routes');
 const scanRoutes = require('./scan.routes');
 const ocrRoutes = require('./ocr.routes');
 const statsRoutes = require('./stats.routes');
+const translationRoutes = require('./translation.routes');
 
 router.use('/contacts', contactsRoutes);
 router.use('/mail-items', mailItemsRoutes);
@@ -27,6 +28,7 @@ router.use('/todos', todosRoutes);
 router.use('/scan', scanRoutes);
 router.use('/ocr', ocrRoutes);
 router.use('/stats', statsRoutes);
+router.use('/translate', translationRoutes);
 
 module.exports = router;
 
