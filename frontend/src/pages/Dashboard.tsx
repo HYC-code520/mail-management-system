@@ -76,6 +76,25 @@ export default function DashboardPage() {
   const [saving, setSaving] = useState(false);
   const [openFollowUpDropdownId, setOpenFollowUpDropdownId] = useState<string | null>(null);
   
+  // Log New Mail Modal states
+  const [isLogMailModalOpen, setIsLogMailModalOpen] = useState(false);
+  const [logMailFormData, setLogMailFormData] = useState<{
+    contact_id: string;
+    item_type: string;
+    description: string;
+    status: string;
+    received_date: string;
+    quantity: number | '';
+  }>({
+    contact_id: '',
+    item_type: 'Letter',
+    description: '',
+    status: 'Received',
+    received_date: toNYDateString(getTodayNY()),
+    quantity: 1
+  });
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  
   // Send Email Modal states
   const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
   const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
@@ -99,6 +118,8 @@ export default function DashboardPage() {
 
   const loadDashboardData = useCallback(async () => {
     try {
+      setLoading(true);
+      
       const [contacts, mailItems] = await Promise.all([
         api.contacts.getAll(),
         api.mailItems.getAll()
@@ -411,6 +432,61 @@ export default function DashboardPage() {
     });
   };
 
+  const openLogMailModal = async () => {
+    setIsLogMailModalOpen(true);
+    // Load contacts for the dropdown
+    try {
+      const contactsData = await api.contacts.getAll();
+      setContacts(contactsData);
+    } catch (err) {
+      console.error('Failed to load contacts:', err);
+      toast.error('Failed to load customers');
+    }
+  };
+
+  const closeLogMailModal = () => {
+    setIsLogMailModalOpen(false);
+    setLogMailFormData({
+      contact_id: '',
+      item_type: 'Letter',
+      description: '',
+      status: 'Received',
+      received_date: toNYDateString(getTodayNY()),
+      quantity: 1
+    });
+  };
+
+  const handleLogMailFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setLogMailFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleLogMailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!logMailFormData.contact_id) {
+      toast.error('Please select a customer');
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      await api.mail.create({
+        ...logMailFormData,
+        quantity: logMailFormData.quantity || 1
+      });
+      toast.success('Mail logged successfully!');
+      closeLogMailModal();
+      loadDashboardData(); // Refresh dashboard data
+    } catch (err) {
+      console.error('Failed to log mail:', err);
+      toast.error(`Failed to log mail: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleAddCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -576,7 +652,7 @@ export default function DashboardPage() {
             <span>Add Customer</span>
           </button>
           <button
-            onClick={() => navigate('/dashboard/mail')}
+            onClick={openLogMailModal}
             className="flex items-center justify-center gap-3 px-6 py-4 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors shadow-lg hover:shadow-xl"
           >
             <Mail className="w-5 h-5" />
@@ -1170,6 +1246,151 @@ export default function DashboardPage() {
               disabled={saving}
             >
               {saving ? 'Saving...' : 'Save Customer'}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Log New Mail Modal */}
+      <Modal 
+        isOpen={isLogMailModalOpen} 
+        onClose={closeLogMailModal}
+        title="Log New Mail"
+      >
+        <form onSubmit={handleLogMailSubmit} className="space-y-6">
+          {/* Customer Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Customer <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="contact_id"
+              value={logMailFormData.contact_id}
+              onChange={handleLogMailFormChange}
+              required
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">Select a customer</option>
+              {contacts
+                .sort((a, b) => (a.mailbox_number || '').localeCompare(b.mailbox_number || ''))
+                .map(contact => (
+                  <option key={contact.contact_id} value={contact.contact_id}>
+                    {contact.mailbox_number} - {contact.contact_person || contact.company_name}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+
+          {/* Item Type & Status */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Item Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="item_type"
+                value={logMailFormData.item_type}
+                onChange={handleLogMailFormChange}
+                required
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="Letter">Letter</option>
+                <option value="Package">Package</option>
+                <option value="Large Package">Large Package</option>
+                <option value="Certified Mail">Certified Mail</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="status"
+                value={logMailFormData.status}
+                onChange={handleLogMailFormChange}
+                required
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="Received">Received</option>
+                <option value="Notified">Notified</option>
+                <option value="Ready for Pickup">Ready for Pickup</option>
+                <option value="Picked Up">Picked Up</option>
+                <option value="Forward">Forward</option>
+                <option value="Scanned">Scanned</option>
+                <option value="Abandoned">Abandoned</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quantity & Received Date */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Quantity
+              </label>
+              <input
+                type="number"
+                name="quantity"
+                value={logMailFormData.quantity}
+                onChange={handleLogMailFormChange}
+                min="1"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Received Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="received_date"
+                value={logMailFormData.received_date}
+                onChange={handleLogMailFormChange}
+                required
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Description (Optional)
+            </label>
+            <textarea
+              name="description"
+              value={logMailFormData.description}
+              onChange={handleLogMailFormChange}
+              rows={3}
+              placeholder="Add any notes about this mail item..."
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={closeLogMailModal}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span>Logging...</span>
+                </>
+              ) : (
+                'Log Mail'
+              )}
             </button>
           </div>
         </form>

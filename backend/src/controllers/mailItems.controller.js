@@ -34,22 +34,38 @@ exports.getMailItems = async (req, res, next) => {
       return res.status(500).json({ error: 'Failed to fetch mail items' });
     }
 
-    // Enrich mail items with notification count
-    const enrichedData = await Promise.all(
-      data.map(async (item) => {
-        const { count } = await supabase
-          .from('notification_history')
-          .select('*', { count: 'exact', head: true })
-          .eq('mail_item_id', item.mail_item_id);
-        
-        return {
-          ...item,
-          notification_count: count || 0
-        };
-      })
-    );
+    // Batch fetch notification counts for all mail items in a single query
+    if (data && data.length > 0) {
+      const mailItemIds = data.map(item => item.mail_item_id);
+      
+      // Get all notification counts in one query
+      const { data: notifications, error: notifError } = await supabase
+        .from('notification_history')
+        .select('mail_item_id')
+        .in('mail_item_id', mailItemIds);
 
-    res.json(enrichedData);
+      if (notifError) {
+        console.error('Error fetching notification counts:', notifError);
+        // Continue without notification counts rather than failing
+        return res.json(data.map(item => ({ ...item, notification_count: 0 })));
+      }
+
+      // Count notifications per mail item
+      const notificationCounts = notifications.reduce((acc, notif) => {
+        acc[notif.mail_item_id] = (acc[notif.mail_item_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Enrich data with notification counts
+      const enrichedData = data.map(item => ({
+        ...item,
+        notification_count: notificationCounts[item.mail_item_id] || 0
+      }));
+
+      res.json(enrichedData);
+    } else {
+      res.json([]);
+    }
   } catch (error) {
     next(error);
   }

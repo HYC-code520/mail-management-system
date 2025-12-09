@@ -12,6 +12,7 @@ const oauthRoutes = require('./oauth.routes');
 const todosRoutes = require('./todos.routes');
 const scanRoutes = require('./scan.routes');
 const ocrRoutes = require('./ocr.routes');
+const statsRoutes = require('./stats.routes');
 
 router.use('/contacts', contactsRoutes);
 router.use('/mail-items', mailItemsRoutes);
@@ -25,6 +26,7 @@ router.use('/oauth', oauthRoutes);
 router.use('/todos', todosRoutes);
 router.use('/scan', scanRoutes);
 router.use('/ocr', ocrRoutes);
+router.use('/stats', statsRoutes);
 
 module.exports = router;
 

@@ -100,11 +100,27 @@ describe('Mail Items API', () => {
       
       mockSupabaseClient.order.mockReturnValue(mockQuery);
 
+      // Mock the notification history query (for batched notification counts)
+      const notificationChain = {
+        select: jest.fn().mockReturnThis(),
+        in: jest.fn().mockResolvedValue({ data: [], error: null })
+      };
+      
+      // When from('notification_history') is called, return the notification chain
+      mockSupabaseClient.from.mockImplementation((tableName) => {
+        if (tableName === 'notification_history') {
+          return notificationChain;
+        }
+        return mockSupabaseClient;
+      });
+
       const response = await request(app)
         .get('/api/mail-items')
         .expect(200);
 
-      expect(response.body).toEqual(mockMailItems);
+      // Expect enriched data with notification_count
+      const expectedData = mockMailItems.map(item => ({ ...item, notification_count: 0 }));
+      expect(response.body).toEqual(expectedData);
       expect(mockSupabaseClient.from).toHaveBeenCalledWith('mail_items');
     });
 
@@ -116,6 +132,19 @@ describe('Mail Items API', () => {
       });
       
       mockSupabaseClient.eq.mockReturnValue(mockQuery);
+
+      // Mock the notification history query (even for empty results)
+      const notificationChain = {
+        select: jest.fn().mockReturnThis(),
+        in: jest.fn().mockResolvedValue({ data: [], error: null })
+      };
+      
+      mockSupabaseClient.from.mockImplementation((tableName) => {
+        if (tableName === 'notification_history') {
+          return notificationChain;
+        }
+        return mockSupabaseClient;
+      });
 
       await request(app)
         .get('/api/mail-items?contact_id=contact-123')

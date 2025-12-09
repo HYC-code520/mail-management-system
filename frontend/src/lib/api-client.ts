@@ -210,5 +210,9 @@ export const api = {
     }) =>
       apiClient.post('/scan/smart-match', data),
   },
+
+  stats: {
+    getDashboard: (days: number = 7) => apiClient.get(`/stats/dashboard?days=${days}`),
+  },
 };
 
