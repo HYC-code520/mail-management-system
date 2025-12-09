@@ -1,4 +1,17 @@
-# Technical Question: Nodemailer OAuth2 SMTP vs Gmail API
+# ✅ RESOLVED: Technical Question: Nodemailer OAuth2 SMTP vs Gmail API
+
+**STATUS:** ✅ **RESOLVED - Gmail API Implemented (December 9, 2025)**
+
+**Solution:** We successfully switched to Gmail REST API (`gmail.users.messages.send`). All emails now send via Gmail API, not SMTP. See implementation in `backend/src/services/email.service.js` and tests in `backend/src/__tests__/email-gmail-api.test.js`.
+
+**Related Documentation:**
+- Error details: `log.md` Error #31 (OAuth2 SMTP blocked)
+- Test coverage: 7 Gmail API tests + 12 template variable tests
+- All 19 tests passing
+
+---
+
+**Original Question (For Historical Reference):**
 
 **Context:** We implemented OAuth2 Gmail integration for our mail management system, but encountered authentication errors. We switched from Nodemailer+SMTP+OAuth2 to Gmail API. I want to verify this was the right approach.
 

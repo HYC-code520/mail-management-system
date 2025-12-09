@@ -1,8 +1,16 @@
-# 📧 Nodemailer Integration Complete - Summary
+# 📧 Email Integration Complete - Gmail REST API (Not Nodemailer SMTP)
+
+**⚠️ IMPORTANT UPDATE:** This system now uses **Gmail REST API** (`gmail.users.messages.send`) for sending emails, NOT nodemailer with SMTP OAuth2. SMTP with App Passwords is available as a fallback only.
+
+**Why the change?** Google blocks OAuth2 SMTP authentication for apps not verified by Google (error 535-5.7.8). The Gmail REST API has no such restriction. See `log.md` Error #31 for details.
+
+**Note:** Nodemailer is still installed and used for SMTP fallback (App Password), but OAuth2 email sending uses Gmail REST API directly.
+
+---
 
 ## What Was Implemented
 
-A complete email notification system using **nodemailer** with Gmail SMTP has been successfully integrated into the MeiWay Mail Management System.
+A complete email notification system using **Gmail REST API** with OAuth2 has been successfully integrated into the MeiWay Mail Management System.
 
 ---
 
@@ -10,8 +18,9 @@ A complete email notification system using **nodemailer** with Gmail SMTP has be
 
 ### Backend Changes
 
-**1. Nodemailer Package Installed**
-- Package: `nodemailer@^7.0.11`
+**1. Gmail API Package Installed**
+- Package: `googleapis@^126.0.0` (Gmail REST API)
+- Package: `nodemailer@^7.0.11` (SMTP fallback only)
 - Location: `/backend/package.json`
 - Status: ✅ Installed and ready
 
@@ -19,11 +28,17 @@ A complete email notification system using **nodemailer** with Gmail SMTP has be
 
 | File | Purpose |
 |------|---------|
-| `backend/src/services/email.service.js` | Core email sending service with nodemailer |
+| `backend/src/services/email.service.js` | Gmail REST API integration + SMTP fallback |
+| `backend/src/services/oauth2.service.js` | OAuth2 token management for Gmail API |
 | `backend/src/controllers/email.controller.js` | Email endpoint logic and database logging |
+| `backend/src/controllers/oauth.controller.js` | OAuth2 flow handling |
 | `backend/src/routes/email.routes.js` | Email API routes |
+| `backend/src/routes/oauth.routes.js` | OAuth2 routes |
+| `backend/src/__tests__/email-gmail-api.test.js` | Gmail API tests (7 tests) |
+| `backend/src/__tests__/email-template-variables.test.js` | Template variable tests (12 tests) |
 | `backend/env.example` | Environment variable template |
 | `docs/EMAIL_SETUP_GUIDE.md` | Complete setup instructions |
+| `docs/OAUTH2_SETUP_GUIDE.md` | OAuth2 setup guide |
 
 **3. Files Modified**
 
@@ -39,11 +54,19 @@ A complete email notification system using **nodemailer** with Gmail SMTP has be
 
 ### From the Website:
 
-1. **Send Template-Based Emails**
+1. **Connect Gmail via OAuth2** (One-time setup)
+   - Click "Connect Gmail" in Settings
+   - Authorize with Google
+   - System securely stores tokens
+   - Automatic token refresh
+
+2. **Send Template-Based Emails** (Uses Gmail REST API)
    - Use existing bilingual message templates
    - Auto-fill customer details (name, mailbox, tracking, etc.)
-   - Variables like `{{CUSTOMER_NAME}}`, `{{MAILBOX_NUMBER}}` automatically replaced
+   - Variables like `{CUSTOMER_NAME}`, `{MAILBOX_NUMBER}` automatically replaced
+   - Supports both `{VAR}` and `{{VAR}}` formats
    - One-click send from the UI
+   - Sends via **Gmail REST API** (not SMTP)
 
 2. **Send Custom Emails**
    - Write custom one-off messages
@@ -64,9 +87,16 @@ A complete email notification system using **nodemailer** with Gmail SMTP has be
 
 ## 💰 Cost & Limits
 
-### Nodemailer
+### Gmail REST API (Primary Method)
+- **Cost:** FREE ✅ 
+- **Limit:** No daily limit for OAuth2 apps
+- **Authentication:** OAuth2 (secure, per-user)
+- **Verification:** Not required (unlike SMTP OAuth2)
+
+### Nodemailer (Fallback Only)
 - **Cost:** FREE ✅ (open-source MIT license)
-- **Forever free:** No subscription, no hidden costs
+- **Use Case:** SMTP fallback with App Password only
+- **Note:** DO NOT use with OAuth2 SMTP (will fail with 535-5.7.8)
 
 ### Gmail SMTP (What They're Using)
 

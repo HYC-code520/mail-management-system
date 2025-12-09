@@ -1,6 +1,8 @@
 # Backend API - Mail Management System
 
-Express.js backend API for the Mail Management System with email notification support (SMTP + OAuth2).
+Express.js backend API for the Mail Management System with email notification support using **Gmail REST API** (OAuth2).
+
+**📧 Email Implementation:** We use Gmail REST API (`gmail.users.messages.send`), NOT nodemailer SMTP OAuth2, to avoid Google's OAuth2 SMTP authentication restrictions. SMTP with App Passwords is available as a fallback only.
 
 ## Setup
 
@@ -22,16 +24,30 @@ cp env.example .env
 
 This system supports **TWO** methods for sending emails:
 
-1. **SMTP with App Password** - Simple, single business account
-2. **OAuth2** - More secure, per-user sending, no 2FA required
+1. **Gmail REST API (OAuth2)** - Primary method, secure, per-user sending
+2. **SMTP with App Password** - Fallback only, single business account
 
-You can use either method OR both (OAuth2 with SMTP fallback).
+**⚠️ Important:** We use **Gmail REST API**, not nodemailer OAuth2 SMTP. Google blocks OAuth2 SMTP authentication for non-verified apps (error 535-5.7.8). The REST API has no such restriction.
+
+You can use either method OR both (Gmail API primary, SMTP fallback).
 
 ---
 
-### Method 1: SMTP (App Password) - Simple Setup
+### Method 1: Gmail REST API (OAuth2) - Recommended
 
-**Best for:** Single business Gmail account, quick setup
+**Best for:** Multiple users, each using their own Gmail, most secure, no restrictions
+
+**Why Gmail REST API instead of SMTP OAuth2?**
+- Gmail blocks OAuth2 SMTP for apps not verified by Google (takes weeks/months)
+- REST API (`gmail.users.messages.send`) has no such restriction
+- More reliable and officially supported
+- Same OAuth2 credentials, different delivery method
+
+**Note:** If you need SMTP OAuth2 in the future, it's possible but requires Google security review and app verification.
+
+**Best for:** Fallback when OAuth2 not configured, testing only
+
+**⚠️ Note:** This is SMTP with App Password only. Do NOT try to use nodemailer with OAuth2 SMTP - it will fail with error 535-5.7.8 (see `log.md` Error #31).
 
 #### Step 1: Generate Gmail App Password
 
@@ -61,7 +77,31 @@ SMTP_FROM_NAME=MeiWay Mail Service
 
 ---
 
-### Method 2: OAuth2 - Secure, No 2FA Required
+### Hybrid Approach (Recommended!)
+
+Configure **both** methods:
+- **Gmail REST API (OAuth2)** as primary method
+- SMTP as fallback for users who don't connect Gmail
+- System intelligently uses Gmail API if available, falls back to SMTP
+
+```env
+# SMTP (Fallback only)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=business@gmail.com
+SMTP_PASS=app-password
+
+# Gmail REST API OAuth2 (Primary - Recommended)
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-secret
+GOOGLE_REDIRECT_URI=http://localhost:5000/api/oauth/gmail/callback
+FRONTEND_URL=http://localhost:3000
+```
+
+**How it works:**
+1. If user has connected Gmail → Use Gmail REST API ✅
+2. If Gmail not connected → Fall back to SMTP
+3. If SMTP not configured → Show error
 
 **Best for:** Multiple users, each using their own Gmail, more secure
 
@@ -89,16 +129,18 @@ SMTP_FROM_NAME=MeiWay Mail Service
 
 **Full OAuth2 Setup Guide:** `/docs/OAUTH2_SETUP_GUIDE.md`
 
-#### OAuth2 Benefits:
+#### Gmail REST API Benefits:
+- ✅ No Google verification required (unlike SMTP OAuth2)
 - ✅ No 2FA requirement
 - ✅ No password storage
 - ✅ Per-user Gmail sending
 - ✅ Revocable access
 - ✅ Automatic token refresh
+- ✅ Bypasses Gmail's OAuth2 SMTP authentication blocks
 
 ---
 
-### Hybrid Approach (Recommended!)
+### Method 2: SMTP (App Password) - Fallback Only
 
 Configure **both** methods:
 - SMTP as fallback
