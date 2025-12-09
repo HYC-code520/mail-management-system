@@ -29,13 +29,16 @@ export default function ScanSessionPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [showReview, setShowReview] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [quickScanMode, setQuickScanMode] = useState(false); // Quick scan mode for bulk scanning
+  const [quickScanMode, setQuickScanMode] = useState(true); // Default to true - most users want bulk scanning
   const [processingQueue, setProcessingQueue] = useState(0); // Count of items being processed in background
   const lastGeminiCallRef = useRef<number>(0); // Track last Gemini API call for rate limiting
   
   // Confirm modal state
   const [pendingItem, setPendingItem] = useState<ScannedItem | null>(null);
   const [editingItem, setEditingItem] = useState<ScannedItem | null>(null);
+  
+  // Photo preview modal state
+  const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
 
   // Load contacts and check for existing session on mount
   useEffect(() => {
@@ -630,25 +633,25 @@ export default function ScanSessionPage() {
                   }
                 }
               }}
-              className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg transition-colors"
+              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold shadow-md"
             >
               End Session
             </button>
           </div>
           
           {/* Quick Scan Mode Toggle */}
-          <div className="mt-4 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="mt-4 flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg p-3">
             <input
               type="checkbox"
               id="quickScanMode"
               checked={quickScanMode}
               onChange={(e) => setQuickScanMode(e.target.checked)}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
             />
             <label htmlFor="quickScanMode" className="flex-1 cursor-pointer">
-              <span className="font-semibold text-blue-900">⚡ Quick Scan Mode</span>
-              <p className="text-xs text-blue-700 mt-0.5">
-                Auto-accept high confidence matches (≥70%) for faster bulk scanning. Perfect for 20-30 items!
+              <span className="font-semibold text-green-900">⚡ Quick Scan Mode (Recommended)</span>
+              <p className="text-xs text-green-700 mt-0.5">
+                Auto-accept high confidence matches (≥70%) for faster bulk scanning. Uncheck if you want to review each scan manually.
               </p>
             </label>
           </div>
@@ -738,7 +741,9 @@ export default function ScanSessionPage() {
                   <img
                     src={item.photoPreviewUrl}
                     alt="Scanned mail"
-                    className="w-16 h-16 object-cover rounded"
+                    className="w-16 h-16 object-cover rounded cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setPreviewPhoto(item.photoPreviewUrl!)}
+                    title="Click to view full size"
                   />
                 )}
                 
@@ -808,6 +813,33 @@ export default function ScanSessionPage() {
           onCancel={() => setEditingItem(null)}
         />
       )}
+
+      {/* Photo Preview Modal - Full Screen */}
+      {previewPhoto && (
+        <div 
+          className="fixed inset-0 z-50 bg-black bg-opacity-90 flex items-center justify-center p-4"
+          onClick={() => setPreviewPhoto(null)}
+        >
+          <div className="relative max-w-4xl w-full">
+            <button
+              onClick={() => setPreviewPhoto(null)}
+              className="absolute top-4 right-4 p-2 bg-white rounded-full hover:bg-gray-100 transition-colors z-10"
+              title="Close"
+            >
+              <XCircle className="w-6 h-6 text-gray-700" />
+            </button>
+            <img
+              src={previewPhoto}
+              alt="Full size preview"
+              className="w-full h-auto max-h-[90vh] object-contain rounded-lg"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <p className="text-white text-center mt-4 text-sm">
+              Click outside or press X to close
+            </p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -834,7 +866,9 @@ function ConfirmModal({ item, contacts, onConfirm, onCancel }: ConfirmModalProps
           <img
             src={item.photoPreviewUrl}
             alt="Scanned mail"
-            className="w-full h-48 object-cover rounded-lg mb-4"
+            className="w-full h-48 object-cover rounded-lg mb-4 cursor-pointer hover:opacity-90 transition-opacity"
+            onClick={() => setPreviewPhoto(item.photoPreviewUrl!)}
+            title="Click to view full size"
           />
         )}
 

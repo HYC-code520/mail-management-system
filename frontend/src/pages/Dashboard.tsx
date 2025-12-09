@@ -272,7 +272,7 @@ export default function DashboardPage() {
     } else {
       buttonText = "Send Final Notice";
       suggestedTemplateType = "Final Notice";
-      buttonColor = "bg-gray-700/40 hover:bg-gray-700/60 text-gray-900 border border-gray-400"; // 40% transparent dark gray
+      buttonColor = "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300"; // Muted amber (soft, not vibrant)
     }
     
     return { buttonText, suggestedTemplateType, buttonColor, count };

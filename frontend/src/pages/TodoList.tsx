@@ -56,6 +56,10 @@ export default function TodoList() {
     staff_member: 'Merlin',
   });
 
+  // Completion modal state
+  const [isCompletionModalOpen, setIsCompletionModalOpen] = useState(false);
+  const [todoToComplete, setTodoToComplete] = useState<Todo | null>(null);
+
   useEffect(() => {
     loadTodos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,13 +116,65 @@ export default function TodoList() {
 
   const handleToggleComplete = async (todo: Todo) => {
     try {
-      await api.todos.update(todo.todo_id, {
-        is_completed: !todo.is_completed,
-      });
-      await loadTodos();
+      if (!todo.is_completed) {
+        // Task is being marked as complete - show modal to select who completed it
+        setTodoToComplete(todo);
+        setIsCompletionModalOpen(true);
+      } else {
+        // Task is being marked as incomplete - optimistic update
+        // Update UI immediately
+        setTodos(prevTodos => 
+          prevTodos.map(t => 
+            t.todo_id === todo.todo_id 
+              ? { ...t, is_completed: false }
+              : t
+          )
+        );
+        
+        // Then update server in background
+        await api.todos.update(todo.todo_id, {
+          is_completed: false,
+          staff_member: todo.created_by_name || 'Merlin',
+        });
+      }
     } catch (error: any) {
       console.error('Failed to update todo:', error);
       toast.error('Failed to update task');
+      // Revert on error
+      await loadTodos();
+    }
+  };
+
+  const handleCompleteWithStaff = async (staffMember: string) => {
+    if (!todoToComplete) return;
+    
+    try {
+      // Optimistic update - update UI immediately
+      setTodos(prevTodos => 
+        prevTodos.map(t => 
+          t.todo_id === todoToComplete.todo_id 
+            ? { ...t, is_completed: true, last_edited_by_name: staffMember }
+            : t
+        )
+      );
+      
+      // Close modal immediately for smooth UX
+      setIsCompletionModalOpen(false);
+      setTodoToComplete(null);
+      toast.success(`Task completed by ${staffMember}!`);
+      
+      // Then update server in background
+      await api.todos.update(todoToComplete.todo_id, {
+        is_completed: true,
+        staff_member: staffMember,
+      });
+    } catch (error: any) {
+      console.error('Failed to update todo:', error);
+      toast.error('Failed to update task');
+      // Revert on error
+      await loadTodos();
+      setIsCompletionModalOpen(false);
+      setTodoToComplete(null);
     }
   };
 
@@ -811,6 +867,56 @@ export default function TodoList() {
             </button>
           </div>
         </form>
+      </Modal>
+
+      {/* Completion Modal - Who completed the task */}
+      <Modal
+        isOpen={isCompletionModalOpen}
+        onClose={() => {
+          setIsCompletionModalOpen(false);
+          setTodoToComplete(null);
+        }}
+        title="Who completed this task?"
+      >
+        <div className="space-y-4">
+          <p className="text-gray-600 text-sm">
+            Select who completed: <strong>{todoToComplete?.title}</strong>
+          </p>
+          
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <button
+              onClick={() => handleCompleteWithStaff('Merlin')}
+              className="flex flex-col items-center gap-3 p-6 bg-white border-2 border-gray-300 hover:border-blue-500 hover:bg-blue-50 rounded-lg transition-all group"
+            >
+              <div className="w-16 h-16 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 text-xl font-bold group-hover:bg-blue-200">
+                MR
+              </div>
+              <span className="font-medium text-gray-900">Merlin</span>
+            </button>
+            
+            <button
+              onClick={() => handleCompleteWithStaff('Madison')}
+              className="flex flex-col items-center gap-3 p-6 bg-white border-2 border-gray-300 hover:border-purple-500 hover:bg-purple-50 rounded-lg transition-all group"
+            >
+              <div className="w-16 h-16 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 text-xl font-bold group-hover:bg-purple-200">
+                MP
+              </div>
+              <span className="font-medium text-gray-900">Madison</span>
+            </button>
+          </div>
+          
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={() => {
+                setIsCompletionModalOpen(false);
+                setTodoToComplete(null);
+              }}
+              className="px-4 py-2 text-gray-600 hover:text-gray-900 font-medium"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

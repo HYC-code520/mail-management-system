@@ -219,7 +219,7 @@ export default function TemplatesPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
         <div className="flex items-center justify-center min-h-[60vh]">
           <LoadingSpinner 
             message="Loading templates..." 
@@ -241,16 +241,16 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
       {/* Header */}
-      <div className="flex justify-between items-center mb-8">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Email Templates</h1>
-          <p className="text-gray-600">Manage and use bilingual message templates</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Email Templates</h1>
+          <p className="text-sm md:text-base text-gray-600">Manage and use bilingual message templates</p>
         </div>
         <button
           onClick={openCreateModal}
-          className="flex items-center gap-2 px-6 py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors"
+          className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors text-sm md:text-base whitespace-nowrap"
         >
           <Plus className="w-4 h-4" />
           <span>New Template</span>
@@ -258,10 +258,10 @@ export default function TemplatesPage() {
       </div>
 
       {templates.length === 0 ? (
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-12 text-center">
-          <div className="text-6xl mb-4">📝</div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">No templates yet</h3>
-          <p className="text-gray-600 mb-6">Create your first notification template to get started</p>
+        <div className="bg-white border border-gray-200 rounded-lg shadow-sm p-8 md:p-12 text-center">
+          <div className="text-5xl md:text-6xl mb-4">📝</div>
+          <h3 className="text-lg md:text-xl font-semibold text-gray-900 mb-2">No templates yet</h3>
+          <p className="text-sm md:text-base text-gray-600 mb-6">Create your first notification template to get started</p>
           <button
             onClick={openCreateModal}
             className="px-6 py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors"
@@ -270,14 +270,14 @@ export default function TemplatesPage() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
           {/* Left Sidebar - Template List */}
-          <div className="col-span-1">
+          <div className="lg:col-span-1">
             <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-              <div className="p-4 border-b border-gray-200">
-                <h3 className="font-semibold text-gray-900">Email Templates</h3>
+              <div className="p-3 md:p-4 border-b border-gray-200">
+                <h3 className="text-sm md:text-base font-semibold text-gray-900">Email Templates</h3>
               </div>
-              <div className="p-2">
+              <div className="p-2 max-h-[50vh] lg:max-h-[70vh] overflow-y-auto">
                 <div className="space-y-4">
                   {/* Scan Templates Section */}
                   {groupedTemplates.scan.length > 0 && (
@@ -412,14 +412,14 @@ export default function TemplatesPage() {
 
           {/* Main Content - Template Display */}
           {selectedTemplate && (
-            <div className="col-span-3 space-y-6">
+            <div className="lg:col-span-3 space-y-4 md:space-y-6">
               {/* Action Buttons */}
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-gray-900">{selectedTemplate.template_name}</h2>
-                <div className="flex gap-2">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <h2 className="text-lg md:text-xl font-bold text-gray-900 break-words">{selectedTemplate.template_name}</h2>
+                <div className="flex gap-2 w-full sm:w-auto">
                   <button
                     onClick={() => openEditModal(selectedTemplate)}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 rounded-lg transition-colors text-sm md:text-base"
                   >
                     <Edit className="w-4 h-4" />
                     <span>Edit</span>
@@ -427,7 +427,7 @@ export default function TemplatesPage() {
                   <button
                     onClick={() => handleDelete(selectedTemplate)}
                     disabled={deletingTemplateId === selectedTemplate.template_id || selectedTemplate.is_default}
-                    className="flex items-center gap-2 px-4 py-2 bg-white border border-red-300 hover:bg-red-50 text-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 md:px-4 py-2 bg-white border border-red-300 hover:bg-red-50 text-red-600 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm md:text-base"
                     title={selectedTemplate.is_default ? "Cannot delete default templates" : "Delete"}
                   >
                     {deletingTemplateId === selectedTemplate.template_id ? (
@@ -440,23 +440,23 @@ export default function TemplatesPage() {
                 </div>
               </div>
 
-              {/* Three Column Template Display */}
-              <div className="grid grid-cols-3 gap-6">
+              {/* Three Column Template Display - Stack on mobile */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
                 {/* English Version */}
                 <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">English Version</h3>
+                  <div className="p-3 md:p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="text-sm md:text-base font-semibold text-gray-900">English Version</h3>
                     <button
                       onClick={() => handleCopy(getTemplateVersions(selectedTemplate).english, 'en')}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-2 md:px-3 py-1.5 text-xs md:text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                     >
-                      <Copy className="w-4 h-4" />
+                      <Copy className="w-3 h-3 md:w-4 md:h-4" />
                       <span>Copy</span>
                     </button>
                   </div>
-                  <div className="p-4">
-                    <div className="h-[500px] overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-words text-sm text-gray-700 font-sans">
+                  <div className="p-3 md:p-4">
+                    <div className="h-[300px] md:h-[500px] overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-words text-xs md:text-sm text-gray-700 font-sans">
                         {getTemplateVersions(selectedTemplate).english}
                       </pre>
                     </div>
@@ -465,20 +465,20 @@ export default function TemplatesPage() {
 
                 {/* Chinese Version */}
                 <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Chinese Version</h3>
+                  <div className="p-3 md:p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="text-sm md:text-base font-semibold text-gray-900">Chinese Version</h3>
                     <button
                       onClick={() => handleCopy(getTemplateVersions(selectedTemplate).chinese, 'cn')}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-2 md:px-3 py-1.5 text-xs md:text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                       disabled={!getTemplateVersions(selectedTemplate).chinese}
                     >
-                      <Copy className="w-4 h-4" />
+                      <Copy className="w-3 h-3 md:w-4 md:h-4" />
                       <span>Copy</span>
                     </button>
                   </div>
-                  <div className="p-4">
-                    <div className="h-[500px] overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-words text-sm text-gray-700 font-sans">
+                  <div className="p-3 md:p-4">
+                    <div className="h-[300px] md:h-[500px] overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-words text-xs md:text-sm text-gray-700 font-sans">
                         {getTemplateVersions(selectedTemplate).chinese || '(No Chinese translation)'}
                       </pre>
                     </div>
@@ -487,19 +487,19 @@ export default function TemplatesPage() {
 
                 {/* Combined Version */}
                 <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
-                  <div className="p-4 border-b border-gray-200 flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900">Combined Version</h3>
+                  <div className="p-3 md:p-4 border-b border-gray-200 flex items-center justify-between">
+                    <h3 className="text-sm md:text-base font-semibold text-gray-900">Combined Version</h3>
                     <button
                       onClick={() => handleCopy(selectedTemplate.message_body, 'combined')}
-                      className="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="flex items-center gap-2 px-2 md:px-3 py-1.5 text-xs md:text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-lg transition-colors"
                     >
-                      <Copy className="w-4 h-4" />
+                      <Copy className="w-3 h-3 md:w-4 md:h-4" />
                       <span>Copy</span>
                     </button>
                   </div>
-                  <div className="p-4">
-                    <div className="h-[500px] overflow-y-auto">
-                      <pre className="whitespace-pre-wrap break-words text-sm text-gray-700 font-sans">
+                  <div className="p-3 md:p-4">
+                    <div className="h-[300px] md:h-[500px] overflow-y-auto">
+                      <pre className="whitespace-pre-wrap break-words text-xs md:text-sm text-gray-700 font-sans">
                         {selectedTemplate.message_body}
                       </pre>
                     </div>

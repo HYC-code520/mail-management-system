@@ -309,7 +309,7 @@ describe('TodoList Component', () => {
   });
 
   describe('Complete/Uncomplete Task', () => {
-    it('should toggle task completion', async () => {
+    it('should show completion modal when marking task as complete', async () => {
       (api.todos.update as any).mockResolvedValue({
         ...mockTodos[0],
         is_completed: true,
@@ -321,21 +321,157 @@ describe('TodoList Component', () => {
         expect(screen.getByText('Test Task 1')).toBeInTheDocument();
       });
 
-      // Find checkbox button
-      const checkboxButtons = screen.getAllByRole('button');
-      const checkbox = checkboxButtons.find((btn) => 
-        btn.querySelector('svg')?.classList.contains('lucide-circle')
-      );
+      // Find the first incomplete task's checkbox
+      const taskElements = screen.getAllByText(/Test Task/i);
+      const task1 = taskElements[0].closest('.group');
+      const checkbox = task1?.querySelector('button');
+
+      if (checkbox) {
+        fireEvent.click(checkbox);
+
+        // Modal should appear asking who completed the task
+        await waitFor(() => {
+          expect(screen.getByText(/who completed this task/i)).toBeInTheDocument();
+        }, { timeout: 3000 });
+
+        // Find and click Merlin button in modal
+        const buttons = screen.getAllByRole('button');
+        const merlinButton = buttons.find(btn => btn.textContent?.includes('Merlin') && btn.closest('[role="dialog"]'));
+        
+        if (merlinButton) {
+          fireEvent.click(merlinButton);
+
+          // Should update with optimistic UI and call API
+          await waitFor(() => {
+            expect(api.todos.update).toHaveBeenCalledWith(
+              '1',
+              expect.objectContaining({
+                is_completed: true,
+                staff_member: 'Merlin',
+              })
+            );
+          });
+        }
+      }
+    });
+
+    it('should allow selecting Madison when completing task', async () => {
+      (api.todos.update as any).mockResolvedValue({
+        ...mockTodos[0],
+        is_completed: true,
+      });
+
+      renderTodoList();
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Task 1')).toBeInTheDocument();
+      });
+
+      const taskElements = screen.getAllByText(/Test Task/i);
+      const task1 = taskElements[0].closest('.group');
+      const checkbox = task1?.querySelector('button');
 
       if (checkbox) {
         fireEvent.click(checkbox);
 
         await waitFor(() => {
+          expect(screen.getByText(/who completed this task/i)).toBeInTheDocument();
+        }, { timeout: 3000 });
+
+        // Find and click Madison button in modal
+        const buttons = screen.getAllByRole('button');
+        const madisonButton = buttons.find(btn => btn.textContent?.includes('Madison') && btn.closest('[role="dialog"]'));
+        
+        if (madisonButton) {
+          fireEvent.click(madisonButton);
+
+          await waitFor(() => {
+            expect(api.todos.update).toHaveBeenCalledWith(
+              '1',
+              expect.objectContaining({
+                is_completed: true,
+                staff_member: 'Madison',
+              })
+            );
+          });
+        }
+      }
+    });
+
+    it('should uncomplete task without modal when clicking completed task', async () => {
+      (api.todos.update as any).mockResolvedValue({
+        ...mockTodos[1],
+        is_completed: false,
+      });
+
+      renderTodoList();
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Task 2')).toBeInTheDocument();
+      });
+
+      // Find checkbox button for completed task (has check icon)
+      const checkboxButtons = screen.getAllByRole('button');
+      const checkbox = checkboxButtons.find((btn) => 
+        btn.querySelector('svg')?.classList.contains('lucide-check')
+      );
+
+      if (checkbox) {
+        fireEvent.click(checkbox);
+
+        // Should NOT show modal, should directly update
+        await waitFor(() => {
+          expect(screen.queryByText(/who completed this task/i)).not.toBeInTheDocument();
           expect(api.todos.update).toHaveBeenCalledWith(
-            '1',
-            { is_completed: true }
+            '2',
+            expect.objectContaining({
+              is_completed: false,
+              staff_member: 'Madison',
+            })
           );
         });
+      }
+    });
+
+    it('should use optimistic UI updates for instant feedback', async () => {
+      (api.todos.update as any).mockResolvedValue({
+        ...mockTodos[0],
+        is_completed: true,
+      });
+
+      renderTodoList();
+
+      await waitFor(() => {
+        expect(screen.getByText('Test Task 1')).toBeInTheDocument();
+      });
+
+      const taskElements = screen.getAllByText(/Test Task/i);
+      const task1 = taskElements[0].closest('.group');
+      const checkbox = task1?.querySelector('button');
+
+      if (checkbox) {
+        fireEvent.click(checkbox);
+
+        await waitFor(() => {
+          expect(screen.getByText(/who completed this task/i)).toBeInTheDocument();
+        }, { timeout: 3000 });
+
+        const buttons = screen.getAllByRole('button');
+        const merlinButton = buttons.find(btn => btn.textContent?.includes('Merlin') && btn.closest('[role="dialog"]'));
+        
+        if (merlinButton) {
+          fireEvent.click(merlinButton);
+
+          // Modal should close immediately (optimistic UI)
+          await waitFor(() => {
+            expect(screen.queryByText(/who completed this task/i)).not.toBeInTheDocument();
+          });
+
+          // API should still be called in background
+          await waitFor(() => {
+            expect(api.todos.update).toHaveBeenCalled();
+          });
+        }
       }
     });
   });

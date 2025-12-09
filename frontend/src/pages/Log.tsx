@@ -90,7 +90,16 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const [actionMailItem, setActionMailItem] = useState<MailItem | null>(null);
   
   // Form data
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    contact_id: string;
+    item_type: string;
+    description: string;
+    status: string;
+    received_date: string;
+    quantity: number | '';
+    performed_by: string;
+    edit_notes: string;
+  }>({
     contact_id: '',
     item_type: 'Package',
     description: '',
@@ -105,7 +114,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   // Get today's date in local timezone (not UTC)
   const [date, setDate] = useState(getTodayNY());
   const [itemType, setItemType] = useState('Letter');
-  const [quantity, setQuantity] = useState(1);
+  const [quantity, setQuantity] = useState<number | ''>(1);
   const [note, setNote] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedContact, setSelectedContact] = useState<Contact | null>(null);
@@ -256,8 +265,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
 
     try {
       if (addToExisting && existingTodayMail) {
-        // Update existing mail item quantity
-        const newQuantity = (existingTodayMail.quantity || 1) + quantity;
+        // Update existing mail item quantity (ensure quantity is a number)
+        const currentQuantity = typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity);
+        const newQuantity = (existingTodayMail.quantity || 1) + currentQuantity;
         
         console.log('Updating existing mail item:', {
           mail_item_id: existingTodayMail.mail_item_id,
@@ -275,7 +285,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         await api.actionHistory.create({
           mail_item_id: existingTodayMail.mail_item_id,
           action_type: 'updated',
-          action_description: `Added ${quantity} more ${itemType}${quantity > 1 ? 's' : ''} (total now: ${newQuantity})`,
+          action_description: `Added ${currentQuantity} more ${itemType}${currentQuantity > 1 ? 's' : ''} (total now: ${newQuantity})`,
           performed_by: 'Staff',
           notes: note || null
         });
@@ -291,12 +301,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           item_type: itemType,
           description: note,
           status: 'Received',
-          quantity: quantity,
+          quantity: typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity),
           received_date: getNYTimestamp()
         });
 
         console.log('Successfully created new mail!');
-        toast.success(`${quantity} mail item(s) added successfully!`);
+        const finalQuantity = typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity);
+        toast.success(`${finalQuantity} mail item(s) added successfully!`);
       }
       
       // Reset form and states
@@ -363,7 +374,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     const { name, value } = e.target;
     setFormData(prev => ({ 
       ...prev, 
-      [name]: name === 'quantity' ? parseInt(value) || 1 : value 
+      [name]: name === 'quantity' ? (value === '' ? '' : parseInt(value) || 1) : value 
     }));
   };
 
@@ -414,6 +425,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         // Update the mail item (exclude performed_by and edit_notes from the update payload)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { performed_by: _performed_by, edit_notes: _edit_notes, ...updateData } = formData;
+        
+        // Ensure quantity is a number (convert empty string to 1)
+        updateData.quantity = typeof updateData.quantity === 'string' && updateData.quantity === '' ? 1 : Number(updateData.quantity);
         
         // If received_date is being updated and it's a date-only string, add timezone
         if (updateData.received_date && /^\d{4}-\d{2}-\d{2}$/.test(updateData.received_date)) {
@@ -780,7 +794,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 type="number"
                 min="1"
                 value={quantity}
-                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                onChange={(e) => setQuantity(e.target.value === '' ? '' : parseInt(e.target.value) || 1)}
                 className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
@@ -1866,7 +1880,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 </div>
               </div>
               <p className="text-sm text-gray-600 mb-4">
-                Would you like to <strong>add {quantity} more {itemType}{quantity > 1 ? 's' : ''}</strong> to the existing log, 
+                Would you like to <strong>add {typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity)} more {itemType}{(typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity)) > 1 ? 's' : ''}</strong> to the existing log, 
                 or create a separate entry?
               </p>
             </div>
@@ -1879,7 +1893,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 disabled={addingMail}
                 className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {addingMail ? 'Adding...' : `Add to Existing (Total: ${(existingTodayMail.quantity || 1) + quantity})`}
+                {addingMail ? 'Adding...' : `Add to Existing (Total: ${(existingTodayMail.quantity || 1) + (typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity))})`}
               </button>
               
               <button
