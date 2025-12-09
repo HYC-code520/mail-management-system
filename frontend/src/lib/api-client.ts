@@ -212,7 +212,7 @@ export const api = {
   },
 
   stats: {
-    getDashboard: (days: number = 7) => apiClient.get(`/stats/dashboard?days=${days}`),
+    getDashboardStats: (timeRange: 7 | 14 | 30 = 7) => apiClient.get(`/stats/dashboard?timeRange=${timeRange}`),
   },
 };
 

@@ -472,7 +472,7 @@ export default function DashboardPage() {
     setSaving(true);
 
     try {
-      await api.mail.create({
+      await api.mailItems.create({
         ...logMailFormData,
         quantity: logMailFormData.quantity || 1
       });
