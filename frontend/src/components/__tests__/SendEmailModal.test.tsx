@@ -1,5 +1,7 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import '@testing-library/jest-dom';
 import { BrowserRouter } from 'react-router-dom';
 import SendEmailModal from '../SendEmailModal';
 import { api } from '../../lib/api-client';
@@ -437,7 +439,7 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
         ...mockMailItem,
         contacts: {
           ...mockMailItem.contacts,
-          contact_person: null,
+          contact_person: undefined,
           company_name: 'Big Company Inc'
         }
       };
@@ -445,7 +447,7 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       (api.contacts.getById as any).mockResolvedValue({
         contact_id: 'contact-123',
         email: null,
-        contact_person: null,
+        contact_person: undefined,
         company_name: 'Big Company Inc'
       });
 
@@ -474,16 +476,16 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
         ...mockMailItem,
         contacts: {
           ...mockMailItem.contacts,
-          contact_person: null,
-          company_name: null
+          contact_person: undefined,
+          company_name: undefined
         }
       };
 
       (api.contacts.getById as any).mockResolvedValue({
         contact_id: 'contact-123',
         email: null,
-        contact_person: null,
-        company_name: null
+        contact_person: undefined,
+        company_name: undefined
       });
 
       render(
@@ -600,7 +602,7 @@ describe('SendEmailModal - Notification History Banner', () => {
     const mailItemNoHistory = {
       ...defaultProps.mailItem,
       notification_count: 0,
-      last_notified: null
+      last_notified: undefined
     };
 
     (api.contacts.getById as any).mockResolvedValue({

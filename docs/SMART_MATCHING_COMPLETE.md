@@ -209,3 +209,4 @@ Follow the testing guide:
 **Testing:** ⏳ Awaiting Gemini API key setup  
 **Ready for:** Demo preparation
 
+

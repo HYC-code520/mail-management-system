@@ -170,3 +170,4 @@ This creates the 3 email templates the scan feature needs.
 **Ready to test!** Just restart your frontend with `--host` and open the URL on your phone! 📱✨
 
 
+
