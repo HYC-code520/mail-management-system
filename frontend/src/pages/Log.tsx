@@ -7,6 +7,7 @@ import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
+import ActionHistorySection from '../components/ActionHistorySection.tsx';
 import { getTodayNY, getNYTimestamp } from '../utils/timezone.ts';
 
 interface MailItem {
@@ -1495,93 +1496,12 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <td colSpan={9} className="py-6 px-4">
                         <div className="space-y-6">
-                          {/* Action History Timeline - Always show, display message if empty */}
-                          <div>
-                            <h3 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                              <Bell className="w-5 h-5 text-purple-600" />
-                              Action History
-                            </h3>
-                            {actionHistory[item.mail_item_id]?.length > 0 ? (
-                              <div className="space-y-3">
-                                {actionHistory[item.mail_item_id].map((action) => {
-                                  // Determine icon and color based on action type
-                                  const getActionIcon = () => {
-                                    if (action.action_description.includes('notified') || action.action_description.includes('Notified')) {
-                                      return <Bell className="w-4 h-4 text-purple-600" />;
-                                    } else if (action.action_description.includes('Picked Up')) {
-                                      return <CheckCircle className="w-4 h-4 text-green-600" />;
-                                    } else if (action.action_description.includes('Scanned')) {
-                                      return <FileText className="w-4 h-4 text-cyan-600" />;
-                                    } else if (action.action_description.includes('Forward')) {
-                                      return <Send className="w-4 h-4 text-orange-600" />;
-                                    } else if (action.action_description.includes('Abandoned')) {
-                                      return <AlertTriangle className="w-4 h-4 text-red-600" />;
-                                    }
-                                    return <Mail className="w-4 h-4 text-gray-600" />;
-                                  };
-
-                                  const getBadgeColor = () => {
-                                    if (action.action_description.includes('notified') || action.action_description.includes('Notified')) {
-                                      return 'bg-purple-100 text-purple-700';
-                                    } else if (action.action_description.includes('Picked Up')) {
-                                      return 'bg-green-100 text-green-700';
-                                    } else if (action.action_description.includes('Scanned')) {
-                                      return 'bg-cyan-100 text-cyan-700';
-                                    } else if (action.action_description.includes('Forward')) {
-                                      return 'bg-orange-100 text-orange-700';
-                                    } else if (action.action_description.includes('Abandoned')) {
-                                      return 'bg-red-100 text-red-700';
-                                    }
-                                    return 'bg-gray-100 text-gray-700';
-                                  };
-
-                                  return (
-                                    <div key={action.action_id} className="bg-white p-4 rounded-lg border border-gray-200 hover:shadow-sm transition-shadow">
-                                      <div className="flex items-start gap-3">
-                                        <div className="flex-shrink-0 mt-0.5">
-                                          {getActionIcon()}
-                                        </div>
-                                        <div className="flex-1 min-w-0">
-                                          <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                            <span className="font-semibold text-gray-900">
-                                              {new Date(action.action_timestamp).toLocaleString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                                hour: 'numeric',
-                                                minute: '2-digit',
-                                                hour12: true
-                                              })}
-                                            </span>
-                                            <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${getBadgeColor()}`}>
-                                              {action.action_description}
-                                            </span>
-                                          </div>
-                                          <p className="text-sm text-gray-600 mb-1">
-                                            Performed by: <span className="font-medium text-gray-900">{action.performed_by}</span>
-                                          </p>
-                                          {action.previous_value && action.new_value && (
-                                            <p className="text-xs text-gray-500">
-                                              Status changed: <span className="font-medium">{action.previous_value}</span> → <span className="font-medium">{action.new_value}</span>
-                                            </p>
-                                          )}
-                                          {action.notes && (
-                                            <p className="text-sm text-gray-700 mt-2 p-2 bg-gray-50 rounded border border-gray-200 italic">
-                                              Note: {action.notes}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : (
-                              <div className="bg-white p-4 rounded-lg border border-gray-200 text-center text-gray-500 text-sm">
-                                No actions recorded yet. Actions will appear here when staff perform operations on this mail item.
-                              </div>
-                            )}
-                          </div>
+                          {/* Action History Timeline */}
+                          <ActionHistorySection
+                            mailItemId={item.mail_item_id}
+                            actionHistory={actionHistory[item.mail_item_id] || []}
+                            loading={false}
+                          />
 
                           {/* Mail Item Details */}
                           <div>

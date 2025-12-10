@@ -116,22 +116,39 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, onSuccess, s
       setTemplates(response.templates || []);
       
       const notificationCount = mailItem.notification_count || 0;
-      let suggestedTemplateType: string;
+      // Auto-select template based on notification count OR suggested type
+      let templateTypeToSelect: string;
       
-      if (notificationCount === 0) {
-        suggestedTemplateType = "Initial";
+      // Use suggestedTemplateType if provided (from Dashboard context-aware logic)
+      if (suggestedTemplateType) {
+        templateTypeToSelect = suggestedTemplateType;
+      } else if (notificationCount === 0) {
+        templateTypeToSelect = "Initial";
       } else if (notificationCount === 1) {
-        suggestedTemplateType = "Reminder";
+        templateTypeToSelect = "Reminder";
       } else {
-        suggestedTemplateType = "Final";
+        templateTypeToSelect = "Final";
       }
 
       if (response.templates && response.templates.length > 0) {
         let templateToSelect = response.templates[0];
-        const found = response.templates.find((t: Template) => t.template_type === suggestedTemplateType);
-        if (found) {
-          templateToSelect = found;
+        
+        // Try to find exact match by template_name first (for specific templates like "Package Fee Reminder")
+        const foundByName = response.templates.find((t: Template) => 
+          t.template_name === templateTypeToSelect
+        );
+        
+        // Fall back to matching by template_type
+        const foundByType = response.templates.find((t: Template) => 
+          t.template_type === templateTypeToSelect
+        );
+        
+        if (foundByName) {
+          templateToSelect = foundByName;
+        } else if (foundByType) {
+          templateToSelect = foundByType;
         }
+        
         setSelectedTemplateId(templateToSelect.template_id);
         previewTemplate(templateToSelect);
       }

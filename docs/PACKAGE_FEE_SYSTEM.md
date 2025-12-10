@@ -17,11 +17,11 @@ The Package Storage Fee Tracking System automatically calculates and tracks stor
 ### Example Fee Calculation
 ```
 Package received: Dec 1, 2025
-- Dec 1 (Day 0): $0 (grace period)
-- Dec 2 (Day 1): $0 (grace period)
-- Dec 3 (Day 2): $2 (billable)
-- Dec 4 (Day 3): $4 (billable)
-- Dec 5 (Day 4): $6 (billable)
+- Dec 1 (Day 0): $0 (free - arrival day)
+- Dec 2 (Day 1): $0 (free - 1 day included storage)
+- Dec 3 (Day 2): $2 (1 billable day × $2/day)
+- Dec 4 (Day 3): $4 (2 billable days × $2/day)
+- Dec 5 (Day 4): $6 (3 billable days × $2/day)
 ```
 
 ### Abandonment

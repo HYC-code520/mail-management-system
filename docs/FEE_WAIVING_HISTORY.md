@@ -24,10 +24,10 @@ When a fee is waived via `POST /api/fees/:feeId/waive`, the system now:
 **File**: `frontend/src/components/dashboard/GroupedFollowUp.tsx`
 
 The "Need Follow-up" section now displays fee status:
-- **Grace Period**: `Day 0 - Grace period ($0.00)` (green)
-- **Pending Fee**: `Day 9 - $16.00` (orange for fees > $0)
-- **Waived Fee**: `Day 9 - ~~$16.00~~ (fee waived)` (strikethrough with blue "fee waived")
-- **Paid Fee**: `Day 9 - $16.00 (paid)` (green)
+- **Free Storage**: `📦 Received Nov 26 (0 days ago) - Free (1 day included)` (green)
+- **Pending Fee**: `📦 Received Nov 26 (9 days ago) - Storage fee: $16.00` (orange)
+- **Waived Fee**: `📦 Received Nov 26 (9 days ago) - ~~Storage fee: $16.00~~ (fee waived)` (strikethrough with blue)
+- **Paid Fee**: `📦 Received Nov 26 (9 days ago) - Storage fee: $16.00 ✓ Paid` (green)
 
 ## Where History Appears
 

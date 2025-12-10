@@ -24,7 +24,7 @@ const { getDaysBetweenNY, toNYDateString } = require('../utils/timezone');
  */
 function calculateFeeForPackage(mailItem, asOfDate = new Date()) {
   const receivedDate = new Date(mailItem.received_date);
-  const gracePeriodDays = 1; // Day 1 is free
+  const gracePeriodDays = 1; // 1 day FREE storage (Day 0 + Day 1 = free, fees start Day 2)
   const dailyRate = 2.00; // $2 per day
   
   // Calculate days using NY timezone (critical for accuracy!)

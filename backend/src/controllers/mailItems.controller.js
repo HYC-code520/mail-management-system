@@ -170,6 +170,18 @@ exports.updateMailItemStatus = async (req, res, next) => {
     const { id } = req.params;
     const { status, item_type, description, contact_id, received_date, quantity } = req.body;
 
+    // Fetch existing mail item to detect item_type changes
+    const { data: existingMailItem, error: fetchError } = await supabase
+      .from('mail_items')
+      .select('*')
+      .eq('mail_item_id', id)
+      .single();
+    
+    if (fetchError || !existingMailItem) {
+      console.error('Error fetching existing mail item:', fetchError);
+      return res.status(404).json({ error: 'Mail item not found' });
+    }
+
     // Build update data object with only provided fields
     const updateData = {};
     
@@ -219,6 +231,21 @@ exports.updateMailItemStatus = async (req, res, next) => {
     if (error) {
       console.error('Error updating mail item status:', error);
       return res.status(500).json({ error: 'Failed to update mail item status' });
+    }
+
+    // If item_type changed TO "Package", create a fee record
+    if (item_type && existingMailItem.item_type !== 'Package' && item_type === 'Package') {
+      try {
+        await feeService.createFeeRecord(
+          mailItem.mail_item_id,
+          mailItem.contact_id,
+          req.user.id
+        );
+        console.log(`✅ Created fee record for package ${mailItem.mail_item_id} (converted from ${existingMailItem.item_type})`);
+      } catch (feeError) {
+        console.error('⚠️  Warning: Failed to create fee record for converted package:', feeError);
+        // Don't fail the entire request if fee creation fails
+      }
     }
 
     res.json({ mailItem });

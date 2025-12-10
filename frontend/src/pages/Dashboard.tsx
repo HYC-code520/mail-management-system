@@ -136,6 +136,7 @@ export default function DashboardPage() {
   // Send Email Modal states
   const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
   const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
+  const [suggestedTemplateType, setSuggestedTemplateType] = useState<string | undefined>(undefined);
   
   // Waive Fee Modal states
   const [isWaiveFeeModalOpen, setIsWaiveFeeModalOpen] = useState(false);
@@ -510,6 +511,20 @@ export default function DashboardPage() {
     // We'll use the first mail item as the reference
     const firstItem = group.packages[0] || group.letters[0];
     if (firstItem) {
+      // Calculate suggested template based on urgency
+      const allItems = [...group.packages, ...group.letters];
+      const oldestDays = Math.max(...allItems.map(item => getDaysSince(item.received_date)));
+      
+      let suggested: string | undefined;
+      if (oldestDays >= 28) {
+        suggested = 'Final Notice Before Abandonment';
+      } else if (group.totalFees > 0) {
+        suggested = 'Package Fee Reminder';
+      } else {
+        suggested = 'General Reminder';
+      }
+      
+      setSuggestedTemplateType(suggested);
       openSendEmailModal(firstItem);
     }
   };
@@ -1031,9 +1046,11 @@ export default function DashboardPage() {
           onClose={() => {
             setIsSendEmailModalOpen(false);
             setEmailingMailItem(null);
+            setSuggestedTemplateType(undefined);
           }}
           mailItem={emailingMailItem}
           onSuccess={handleEmailSuccess}
+          suggestedTemplateType={suggestedTemplateType}
         />
       )}
     </div>
