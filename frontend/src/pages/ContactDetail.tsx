@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Mail, Package, Bell, ChevronRight, Send, Edit } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import SendEmailModal from '../components/SendEmailModal.tsx';
+import ActionHistorySection from '../components/ActionHistorySection.tsx';
 import Modal from '../components/Modal.tsx';
 import { validateContactForm } from '../utils/validation.ts';
 import toast from 'react-hot-toast';
@@ -59,6 +60,7 @@ export default function ContactDetailPage() {
   const [contact, setContact] = useState<Contact | null>(null);
   const [mailHistory, setMailHistory] = useState<MailItem[]>([]);
   const [notificationHistory, setNotificationHistory] = useState<Record<string, NotificationHistory[]>>({});
+  const [actionHistory, setActionHistory] = useState<Record<string, any[]>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   
@@ -121,15 +123,30 @@ export default function ContactDetailPage() {
     }
   };
 
+  const loadActionHistoryForMailItem = async (mailItemId: string) => {
+    try {
+      const data = await api.actionHistory.getByMailItem(mailItemId);
+      setActionHistory(prev => ({
+        ...prev,
+        [mailItemId]: data
+      }));
+    } catch (err) {
+      console.error('Error loading action history:', err);
+    }
+  };
+
   const toggleRow = (mailItemId: string) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(mailItemId)) {
       newExpanded.delete(mailItemId);
     } else {
       newExpanded.add(mailItemId);
-      // Load notification history when row is expanded
+      // Load both notification and action history when row is expanded
       if (!notificationHistory[mailItemId]) {
         loadNotificationHistoryForMailItem(mailItemId);
+      }
+      if (!actionHistory[mailItemId]) {
+        loadActionHistoryForMailItem(mailItemId);
       }
     }
     setExpandedRows(newExpanded);
@@ -515,54 +532,62 @@ export default function ContactDetailPage() {
                         </td>
                       </tr>
 
-                      {/* Expanded Row - Notification History */}
+                      {/* Expanded Row - Notification & Action History */}
                       {expandedRows.has(item.mail_item_id) && (
                         <tr className="bg-gray-50 border-b border-gray-200">
                           <td colSpan={6} className="py-6 px-6">
-                            <div className="ml-10">
-                              <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                <Bell className="w-5 h-5 text-purple-600" />
-                                Notification History
-                              </h4>
-                              {notificationHistory[item.mail_item_id]?.length > 0 ? (
-                                <div className="space-y-3">
-                                  {notificationHistory[item.mail_item_id].map((notif) => (
-                                    <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
-                                      <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-gray-900">
-                                              {new Date(notif.notified_at).toLocaleString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                                hour: 'numeric',
-                                                minute: '2-digit',
-                                                hour12: true
-                                              })}
-                                            </span>
-                                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
-                                              {notif.notification_method}
-                                            </span>
-                                          </div>
-                                          <p className="text-sm text-gray-600">
-                                            Notified by: <span className="font-medium text-gray-900">{notif.notified_by}</span>
-                                          </p>
-                                          {notif.notes && (
-                                            <p className="text-sm text-gray-600 mt-1 italic">
-                                              Note: {notif.notes}
+                            <div className="ml-10 space-y-6">
+                              {/* Notification History Section */}
+                              <div>
+                                <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                  <Bell className="w-5 h-5 text-purple-600" />
+                                  Notification History
+                                </h4>
+                                {notificationHistory[item.mail_item_id]?.length > 0 ? (
+                                  <div className="space-y-3">
+                                    {notificationHistory[item.mail_item_id].map((notif) => (
+                                      <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
+                                        <div className="flex items-start justify-between">
+                                          <div className="flex-1">
+                                            <div className="flex items-center gap-2 mb-1">
+                                              <span className="font-semibold text-gray-900">
+                                                {new Date(notif.notified_at).toLocaleString('en-US', {
+                                                  month: 'short',
+                                                  day: 'numeric',
+                                                  year: 'numeric',
+                                                  hour: 'numeric',
+                                                  minute: '2-digit',
+                                                  hour12: true
+                                                })}
+                                              </span>
+                                              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                                                {notif.notification_method}
+                                              </span>
+                                            </div>
+                                            <p className="text-sm text-gray-600">
+                                              Notified by: <span className="font-medium text-gray-900">{notif.notified_by}</span>
                                             </p>
-                                          )}
+                                            {notif.notes && (
+                                              <p className="text-sm text-gray-600 mt-1 italic">
+                                                Note: {notif.notes}
+                                              </p>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-gray-500 italic">
-                                  No notifications sent for this mail item yet.
-                                </p>
-                              )}
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <p className="text-sm text-gray-500 italic">
+                                    No notifications sent for this mail item yet.
+                                  </p>
+                                )}
+                              </div>
+
+                              {/* Action History Section */}
+                              <ActionHistorySection 
+                                actions={actionHistory[item.mail_item_id] || []}
+                              />
                             </div>
                           </td>
                         </tr>

@@ -212,12 +212,28 @@ export const api = {
   },
 
   stats: {
-    getDashboardStats: (timeRange: 7 | 14 | 30 = 7) => apiClient.get(`/stats/dashboard?timeRange=${timeRange}`),
+    getDashboardStats: (timeRange: 7 | 14 | 30 = 7) => apiClient.get(`/stats/dashboard?days=${timeRange}`),
   },
 
   translation: {
     translateText: (text: string) => apiClient.post('/translate', { text }),
     getStatus: () => apiClient.get('/translate/status'),
+  },
+
+  fees: {
+    getAll: () => apiClient.get('/fees'),
+    getOutstanding: () => apiClient.get('/fees/outstanding'),
+    getRevenue: (startDate?: string, endDate?: string) => {
+      const params = new URLSearchParams();
+      if (startDate) params.append('startDate', startDate);
+      if (endDate) params.append('endDate', endDate);
+      return apiClient.get(`/fees/revenue${params.toString() ? `?${params}` : ''}`);
+    },
+    waive: (feeId: string, reason: string) => 
+      apiClient.post(`/fees/${feeId}/waive`, { reason }),
+    markPaid: (feeId: string, paymentMethod: string) => 
+      apiClient.post(`/fees/${feeId}/pay`, { paymentMethod }),
+    recalculate: () => apiClient.post('/fees/recalculate', {}),
   },
 };
 

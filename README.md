@@ -7,19 +7,25 @@ Internal CRM and mail tracking system for managing customer contacts, mail items
 This application helps manage:
 - **Customer Contacts** - Track customer information, service tiers, and contact preferences
 - **Mail Items** - Log packages, letters, and certified mail with real-time status tracking
+- **Package Storage Fees** - Automatically calculate and track storage fees for Tier 2 customers
+- **Revenue Analytics** - Monitor monthly revenue, outstanding fees, and payment history
 - **Outreach Messages** - Record all customer communications and follow-ups
 - **Templates** - Manage reusable message templates
-- **Dashboard Analytics** - View real-time statistics and pending actions
+- **Dashboard Analytics** - View real-time statistics, grouped follow-ups by person, and revenue metrics
 
 ## 🚀 Features
 
 - ✅ Customer contact management with search and filtering
 - ✅ Mail item tracking (packages, letters, certified mail)
 - ✅ Status tracking (Received → Notified → Picked Up)
+- ✅ **Package Storage Fee Tracking** - Automatic fee calculation for packages held beyond grace period
+- ✅ **Revenue Analytics** - Track monthly revenue, outstanding fees, and total earnings
 - ✅ Outreach message logging with templates
-- ✅ Real-time dashboard with statistics
+- ✅ Real-time dashboard with statistics and grouped follow-ups
 - ✅ Secure authentication with Supabase
 - ✅ Modern, responsive UI with Tailwind CSS and Radix UI
+- ✅ Daily automated fee updates via cron job
+- ✅ Fee waiving with audit trail (reason tracking)
 - 🔄 Bilingual support (Coming soon)
 - 🔄 Email/SMS integration (Coming soon)
 
@@ -137,6 +143,7 @@ This application helps manage:
 - **[Design System](./docs/DESIGN_SYSTEM_GUIDE.md)** - UI components and styling
 - **[Icon Guide](./docs/ICON_GUIDE.md)** - Icon usage guidelines
 - **[Branch Protection](./docs/BRANCH_PROTECTION_GUIDE.md)** - Git workflow and PR process
+- **[Package Fee System](./docs/PACKAGE_FEE_SYSTEM.md)** - Storage fee tracking and revenue management
 
 **Project Info:**
 - **[Progress Summary](./docs/PROGRESS_SUMMARY.md)** - Current project status

@@ -170,6 +170,50 @@ All templates support **both** formats:
 
 ---
 
+## `package_fees` Table
+
+**Primary Key:** `fee_id` (UUID)
+
+| Column Name | Type | Required | Description | ⚠️ Business Rules |
+|------------|------|----------|-------------|-------------------|
+| `fee_id` | UUID | Yes | Primary key | |
+| `mail_item_id` | UUID | Yes | Foreign key to mail_items | Must be a Package |
+| `contact_id` | UUID | Yes | Foreign key to contacts | |
+| `user_id` | UUID | Yes | Foreign key to users | |
+| `fee_amount` | DECIMAL(10,2) | Yes | Current fee in dollars | Calculated daily |
+| `days_charged` | INTEGER | Yes | Total days since received | Includes grace period |
+| `daily_rate` | DECIMAL(10,2) | Yes | Rate per day (default: $2.00) | After grace period |
+| `grace_period_days` | INTEGER | Yes | Free days (default: 1) | Day 1 is free |
+| `fee_status` | VARCHAR | Yes | pending/paid/waived | Default: pending |
+| `paid_date` | TIMESTAMP | No | When customer paid | |
+| `payment_method` | VARCHAR | No | cash/card/venmo/zelle | |
+| `waived_date` | TIMESTAMP | No | When fee was waived | |
+| `waived_by` | UUID | No | User who waived fee | Foreign key to users |
+| `waive_reason` | TEXT | No | Why fee was waived | Required when waived |
+| `created_at` | TIMESTAMP | Yes | Auto-generated | |
+| `updated_at` | TIMESTAMP | Yes | Auto-updated | |
+| `last_calculated_at` | TIMESTAMP | Yes | Last fee calculation | Updated by cron |
+
+### Business Rules:
+- **Grace Period**: Tier 2 customers get 1-day FREE storage (Day 0 = free, Day 1 = free)
+- **Billable Days**: `billable_days = max(0, days_charged - grace_period_days)`
+- **Fee Calculation**: `fee_amount = billable_days * daily_rate`
+- **Example**: Package received Dec 1 → Dec 3 = 2 days → billable = 2 - 1 = 1 day → fee = $2
+- **Abandonment**: Packages 30+ days old are considered abandoned
+
+### Fee Status Values:
+- `pending`: Fee is owed, not yet paid
+- `paid`: Customer has paid the fee
+- `waived`: Fee was forgiven (must have waive_reason)
+
+### Important Notes:
+- Fees are automatically created when a Package is logged
+- Daily cron job updates `fee_amount` and `days_charged` at 2 AM EST
+- Fees are NOT charged for Letters (only Packages)
+- Extra-large packages ($5 flat fee) are tracked manually, not in system
+
+---
+
 ## Backend Code Guidelines
 
 ### When querying `contacts` table:

@@ -1,4 +1,5 @@
 const { getSupabaseClient } = require('../services/supabase.service');
+const feeService = require('../services/fee.service');
 
 /**
  * GET /api/mail-items
@@ -8,6 +9,15 @@ exports.getMailItems = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
     const { contact_id } = req.query;
+
+    // Auto-recalculate pending fees when viewing mail items
+    // This ensures fees are always up-to-date
+    try {
+      await feeService.updateFeesForAllPackages(req.user.id);
+    } catch (feeError) {
+      console.error('Error auto-recalculating fees:', feeError);
+      // Continue even if fee calculation fails
+    }
 
     let query = supabase
       .from('mail_items')
@@ -126,6 +136,22 @@ exports.createMailItem = async (req, res, next) => {
     if (error) {
       console.error('Error creating mail item:', error);
       return res.status(500).json({ error: 'Failed to create mail item' });
+    }
+
+    // If this is a package, automatically create a fee record
+    if (mailItem.item_type === 'Package') {
+      try {
+        await feeService.createFeeRecord(
+          mailItem.mail_item_id,
+          mailItem.contact_id,
+          req.user.id
+        );
+        console.log(`✅ Created fee record for package ${mailItem.mail_item_id}`);
+      } catch (feeError) {
+        console.error('⚠️  Warning: Failed to create fee record for package:', feeError);
+        // Don't fail the entire request if fee creation fails
+        // The fee can be created later or manually
+      }
     }
 
     res.status(201).json(mailItem);

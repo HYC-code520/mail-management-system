@@ -14,7 +14,7 @@ import GroupedFollowUpSection from '../components/dashboard/GroupedFollowUp.tsx'
 import QuickActionsSection from '../components/dashboard/QuickActionsSection.tsx';
 import ChartsSection from '../components/dashboard/ChartsSection.tsx';
 import toast from 'react-hot-toast';
-import { getTodayNY, toNYDateString, getNYTimestamp } from '../utils/timezone.ts';
+import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 
 interface PackageFee {
   fee_id: string;
@@ -66,7 +66,6 @@ interface Contact {
   mailbox_number?: string;
   status?: string;
   created_at?: string;
-  service_tier?: number;
 }
 
 interface DashboardStats {
@@ -92,7 +91,6 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [chartsLoading, setChartsLoading] = useState(false); // Separate loading state for charts
   const [statusFilter] = useState('All Status');
   const [searchTerm] = useState('');
   const [isFollowUpExpanded, setIsFollowUpExpanded] = useState(true);
@@ -158,49 +156,22 @@ export default function DashboardPage() {
     status: 'Pending'
   });
 
-  const loadDashboardData = useCallback(async (isInitialLoad = true) => {
+  const loadDashboardData = useCallback(async () => {
     try {
-      if (isInitialLoad) {
-        setLoading(true);
-      } else {
-        setChartsLoading(true);
-      }
+      setLoading(true);
       const statsData = await api.stats.getDashboardStats(chartTimeRange);
-      
-      if (isInitialLoad) {
-        // Full update on initial load
-        setStats(statsData);
-      } else {
-        // Only update chart data when switching time ranges
-        setStats(prevStats => prevStats ? {
-          ...prevStats,
-          mailVolumeData: statsData.mailVolumeData,
-          customerGrowthData: statsData.customerGrowthData
-        } : statsData);
-      }
+      setStats(statsData);
     } catch (err) {
       console.error('Error loading dashboard data:', err);
       toast.error('Failed to load dashboard data.');
     } finally {
-      if (isInitialLoad) {
-        setLoading(false);
-      } else {
-        setChartsLoading(false);
-      }
+      setLoading(false);
     }
   }, [chartTimeRange]);
 
-  // Initial load on mount
   useEffect(() => {
-    void loadDashboardData(true);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Update only charts when time range changes
-  useEffect(() => {
-    if (stats) { // Only run if we already have data (skip initial load)
-      void loadDashboardData(false);
-    }
-  }, [chartTimeRange]); // eslint-disable-line react-hooks/exhaustive-deps
+    void loadDashboardData();
+  }, [loadDashboardData]);
 
   // Helper function to get notification context based on notification history
   const getNotificationContext = (mailItem: MailItem) => {
@@ -380,17 +351,6 @@ export default function DashboardPage() {
 
   const handleLogMailFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    
-    // Check if selecting Package for Tier 1 customer
-    if (name === 'item_type' && (value === 'Package' || value === 'Large Package')) {
-      const selectedContact = contacts.find(c => c.contact_id === logMailFormData.contact_id);
-      if (selectedContact && selectedContact.service_tier === 1) {
-        if (!window.confirm('⚠️ Warning: This customer is on Service Tier 1, which typically does not include package handling. Are you sure you want to log a package for this customer?')) {
-          return; // Don't change if user cancels
-        }
-      }
-    }
-    
     setLogMailFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -405,22 +365,13 @@ export default function DashboardPage() {
     setSaving(true);
 
     try {
-      // Convert the date string (YYYY-MM-DD) to NY timezone timestamp
-      // Add noon time to avoid timezone edge cases
-      const dateObj = new Date(logMailFormData.received_date + 'T12:00:00');
-      const nyYear = dateObj.getFullYear();
-      const nyMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
-      const nyDay = String(dateObj.getDate()).padStart(2, '0');
-      const receivedDateNY = `${nyYear}-${nyMonth}-${nyDay}T12:00:00-05:00`; // NY timezone offset
-      
       await api.mailItems.create({
         ...logMailFormData,
-        received_date: receivedDateNY,
         quantity: logMailFormData.quantity || 1
       });
       toast.success('Mail logged successfully!');
       closeLogMailModal();
-      await loadDashboardData(); // Refresh dashboard data
+      loadDashboardData(); // Refresh dashboard data
     } catch (err) {
       console.error('Failed to log mail:', err);
       toast.error(`Failed to log mail: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -679,13 +630,376 @@ export default function DashboardPage() {
           customerGrowthData={stats?.customerGrowthData || []}
           chartTimeRange={chartTimeRange}
           onTimeRangeChange={setChartTimeRange}
-          loading={chartsLoading}
         />
       </div>
 
       {/* Add Customer Modal */}
       <Modal 
         isOpen={isAddCustomerModalOpen}
+        onClose={closeAddCustomerModal}
+        title="Add New Customer"
+      >
+        <form onSubmit={handleAddCustomerSubmit} className="space-y-6">
+          {/* Name & Company */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                        isAbandoned ? 'bg-red-600' : 
+                        isUrgent ? 'bg-gray-900' : 'bg-gray-600'
+                      }`}></div>
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {item.contacts?.contact_person || item.contacts?.company_name || 'Unknown Customer'}
+                        </p>
+                        <p className="text-sm text-gray-600">
+                          📮 {item.contacts?.mailbox_number} • {item.item_type} • {daysSinceReceived} {daysSinceReceived === 1 ? 'day' : 'days'} old
+                          {isAbandoned && (
+                            <span className="font-semibold text-gray-900"> • ⚠️ ABANDONED</span>
+                          )}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {/* Primary Action Button - Most Common/Urgent Action */}
+                      {isAbandoned ? (
+                        <button
+                          onClick={() => {
+                            setActionMailItem(item);
+                            setActionModalType('abandoned');
+                            setIsActionModalOpen(true);
+                          }}
+                          className="px-4 py-2 bg-red-200 hover:bg-red-300 text-gray-900 text-sm rounded-lg transition-colors flex items-center gap-2 relative group"
+                        >
+                          <AlertTriangle className="w-4 h-4" />
+                          Mark as Abandoned
+                          
+                          {/* Tooltip for Abandoned */}
+                          <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-64 z-50 pointer-events-none">
+                            {`📦 Received: ${formatDateForTooltip(item.received_date)} (${daysSinceReceived} days ago)\n⚠ Status: Abandoned (30+ days old)\n→ Action: Mark and archive this item`}
+                            <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-200"></div>
+                          </div>
+                        </button>
+                      ) : (
+                        (() => {
+                          const notificationCtx = getNotificationContext(item);
+                          const tooltipText = getNotificationTooltip(item);
+                          return (
+                            <button
+                              onClick={() => openSendEmailModal(item)}
+                              className={`px-4 py-2 ${notificationCtx.buttonColor} text-sm rounded-lg transition-colors flex items-center gap-2 relative group`}
+                            >
+                              <Send className="w-4 h-4" />
+                              {notificationCtx.buttonText}
+                              
+                              {/* Custom Tooltip - Sharp corners and darker gray */}
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-64 z-50 pointer-events-none">
+                                {tooltipText}
+                                <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-4 border-transparent border-t-gray-200"></div>
+                              </div>
+                            </button>
+                          );
+                        })()
+                      )}
+                      
+                      {/* Three-Dots Dropdown for More Actions */}
+                      <div className="relative">
+                        <button
+                          id={`followup-more-btn-${item.mail_item_id}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenFollowUpDropdownId(openFollowUpDropdownId === item.mail_item_id ? null : item.mail_item_id);
+                          }}
+                          className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                          title="More Actions"
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+                        
+                        {/* Dropdown Menu */}
+                        {openFollowUpDropdownId === item.mail_item_id && (
+                          <>
+                            {/* Backdrop to close dropdown */}
+                            <div 
+                              className="fixed inset-0 z-30" 
+                              onClick={() => setOpenFollowUpDropdownId(null)}
+                            ></div>
+                            
+                            {/* Dropdown content - using fixed positioning */}
+                            <div 
+                              className="fixed w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-40 max-h-96 overflow-y-auto"
+                              style={{
+                                top: `${(document.getElementById(`followup-more-btn-${item.mail_item_id}`)?.getBoundingClientRect().bottom ?? 0) + 4}px`,
+                                right: `${window.innerWidth - (document.getElementById(`followup-more-btn-${item.mail_item_id}`)?.getBoundingClientRect().right ?? 0)}px`,
+                              }}
+                            >
+                              {/* Send Email/Notification - Always visible */}
+                              {(() => {
+                                const notificationCtx = getNotificationContext(item);
+                                const tooltipText = getNotificationTooltip(item);
+                                return (
+                                  <button
+                                    onClick={() => {
+                                      openSendEmailModal(item);
+                                      setOpenFollowUpDropdownId(null);
+                                    }}
+                                    className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3 relative group"
+                                  >
+                                    <Send className="w-4 h-4 text-blue-600" />
+                                    {notificationCtx.buttonText}
+                                    
+                                    {/* Tooltip for dropdown - Sharp corners and darker gray */}
+                                    <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-64 z-50 pointer-events-none">
+                                      {tooltipText}
+                                      <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                    </div>
+                                  </button>
+                                );
+                              })()}
+                              
+                              {/* Mark as Picked Up - For all statuses */}
+                              <button
+                                onClick={() => {
+                                  setActionMailItem(item);
+                                  setActionModalType('picked_up');
+                                  setIsActionModalOpen(true);
+                                  setOpenFollowUpDropdownId(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-3 relative group"
+                              >
+                                <CheckCircle2 className="w-4 h-4 text-green-600" />
+                                Mark as Picked Up
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`✓ Mark this item as picked up\n→ Customer collected their mail`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
+                              </button>
+                              
+                              {/* Mark as Scanned - Always visible */}
+                              <button
+                                onClick={() => {
+                                  setActionMailItem(item);
+                                  setActionModalType('scanned');
+                                  setIsActionModalOpen(true);
+                                  setOpenFollowUpDropdownId(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-cyan-50 flex items-center gap-3 relative group"
+                              >
+                                <FileText className="w-4 h-4 text-cyan-600" />
+                                Mark as Scanned
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`📄 Scan document and send\n→ For letters and documents`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
+                              </button>
+                              
+                              {/* Forward - Always visible */}
+                              <button
+                                onClick={() => {
+                                  setActionMailItem(item);
+                                  setActionModalType('forward');
+                                  setIsActionModalOpen(true);
+                                  setOpenFollowUpDropdownId(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-3 relative group"
+                              >
+                                <Send className="w-4 h-4 text-orange-600" />
+                                Forward
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`→ Forward to another address\n✉️ Customer requested mail forwarding`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
+                              </button>
+                              
+                              {/* Mark as Abandoned - Always visible */}
+                              <button
+                                onClick={() => {
+                                  setActionMailItem(item);
+                                  setActionModalType('abandoned');
+                                  setIsActionModalOpen(true);
+                                  setOpenFollowUpDropdownId(null);
+                                }}
+                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-3 relative group"
+                              >
+                                <AlertTriangle className="w-4 h-4 text-red-600" />
+                                Mark as Abandoned
+                                
+                                {/* Tooltip */}
+                                <div className="absolute left-full top-0 ml-2 px-3 py-2 bg-gray-200 text-gray-900 text-[11px] text-left leading-relaxed shadow-lg border border-gray-300 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-75 whitespace-pre-line w-56 z-50 pointer-events-none">
+                                  {`⚠ Mark as abandoned package\n→ Customer not responding (30+ days)`}
+                                  <div className="absolute right-full top-1/2 transform -translate-y-1/2 border-4 border-transparent border-r-gray-200"></div>
+                                </div>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              
+              {/* Load More Button */}
+              {stats.needsFollowUp.length > followUpDisplayCount && (
+                <button
+                  onClick={() => setFollowUpDisplayCount(prev => prev + 10)}
+                  className="w-full py-3 mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
+                >
+                  Load More ({stats.needsFollowUp.length - followUpDisplayCount} remaining)
+                </button>
+              )}
+              
+              {/* Show Less Button (if showing more than initial) */}
+              {followUpDisplayCount > 10 && followUpDisplayCount >= stats.needsFollowUp.length && (
+                <button
+                  onClick={() => setFollowUpDisplayCount(10)}
+                  className="w-full py-3 mt-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium rounded-lg transition-colors"
+                >
+                  Show Less
+                </button>
+              )}
+            </div>
+          )}
+            </div>
+          )}
+        </div>
+
+        {/* Charts - Full width on mobile, 40% on desktop */}
+        <div className="lg:col-span-2 space-y-6 h-full">
+          {/* Time Range Toggle - Shared for both charts */}
+          <div className="flex items-center justify-center gap-2 bg-gray-100 p-1 rounded-lg">
+            <button
+              onClick={() => setChartTimeRange(7)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                chartTimeRange === 7
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              7 Days
+            </button>
+            <button
+              onClick={() => setChartTimeRange(14)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                chartTimeRange === 14
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              14 Days
+            </button>
+            <button
+              onClick={() => setChartTimeRange(30)}
+              className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+                chartTimeRange === 30
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              30 Days
+            </button>
+          </div>
+
+          {/* Mail Volume Chart */}
+          <div className="bg-white border-2 border-gray-300 rounded-lg p-6 shadow-sm h-[calc(50%-3rem)]">
+            <div className="flex items-center gap-3 mb-6">
+              <TrendingUp className="w-6 h-6 text-gray-900" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">Mail Volume</h2>
+                <p className="text-sm text-gray-600">Last {chartTimeRange} days</p>
+              </div>
+            </div>
+            <div className="animate-fadeIn">
+              <ResponsiveContainer width="100%" height={250}>
+                <BarChart data={stats?.mailVolumeData || []} key={`mail-volume-${chartTimeRange}`}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: '#6B7280', fontSize: 11 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                    interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    tick={{ fill: '#6B7280', fontSize: 12 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Bar dataKey="count" fill="#10B981" radius={[8, 8, 0, 0]} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Customer Growth Chart */}
+          <div className="bg-white border-2 border-gray-300 rounded-lg p-6 shadow-sm h-[calc(50%-3rem)]">
+            <div className="flex items-center gap-3 mb-6">
+              <UserPlus className="w-6 h-6 text-green-600" />
+              <div>
+                <h2 className="text-xl font-bold text-gray-900">New Customers</h2>
+                <p className="text-sm text-gray-600">Added per day (last {chartTimeRange} days)</p>
+              </div>
+            </div>
+            <div className="animate-fadeIn">
+              <ResponsiveContainer width="100%" height={250}>
+                <LineChart data={stats?.customerGrowthData || []} key={`customer-growth-${chartTimeRange}`}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis 
+                    dataKey="date" 
+                    tick={{ fill: '#6B7280', fontSize: 11 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                    interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
+                    angle={-45}
+                    textAnchor="end"
+                    height={60}
+                  />
+                  <YAxis 
+                    tick={{ fill: '#6B7280', fontSize: 12 }}
+                    tickLine={{ stroke: '#E5E7EB' }}
+                    allowDecimals={false}
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      backgroundColor: '#fff', 
+                      border: '1px solid #E5E7EB',
+                      borderRadius: '8px',
+                      boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                    }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="customers" 
+                    stroke="#10B981" 
+                    strokeWidth={3}
+                    isAnimationActive={false}
+                    dot={{ fill: '#10B981', r: 4 }}
+                    activeDot={{ r: 6 }}
+                    connectNulls={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Add Customer Modal */}
+      <Modal 
+        isOpen={isAddCustomerModalOpen} 
         onClose={closeAddCustomerModal}
         title="Add New Customer"
       >
@@ -873,14 +1187,6 @@ export default function DashboardPage() {
                 <option value="Large Package">Large Package</option>
                 <option value="Certified Mail">Certified Mail</option>
               </select>
-              {(logMailFormData.item_type === 'Package' || logMailFormData.item_type === 'Large Package') && 
-               logMailFormData.contact_id && 
-               contacts.find(c => c.contact_id === logMailFormData.contact_id)?.service_tier === 1 && (
-                <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">
-                  <AlertTriangle className="w-4 h-4" />
-                  Tier 1 customers typically don't receive packages
-                </p>
-              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-2">

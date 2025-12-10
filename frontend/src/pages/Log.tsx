@@ -295,6 +295,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       } else {
         console.log('Creating new mail item...');
         
+        // Convert the selected date to NY timezone timestamp
+        const dateObj = new Date(date + 'T12:00:00');
+        const nyYear = dateObj.getFullYear();
+        const nyMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const nyDay = String(dateObj.getDate()).padStart(2, '0');
+        const receivedDateNY = `${nyYear}-${nyMonth}-${nyDay}T12:00:00-05:00`;
+        
         // Send the actual current timestamp to capture when mail was logged
         await api.mailItems.create({
           contact_id: selectedContact!.contact_id,
@@ -302,7 +309,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           description: note,
           status: 'Received',
           quantity: typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity),
-          received_date: getNYTimestamp()
+          received_date: receivedDateNY
         });
 
         console.log('Successfully created new mail!');
@@ -753,10 +760,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 type="date"
                 value={date}
                 onChange={(e) => setDate(e.target.value)}
-                max={getTodayNY()}
                 className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <p className="mt-1 text-xs text-gray-500">Cannot select future dates</p>
+              <p className="mt-1 text-xs text-gray-500">Select the date the mail was received</p>
             </div>
 
             {/* Type */}
@@ -1671,11 +1677,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 name="received_date"
                 value={formData.received_date}
                 onChange={handleChange}
-                max={getTodayNY()}
                 required
                 className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
               />
-              <p className="mt-1 text-xs text-gray-500">Cannot select future dates</p>
+              <p className="mt-1 text-xs text-gray-500">Select the date the mail was received</p>
             </div>
 
             {/* Quantity */}

@@ -57,6 +57,8 @@ async function sendNotificationEmail(req, res, next) {
 
     // 3. Get mail item details if provided
     let mailItemDetails = {};
+    let packageFeeDetails = {};
+    
     if (mail_item_id) {
       const { data: mailItem } = await supabase
         .from('mail_items')
@@ -76,8 +78,38 @@ async function sendNotificationEmail(req, res, next) {
           QUANTITY: mailItem.quantity || 1,
           STATUS: mailItem.status || ''
         };
+
+        // Fetch package fee information if it's a package
+        if (mailItem.item_type === 'Package' || mailItem.item_type === 'Large Package') {
+          const { data: packageFee } = await supabase
+            .from('package_fees')
+            .select('*')
+            .eq('mail_item_id', mail_item_id)
+            .eq('fee_status', 'pending')
+            .single();
+          
+          if (packageFee) {
+            packageFeeDetails = {
+              PackageFees: `$${packageFee.fee_amount.toFixed(2)}`,
+              PackageFeeAmount: packageFee.fee_amount.toFixed(2),
+              DaysCharged: packageFee.days_charged,
+              DailyRate: `$${packageFee.daily_rate.toFixed(2)}`,
+              GracePeriodDays: packageFee.grace_period_days
+            };
+          }
+        }
       }
     }
+
+    // Get all pending package fees for this contact (for summary emails)
+    const { data: allPendingFees } = await supabase
+      .from('package_fees')
+      .select('*, mail_items!inner(*)')
+      .eq('contact_id', contact_id)
+      .eq('fee_status', 'pending');
+    
+    const totalPendingFees = allPendingFees?.reduce((sum, fee) => sum + fee.fee_amount, 0) || 0;
+    const packageCount = allPendingFees?.length || 0;
 
     // 4. Build variables for template substitution
     const variables = {
@@ -85,6 +117,12 @@ async function sendNotificationEmail(req, res, next) {
       BoxNumber: contact.mailbox_number || '',
       CONTACT_EMAIL: contact.email || '',
       ...mailItemDetails,
+      ...packageFeeDetails,
+      // Package fee summary (for all packages for this contact)
+      TotalPackageFees: `$${totalPendingFees.toFixed(2)}`,
+      TotalPackageFeeAmount: totalPendingFees.toFixed(2),
+      PackageCount: packageCount,
+      PackagesText: packageCount === 1 ? 'package' : 'packages',
       ...(custom_variables || {}) // Allow custom variables from frontend
     };
 
