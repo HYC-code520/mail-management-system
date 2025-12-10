@@ -1498,8 +1498,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         <div className="space-y-6">
                           {/* Action History Timeline */}
                           <ActionHistorySection
-                            mailItemId={item.mail_item_id}
-                            actionHistory={actionHistory[item.mail_item_id] || []}
+                            actions={actionHistory[item.mail_item_id] || []}
                             loading={false}
                           />
 
