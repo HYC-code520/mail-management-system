@@ -32,7 +32,7 @@ const mockTodos = [
     title: 'Test Task 1',
     notes: 'Test notes',
     is_completed: false,
-    date_header: '2025-12-11',
+    date_header: '2025-12-20', // Future date to avoid "Today"/"Yesterday" issues
     priority: 1,
     category: 'Work',
     sort_order: 0,
@@ -48,7 +48,7 @@ const mockTodos = [
     title: 'Test Task 2',
     notes: null,
     is_completed: true,
-    date_header: '2025-12-10',
+    date_header: '2025-12-15', // Future date to avoid "Today"/"Yesterday" issues
     priority: 0,
     category: null,
     sort_order: 0,
@@ -115,8 +115,8 @@ describe('TodoList Component', () => {
       renderTodoList();
 
       await waitFor(() => {
-        expect(screen.getByText('Dec 11')).toBeInTheDocument();
-        expect(screen.getByText('Dec 10')).toBeInTheDocument();
+        expect(screen.getByText('Dec 20')).toBeInTheDocument();
+        expect(screen.getByText('Dec 15')).toBeInTheDocument();
         expect(screen.getByText('No Date')).toBeInTheDocument();
       });
     });
@@ -628,8 +628,8 @@ describe('TodoList Component', () => {
 
       await waitFor(() => {
         // Date should be displayed correctly in local time
-        expect(screen.getByText('Dec 11')).toBeInTheDocument();
-        expect(screen.getByText('Dec 10')).toBeInTheDocument();
+        expect(screen.getByText('Dec 20')).toBeInTheDocument();
+        expect(screen.getByText('Dec 15')).toBeInTheDocument();
       });
     });
 
