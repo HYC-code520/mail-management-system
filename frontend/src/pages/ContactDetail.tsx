@@ -54,11 +54,73 @@ interface NotificationHistory {
   notes?: string;
 }
 
+interface GroupedMailItem {
+  groupKey: string; // e.g., "2024-12-11_Letter"
+  itemType: string;
+  receivedDate: string; // Date part only (YYYY-MM-DD)
+  totalQuantity: number;
+  items: MailItem[]; // All individual mail items in this group
+  latestStatus: string;
+  latestDescription?: string;
+}
+
+// Helper function to group mail items by date and type
+const groupMailItems = (items: MailItem[]): GroupedMailItem[] => {
+  const grouped = new Map<string, GroupedMailItem>();
+
+  items.forEach(item => {
+    // Format date to YYYY-MM-DD in NY timezone
+    const receivedDateDay = new Date(item.received_date).toLocaleDateString('en-CA', {
+      timeZone: 'America/New_York',
+    }); // en-CA gives YYYY-MM-DD format
+
+    const groupKey = `${receivedDateDay}_${item.item_type}`;
+
+    if (!grouped.has(groupKey)) {
+      grouped.set(groupKey, {
+        groupKey,
+        itemType: item.item_type,
+        receivedDate: receivedDateDay,
+        totalQuantity: 0,
+        items: [],
+        latestStatus: '',
+        latestDescription: undefined,
+      });
+    }
+
+    const group = grouped.get(groupKey)!;
+    group.items.push(item);
+    group.totalQuantity += item.quantity || 1;
+
+    // Use the most recent item's status and description
+    const currentItemTimestamp = new Date(item.received_date).getTime();
+    const existingLatestTimestamp = group.items.length > 1 
+      ? new Date(group.items[group.items.length - 2].received_date).getTime() 
+      : 0;
+
+    if (currentItemTimestamp >= existingLatestTimestamp) {
+      group.latestStatus = item.status;
+      group.latestDescription = item.description;
+    }
+  });
+
+  // Sort items within each group by received_date (oldest first)
+  grouped.forEach(group => {
+    group.items.sort((a, b) => new Date(a.received_date).getTime() - new Date(b.received_date).getTime());
+  });
+
+  // Return groups sorted by date (most recent first)
+  return Array.from(grouped.values()).sort((a, b) => 
+    new Date(b.receivedDate).getTime() - new Date(a.receivedDate).getTime()
+  );
+};
+
 export default function ContactDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [contact, setContact] = useState<Contact | null>(null);
   const [mailHistory, setMailHistory] = useState<MailItem[]>([]);
+  const [groupedMailHistory, setGroupedMailHistory] = useState<GroupedMailItem[]>([]);
   const [notificationHistory, setNotificationHistory] = useState<Record<string, NotificationHistory[]>>({});
   const [actionHistory, setActionHistory] = useState<Record<string, any[]>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -98,7 +160,9 @@ export default function ContactDetailPage() {
   const loadMailHistory = useCallback(async () => {
     try {
       const data = await api.mailItems.getAll(id);
-      setMailHistory(Array.isArray(data) ? data : []);
+      const items = Array.isArray(data) ? data : [];
+      setMailHistory(items);
+      setGroupedMailHistory(groupMailItems(items));
     } catch (err) {
       console.error('Error loading mail history:', err);
     }
@@ -135,18 +199,58 @@ export default function ContactDetailPage() {
     }
   };
 
-  const toggleRow = (mailItemId: string) => {
+  // Load action history for all items in a group (combined)
+  const loadActionHistoryForGroup = async (groupKey: string, mailItemIds: string[]) => {
+    try {
+      const historyPromises = mailItemIds.map(id => api.actionHistory.getByMailItem(id));
+      const histories = await Promise.all(historyPromises);
+      
+      // Combine and sort by timestamp
+      const combinedHistory = histories.flat().sort((a, b) => 
+        new Date(a.action_timestamp).getTime() - new Date(b.action_timestamp).getTime()
+      );
+
+      setActionHistory(prev => ({
+        ...prev,
+        [groupKey]: combinedHistory
+      }));
+    } catch (err) {
+      console.error('Error loading action history for group:', err);
+    }
+  };
+
+  // Load notification history for all items in a group (combined)
+  const loadNotificationHistoryForGroup = async (groupKey: string, mailItemIds: string[]) => {
+    try {
+      const historyPromises = mailItemIds.map(id => api.notifications.getByMailItem(id));
+      const histories = await Promise.all(historyPromises);
+      
+      // Combine and sort by timestamp
+      const combinedHistory = histories.flat().sort((a, b) => 
+        new Date(a.notified_at).getTime() - new Date(b.notified_at).getTime()
+      );
+
+      setNotificationHistory(prev => ({
+        ...prev,
+        [groupKey]: combinedHistory
+      }));
+    } catch (err) {
+      console.error('Error loading notification history for group:', err);
+    }
+  };
+
+  const toggleRow = (groupKey: string, mailItemIds: string[]) => {
     const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(mailItemId)) {
-      newExpanded.delete(mailItemId);
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey);
     } else {
-      newExpanded.add(mailItemId);
-      // Load both notification and action history when row is expanded
-      if (!notificationHistory[mailItemId]) {
-        loadNotificationHistoryForMailItem(mailItemId);
+      newExpanded.add(groupKey);
+      // Load both notification and action history for all items in the group
+      if (!notificationHistory[groupKey]) {
+        loadNotificationHistoryForGroup(groupKey, mailItemIds);
       }
-      if (!actionHistory[mailItemId]) {
-        loadActionHistoryForMailItem(mailItemId);
+      if (!actionHistory[groupKey]) {
+        loadActionHistoryForGroup(groupKey, mailItemIds);
       }
     }
     setExpandedRows(newExpanded);
@@ -450,22 +554,28 @@ export default function ContactDetailPage() {
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700 w-10"></th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Date</th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Type</th>
+                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Qty</th>
                     <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Note</th>
                     <th className="text-right py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {mailHistory.map((item) => (
-                    <React.Fragment key={item.mail_item_id}>
-                      {/* Main Row */}
-                      <tr className="border-b border-gray-100 hover:bg-gray-50">
+                  {groupedMailHistory.map((group) => (
+                    <React.Fragment key={group.groupKey}>
+                      {/* Main Grouped Row */}
+                      <tr 
+                        className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
+                        onClick={() => toggleRow(group.groupKey, group.items.map(i => i.mail_item_id))}
+                      >
                         <td className="py-4 px-6">
                           <button
-                            onClick={() => toggleRow(item.mail_item_id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleRow(group.groupKey, group.items.map(i => i.mail_item_id));
+                            }}
                             className="text-gray-500 hover:text-gray-700 transition-transform"
                             style={{
-                              transform: expandedRows.has(item.mail_item_id) ? 'rotate(90deg)' : 'rotate(0deg)',
+                              transform: expandedRows.has(group.groupKey) ? 'rotate(90deg)' : 'rotate(0deg)',
                               display: 'inline-block',
                             }}
                           >
@@ -473,56 +583,46 @@ export default function ContactDetailPage() {
                           </button>
                         </td>
                         <td className="py-4 px-6 text-gray-900">
-                          <span 
-                            title={`Logged at: ${new Date(item.received_date).toLocaleString('en-US', {
-                              timeZone: 'America/New_York',
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric',
-                              hour: 'numeric',
-                              minute: '2-digit',
-                              hour12: true,
-                              timeZoneName: 'short'
-                            })}`}
-                            className="cursor-help border-b border-dotted border-gray-400"
-                          >
-                            {new Date(item.received_date).toLocaleDateString('en-US', {
-                              timeZone: 'America/New_York',
-                              year: 'numeric',
-                              month: '2-digit',
-                              day: '2-digit'
-                            })}
-                          </span>
+                          {new Date(group.receivedDate + 'T12:00:00').toLocaleDateString('en-US', {
+                            timeZone: 'America/New_York',
+                            year: 'numeric',
+                            month: '2-digit',
+                            day: '2-digit'
+                          })}
                         </td>
                         <td className="py-4 px-6">
                           <div className="flex items-center gap-2 text-gray-700">
-                            {item.item_type === 'Package' ? (
+                            {group.itemType === 'Package' || group.itemType === 'Large Package' ? (
                               <Package className="w-4 h-4 text-gray-500" />
                             ) : (
                               <Mail className="w-4 h-4 text-gray-500" />
                             )}
-                            <span>{item.item_type}</span>
+                            <span>{group.itemType}</span>
                           </div>
                         </td>
                         <td className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded text-xs font-medium ${
-                            item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
-                            item.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                            item.status === 'Notified' ? 'bg-purple-100 text-purple-700' :
-                            item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
-                            item.status === 'Scanned Document' ? 'bg-cyan-100 text-cyan-700' :
-                            item.status === 'Forward' ? 'bg-orange-100 text-orange-700' :
-                            item.status === 'Abandoned Package' ? 'bg-red-100 text-red-700' :
-                            'bg-gray-200 text-gray-700'
-                          }`}>
-                            {item.status}
+                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium">
+                            {group.totalQuantity}
                           </span>
                         </td>
-                        <td className="py-4 px-6 text-gray-700">{item.description || '—'}</td>
-                        <td className="py-4 px-6 text-right">
-                          {item.status !== 'Picked Up' && item.status !== 'Abandoned Package' && contact?.email && (
+                        <td className="py-4 px-6">
+                          <span className={`px-3 py-1 rounded text-xs font-medium ${
+                            group.latestStatus === 'Received' ? 'bg-blue-100 text-blue-700' :
+                            group.latestStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                            group.latestStatus === 'Notified' ? 'bg-purple-100 text-purple-700' :
+                            group.latestStatus === 'Picked Up' ? 'bg-green-100 text-green-700' :
+                            group.latestStatus === 'Scanned Document' ? 'bg-cyan-100 text-cyan-700' :
+                            group.latestStatus === 'Forward' ? 'bg-orange-100 text-orange-700' :
+                            group.latestStatus === 'Abandoned Package' ? 'bg-red-100 text-red-700' :
+                            'bg-gray-200 text-gray-700'
+                          }`}>
+                            {group.latestStatus}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
+                          {group.latestStatus !== 'Picked Up' && group.latestStatus !== 'Abandoned Package' && contact?.email && (
                             <button
-                              onClick={() => openSendEmailModal(item)}
+                              onClick={() => openSendEmailModal(group.items[0])}
                               className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2 ml-auto"
                             >
                               <Send className="w-4 h-4" />
@@ -532,20 +632,74 @@ export default function ContactDetailPage() {
                         </td>
                       </tr>
 
-                      {/* Expanded Row - Notification & Action History */}
-                      {expandedRows.has(item.mail_item_id) && (
+                      {/* Expanded Row - Details & History */}
+                      {expandedRows.has(group.groupKey) && (
                         <tr className="bg-gray-50 border-b border-gray-200">
                           <td colSpan={6} className="py-6 px-6">
                             <div className="ml-10 space-y-6">
+                              {/* Individual Items in Group */}
+                              {group.items.length > 1 && (
+                                <div>
+                                  <h4 className="font-bold text-gray-900 mb-3">
+                                    Individual Items ({group.items.length})
+                                  </h4>
+                                  <div className="space-y-2">
+                                    {group.items.map((item, index) => (
+                                      <div key={item.mail_item_id} className="bg-white p-3 rounded-lg border border-gray-200">
+                                        <div className="flex items-center justify-between">
+                                          <div className="flex items-center gap-3">
+                                            <span className="text-sm text-gray-500">#{index + 1}</span>
+                                            <span className="text-sm font-medium text-gray-900">
+                                              {new Date(item.received_date).toLocaleTimeString('en-US', {
+                                                timeZone: 'America/New_York',
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                hour12: true
+                                              })}
+                                            </span>
+                                            {item.quantity && item.quantity > 1 && (
+                                              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+                                                Qty: {item.quantity}
+                                              </span>
+                                            )}
+                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                              item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
+                                              item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
+                                              'bg-gray-100 text-gray-700'
+                                            }`}>
+                                              {item.status}
+                                            </span>
+                                          </div>
+                                          {item.description && (
+                                            <span className="text-sm text-gray-600 italic">
+                                              {item.description}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* Single item description if only one item */}
+                              {group.items.length === 1 && group.items[0].description && (
+                                <div className="bg-white p-3 rounded-lg border border-gray-200">
+                                  <p className="text-sm text-gray-600">
+                                    <span className="font-medium">Note:</span> {group.items[0].description}
+                                  </p>
+                                </div>
+                              )}
+
                               {/* Notification History Section */}
                               <div>
                                 <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
                                   <Bell className="w-5 h-5 text-purple-600" />
                                   Notification History
                                 </h4>
-                                {notificationHistory[item.mail_item_id]?.length > 0 ? (
+                                {notificationHistory[group.groupKey]?.length > 0 ? (
                                   <div className="space-y-3">
-                                    {notificationHistory[item.mail_item_id].map((notif) => (
+                                    {notificationHistory[group.groupKey].map((notif) => (
                                       <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
                                         <div className="flex items-start justify-between">
                                           <div className="flex-1">
@@ -579,14 +733,14 @@ export default function ContactDetailPage() {
                                   </div>
                                 ) : (
                                   <p className="text-sm text-gray-500 italic">
-                                    No notifications sent for this mail item yet.
+                                    No notifications sent yet.
                                   </p>
                                 )}
                               </div>
 
                               {/* Action History Section */}
                               <ActionHistorySection 
-                                actions={actionHistory[item.mail_item_id] || []}
+                                actions={actionHistory[group.groupKey] || []}
                               />
                             </div>
                           </td>

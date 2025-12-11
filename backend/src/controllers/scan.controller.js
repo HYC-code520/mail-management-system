@@ -1,6 +1,7 @@
 const { supabaseAdmin } = require('../services/supabase.service');
 const { sendTemplateEmail } = require('../services/email.service');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
+const feeService = require('../services/fee.service');
 
 /**
  * Smart AI matching using Gemini Vision
@@ -200,12 +201,25 @@ async function bulkSubmitScanSession(req, res, next) {
             throw new Error(`Contact not found: ${group.contact_id}`);
           }
 
-          // Create mail items (bulk insert)
-          const mailItemsToInsert = group.items.map(item => ({
-            contact_id: item.contact_id,
-            item_type: item.item_type,
-            quantity: 1,
-            received_date: item.scanned_at,
+          // OPTIMIZATION: Group items by item_type to create ONE record per type with combined quantity
+          // Instead of 5 separate letters, create 1 letter with qty=5
+          const itemsByType = group.items.reduce((acc, item) => {
+            if (!acc[item.item_type]) {
+              acc[item.item_type] = {
+                item_type: item.item_type,
+                count: 0,
+              };
+            }
+            acc[item.item_type].count++;
+            return acc;
+          }, {});
+
+          // Create ONE mail item per type with combined quantity
+          const mailItemsToInsert = Object.values(itemsByType).map(typeGroup => ({
+            contact_id: group.contact_id,
+            item_type: typeGroup.item_type,
+            quantity: typeGroup.count,
+            received_date: new Date().toISOString(), // Use current time for the combined record
             status: 'Received', // Will be updated to 'Notified' if email succeeds
           }));
 
@@ -216,6 +230,43 @@ async function bulkSubmitScanSession(req, res, next) {
 
           if (insertError) {
             throw new Error(`Failed to insert mail items: ${insertError.message}`);
+          }
+
+          // Log action history for each created mail item (noting it was from bulk scan)
+          // Also create fee records for packages
+          for (const mailItem of createdItems) {
+            const typeGroup = itemsByType[mailItem.item_type] || { count: mailItem.quantity || 1 };
+            
+            // Log action history
+            try {
+              await supabaseAdmin
+                .from('action_history')
+                .insert({
+                  mail_item_id: mailItem.mail_item_id,
+                  action_type: 'scanned',
+                  action_description: `Bulk scanned ${typeGroup.count} ${mailItem.item_type}${typeGroup.count > 1 ? 's' : ''} via Scan Session`,
+                  performed_by: req.user.email || 'Staff',
+                  action_timestamp: new Date().toISOString()
+                });
+            } catch (historyError) {
+              console.error('Failed to log scan action history:', historyError);
+              // Don't fail the request if history logging fails
+            }
+
+            // Create fee record for packages
+            if (mailItem.item_type === 'Package' || mailItem.item_type === 'Large Package') {
+              try {
+                await feeService.createFeeRecord(
+                  mailItem.mail_item_id,
+                  mailItem.contact_id,
+                  userId
+                );
+                console.log(`✅ Created fee record for scanned package ${mailItem.mail_item_id}`);
+              } catch (feeError) {
+                console.error('⚠️  Warning: Failed to create fee record for scanned package:', feeError);
+                // Don't fail the request if fee creation fails
+              }
+            }
           }
 
           // Select appropriate email template based on item types

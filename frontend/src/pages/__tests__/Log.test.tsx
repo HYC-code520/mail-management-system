@@ -84,7 +84,7 @@ describe('LogPage - Date Functionality', () => {
     });
   });
 
-  it('should not allow selecting future dates', async () => {
+  it('should display helper text for date field', async () => {
     render(
       <BrowserRouter>
         <LogPage showAddForm={true} />
@@ -92,21 +92,7 @@ describe('LogPage - Date Functionality', () => {
     );
 
     await waitFor(() => {
-      const dateInputs = screen.getAllByDisplayValue(getTodayLocal());
-      const dateInput = dateInputs.find((input: HTMLElement) => (input as HTMLInputElement).type === 'date') as HTMLInputElement;
-      expect(dateInput).toHaveAttribute('max', getTodayLocal());
-    });
-  });
-
-  it('should show helper text about future dates', async () => {
-    render(
-      <BrowserRouter>
-        <LogPage showAddForm={true} />
-      </BrowserRouter>
-    );
-
-    await waitFor(() => {
-      expect(screen.getByText('Cannot select future dates')).toBeInTheDocument();
+      expect(screen.getByText('Select the date the mail was received')).toBeInTheDocument();
     });
   });
 

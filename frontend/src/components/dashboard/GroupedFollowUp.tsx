@@ -180,7 +180,10 @@ export default function GroupedFollowUpSection({
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-gray-900 text-lg">{customerName}</p>
                         <button
-                          onClick={() => togglePersonExpand(group.contact.contact_id)}
+                          onClick={(e) => {
+                            e.stopPropagation(); // Prevent triggering parent div's onClick
+                            togglePersonExpand(group.contact.contact_id);
+                          }}
                           className="p-1 hover:bg-gray-200 rounded transition-colors"
                           title={isPersonExpanded ? "Collapse details" : "Expand details"}
                         >

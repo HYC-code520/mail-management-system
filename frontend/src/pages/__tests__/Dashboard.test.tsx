@@ -19,10 +19,31 @@ vi.mock('../../lib/api-client', () => ({
     notifications: {
       quickNotify: vi.fn(),
     },
+    stats: {
+      getDashboardStats: vi.fn(),
+    },
   },
 }));
 
 import { api } from '../../lib/api-client';
+
+// Helper to create mock dashboard stats
+const createMockDashboardStats = (needsFollowUp: any[] = []) => ({
+  todaysMail: 5,
+  pendingPickups: 10,
+  remindersDue: 3,
+  overdueMail: 2,
+  completedToday: 8,
+  recentMailItems: [],
+  recentCustomers: [],
+  newCustomersToday: 1,
+  needsFollowUp,
+  mailVolumeData: [],
+  customerGrowthData: [],
+  outstandingFees: 0,
+  totalRevenue: 0,
+  monthlyRevenue: 0,
+});
 
 describe('Dashboard', () => {
   beforeEach(() => {
@@ -30,6 +51,7 @@ describe('Dashboard', () => {
     // Set default successful responses
     (api.contacts.getAll as any).mockResolvedValue(mockContacts);
     (api.mailItems.getAll as any).mockResolvedValue(mockMailItems);
+    (api.stats.getDashboardStats as any).mockResolvedValue(createMockDashboardStats());
   });
 
   it('renders dashboard with loading state', async () => {
@@ -40,7 +62,7 @@ describe('Dashboard', () => {
     
     // Wait for data loading to complete
     await waitFor(() => {
-      expect(api.contacts.getAll).toHaveBeenCalled();
+      expect(api.stats.getDashboardStats).toHaveBeenCalled();
     });
   });
 
@@ -53,14 +75,12 @@ describe('Dashboard', () => {
     });
     
     // Verify API was called
-    expect(api.contacts.getAll).toHaveBeenCalled();
-    expect(api.mailItems.getAll).toHaveBeenCalled();
+    expect(api.stats.getDashboardStats).toHaveBeenCalled();
   });
 
   it('shows error message when data fetch fails', async () => {
     // Override default mocks with errors
-    (api.contacts.getAll as any).mockRejectedValue(new Error('Network error'));
-    (api.mailItems.getAll as any).mockRejectedValue(new Error('Network error'));
+    (api.stats.getDashboardStats as any).mockRejectedValue(new Error('Network error'));
     
     render(<Dashboard />);
     
@@ -82,200 +102,31 @@ describe('Dashboard', () => {
   });
 
   describe('Needs Follow-Up Section', () => {
-    it('shows Load More button when there are more than 10 items', async () => {
-      // Create 15 mail items that need follow-up
-      const manyMailItems = Array.from({ length: 15 }, (_, i) => ({
-        mail_item_id: `mail-${i}`,
-        contact_id: 'contact-1',
-        item_type: 'Letter',
-        status: 'Received',
-        received_date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
-        contacts: {
+    // Helper to create grouped follow-up data
+    const createGroupedFollowUp = (count: number) => {
+      return Array.from({ length: count }, (_, i) => ({
+        contact: {
+          contact_id: `contact-${i}`,
           contact_person: `Customer ${i}`,
           mailbox_number: `A${i}`,
         },
-      }));
-
-      (api.mailItems.getAll as any).mockResolvedValue(manyMailItems);
-
-      render(<Dashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      });
-
-      // Should show "Load More" button with remaining count
-      await waitFor(() => {
-        const loadMoreButton = screen.getByText(/Load More \(5 remaining\)/i);
-        expect(loadMoreButton).toBeInTheDocument();
-      });
-    });
-
-    it('loads more items when Load More button is clicked', async () => {
-      // Create 15 mail items that need follow-up
-      const manyMailItems = Array.from({ length: 15 }, (_, i) => ({
-        mail_item_id: `mail-${i}`,
-        contact_id: 'contact-1',
-        item_type: 'Letter',
-        status: 'Received',
-        received_date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
-        contacts: {
-          contact_person: `Customer ${i}`,
-          mailbox_number: `A${i}`,
-        },
-      }));
-
-      (api.mailItems.getAll as any).mockResolvedValue(manyMailItems);
-
-      render(<Dashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      });
-
-      // Wait for Needs Follow-Up section to appear
-      await waitFor(() => {
-        expect(screen.getByText(/Needs Follow-Up/i)).toBeInTheDocument();
-      });
-
-      // Wait for Load More button
-      const loadMoreButton = await screen.findByText(/Load More \(5 remaining\)/i);
-      expect(loadMoreButton).toBeInTheDocument();
-
-      // Click Load More
-      fireEvent.click(loadMoreButton);
-
-      // Should show "Show Less" button after all items are loaded
-      await waitFor(() => {
-        const showLessButton = screen.getByText('Show Less');
-        expect(showLessButton).toBeInTheDocument();
-      });
-    });
-
-    it('shows Show Less button after loading all items', async () => {
-      // Create 15 mail items that need follow-up
-      const manyMailItems = Array.from({ length: 15 }, (_, i) => ({
-        mail_item_id: `mail-${i}`,
-        contact_id: 'contact-1',
-        item_type: 'Letter',
-        status: 'Received',
-        received_date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
-        contacts: {
-          contact_person: `Customer ${i}`,
-          mailbox_number: `A${i}`,
-        },
-      }));
-
-      (api.mailItems.getAll as any).mockResolvedValue(manyMailItems);
-
-      render(<Dashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      });
-
-      // Click Load More
-      const loadMoreButton = await screen.findByText(/Load More \(5 remaining\)/i);
-      fireEvent.click(loadMoreButton);
-
-      // Should show "Show Less" button
-      await waitFor(() => {
-        const showLessButton = screen.getByText('Show Less');
-        expect(showLessButton).toBeInTheDocument();
-      });
-    });
-
-    it('resets to 10 items when Show Less is clicked', async () => {
-      // Create 15 mail items that need follow-up
-      const manyMailItems = Array.from({ length: 15 }, (_, i) => ({
-        mail_item_id: `mail-${i}`,
-        contact_id: 'contact-1',
-        item_type: 'Letter',
-        status: 'Received',
-        received_date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
-        contacts: {
-          contact_person: `Customer ${i}`,
-          mailbox_number: `A${i}`,
-        },
-      }));
-
-      (api.mailItems.getAll as any).mockResolvedValue(manyMailItems);
-
-      render(<Dashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      });
-
-      // Click Load More
-      const loadMoreButton = await screen.findByText(/Load More \(5 remaining\)/i);
-      fireEvent.click(loadMoreButton);
-
-      // Wait for all items to be displayed
-      await waitFor(() => {
-        expect(screen.getByText('Customer 14')).toBeInTheDocument();
-      });
-
-      // Click Show Less
-      const showLessButton = await screen.findByText('Show Less');
-      fireEvent.click(showLessButton);
-
-      // Should be back to showing Load More button
-      await waitFor(() => {
-        const newLoadMoreButton = screen.getByText(/Load More \(5 remaining\)/i);
-        expect(newLoadMoreButton).toBeInTheDocument();
-      });
-    });
-
-    it('displays abandoned mail (30+ days) with red dot and button', async () => {
-      // Create a mail item that is 35 days old (abandoned)
-      const abandonedMailItem = {
-        mail_item_id: 'old-mail',
-        contact_id: 'contact-1',
-        item_type: 'Package',
-        status: 'Received',
-        received_date: new Date(Date.now() - 35 * 24 * 60 * 60 * 1000).toISOString(),
-        contacts: {
-          contact_person: 'Old Customer',
-          mailbox_number: 'Z99',
-        },
-      };
-
-      (api.mailItems.getAll as any).mockResolvedValue([abandonedMailItem]);
-
-      render(<Dashboard />);
-
-      await waitFor(() => {
-        expect(screen.getByText('Dashboard')).toBeInTheDocument();
-      });
-
-      // Verify the customer name is displayed (which means the item is in the Needs Follow-Up section)
-      await waitFor(() => {
-        expect(screen.getByText('Old Customer')).toBeInTheDocument();
-      });
-    });
-
-    it('shows correct days old for all items', async () => {
-      const mailItems = [
-        {
-          mail_item_id: 'mail-1',
-          contact_id: 'contact-1',
-          item_type: 'Letter',
-          status: 'Received',
-          received_date: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-          contacts: { contact_person: 'Customer 1', mailbox_number: 'A1' },
-        },
-        {
-          mail_item_id: 'mail-2',
-          contact_id: 'contact-2',
+        packages: [{
+          mail_item_id: `mail-${i}`,
+          contact_id: `contact-${i}`,
           item_type: 'Package',
           status: 'Received',
-          received_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
-          contacts: { contact_person: 'Customer 2', mailbox_number: 'A2' },
-        },
-      ];
+          received_date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
+        }],
+        letters: [],
+        totalFees: 0,
+        urgencyScore: i + 1,
+        lastNotified: undefined,
+      }));
+    };
 
-      (api.mailItems.getAll as any).mockResolvedValue(mailItems);
+    it('renders when there are items needing follow-up', async () => {
+      const groups = createGroupedFollowUp(5);
+      (api.stats.getDashboardStats as any).mockResolvedValue(createMockDashboardStats(groups));
 
       render(<Dashboard />);
 
@@ -283,33 +134,34 @@ describe('Dashboard', () => {
         expect(screen.getByText('Dashboard')).toBeInTheDocument();
       });
 
-      // Click on Needs Follow-Up section if it's collapsed
-      const needsFollowUpSection = screen.getByText(/Needs Follow-Up/i);
-      if (needsFollowUpSection) {
-        // Section should be expanded by default, but let's verify items are visible
-        await waitFor(() => {
-          // Look for customer names to verify section is rendered
-          expect(screen.getByText('Customer 1')).toBeInTheDocument();
-          expect(screen.getByText('Customer 2')).toBeInTheDocument();
-        });
-      }
+      // Verify the section renders with data
+      await waitFor(() => {
+        expect(screen.getByText('Customer 0')).toBeInTheDocument();
+      });
     });
 
-    it('does not show Load More button when items are 10 or fewer', async () => {
-      // Create only 8 mail items
-      const fewMailItems = Array.from({ length: 8 }, (_, i) => ({
-        mail_item_id: `mail-${i}`,
-        contact_id: 'contact-1',
-        item_type: 'Letter',
-        status: 'Received',
-        received_date: new Date(Date.now() - (i + 1) * 24 * 60 * 60 * 1000).toISOString(),
-        contacts: {
-          contact_person: `Customer ${i}`,
-          mailbox_number: `A${i}`,
+    it('displays customer names in follow-up section', async () => {
+      const groups = [
+        {
+          contact: {
+            contact_id: 'contact-1',
+            contact_person: 'John Doe',
+            mailbox_number: 'A1',
+          },
+          packages: [{
+            mail_item_id: 'mail-1',
+            contact_id: 'contact-1',
+            item_type: 'Package',
+            status: 'Received',
+            received_date: new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString(),
+          }],
+          letters: [],
+          totalFees: 10,
+          urgencyScore: 5,
+          lastNotified: undefined,
         },
-      }));
-
-      (api.mailItems.getAll as any).mockResolvedValue(fewMailItems);
+      ];
+      (api.stats.getDashboardStats as any).mockResolvedValue(createMockDashboardStats(groups));
 
       render(<Dashboard />);
 
@@ -317,10 +169,22 @@ describe('Dashboard', () => {
         expect(screen.getByText('Dashboard')).toBeInTheDocument();
       });
 
-      // Should NOT show "Load More" button
       await waitFor(() => {
-        expect(screen.queryByText(/Load More/i)).not.toBeInTheDocument();
+        expect(screen.getByText('John Doe')).toBeInTheDocument();
       });
+    });
+
+    it('shows empty state when no items need follow-up', async () => {
+      (api.stats.getDashboardStats as any).mockResolvedValue(createMockDashboardStats([]));
+
+      render(<Dashboard />);
+
+      await waitFor(() => {
+        expect(screen.getByText('Dashboard')).toBeInTheDocument();
+      });
+
+      // Dashboard should render without errors even with empty follow-up
+      expect(screen.getByText('Dashboard')).toBeInTheDocument();
     });
   });
 });

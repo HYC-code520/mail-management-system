@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, CheckCircle, XCircle, Loader, Trash2, Edit, Send, ArrowLeft } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, Loader, Trash2, Edit, Send, ArrowLeft, Video } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
 import { api } from '../lib/api-client';
 import { initOCRWorker, terminateOCRWorker } from '../utils/ocr';
 import { smartMatchWithGemini } from '../utils/smartMatch';
+import CameraModal from '../components/scan/CameraModal';
 import type { 
   ScannedItem, 
   ScanSession, 
@@ -39,6 +40,9 @@ export default function ScanSessionPage() {
   
   // Photo preview modal state
   const [previewPhoto, setPreviewPhoto] = useState<string | null>(null);
+  
+  // Camera modal state
+  const [showCameraModal, setShowCameraModal] = useState(false);
 
   // Load contacts and check for existing session on mount
   useEffect(() => {
@@ -111,6 +115,18 @@ export default function ScanSessionPage() {
 
   const handleCameraClick = () => {
     fileInputRef.current?.click();
+  };
+  
+  const handleWebcamClick = () => {
+    setShowCameraModal(true);
+  };
+  
+  const handleCameraCapture = (photoBlob: Blob) => {
+    if (quickScanMode) {
+      processPhotoBackground(photoBlob);
+    } else {
+      processPhoto(photoBlob);
+    }
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -687,23 +703,43 @@ export default function ScanSessionPage() {
             </div>
           )}
           
-          <button
-            onClick={handleCameraClick}
-            disabled={isProcessing && !quickScanMode}
-            className="w-full py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-lg font-semibold rounded-xl transition-colors flex items-center justify-center gap-3"
-          >
-            {isProcessing && !quickScanMode ? (
-              <>
-                <Loader className="w-6 h-6 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <Camera className="w-6 h-6" />
-                {quickScanMode ? '📸 Scan (Keep Going!)' : 'Scan Next Item'}
-              </>
-            )}
-          </button>
+          {/* Camera Options */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Webcam Button (Desktop/Laptop) */}
+            <button
+              onClick={handleWebcamClick}
+              disabled={isProcessing && !quickScanMode}
+              className="py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              title="Use computer webcam"
+            >
+              <Video className="w-5 h-5" />
+              <span className="hidden sm:inline">Webcam</span>
+              <span className="sm:hidden">📹</span>
+            </button>
+            
+            {/* File/Mobile Camera Button */}
+            <button
+              onClick={handleCameraClick}
+              disabled={isProcessing && !quickScanMode}
+              className="py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              title="Upload image or use phone camera"
+            >
+              {isProcessing && !quickScanMode ? (
+                <>
+                  <Loader className="w-5 h-5 animate-spin" />
+                  <span className="hidden sm:inline">Processing...</span>
+                </>
+              ) : (
+                <>
+                  <Camera className="w-5 h-5" />
+                  <span className="hidden sm:inline">
+                    {quickScanMode ? 'Upload/Camera' : 'Upload'}
+                  </span>
+                  <span className="sm:hidden">📸</span>
+                </>
+              )}
+            </button>
+          </div>
           
           {quickScanMode && processingQueue === 0 && session.items.length > 0 && (
             <p className="text-center text-sm text-gray-600 mt-2">
@@ -841,6 +877,13 @@ export default function ScanSessionPage() {
           </div>
         </div>
       )}
+      
+      {/* Camera Modal */}
+      <CameraModal
+        isOpen={showCameraModal}
+        onClose={() => setShowCameraModal(false)}
+        onCapture={handleCameraCapture}
+      />
     </div>
   );
 }

@@ -29,6 +29,24 @@ vi.mock('../../utils/ocr', () => ({
   terminateOCRWorker: vi.fn(() => Promise.resolve()) // Add cleanup function!
 }));
 
+// Mock CameraModal component
+vi.mock('../../components/scan/CameraModal', () => ({
+  default: ({ isOpen, onClose, onCapture }: { isOpen: boolean; onClose: () => void; onCapture: (blob: Blob) => void }) => {
+    if (!isOpen) return null;
+    return (
+      <div data-testid="camera-modal">
+        <button onClick={onClose} data-testid="camera-close">Close Camera</button>
+        <button 
+          onClick={() => onCapture(new Blob(['test'], { type: 'image/jpeg' }))}
+          data-testid="camera-capture"
+        >
+          Capture Photo
+        </button>
+      </div>
+    );
+  }
+}));
+
 vi.mock('react-hot-toast', () => ({
   toast: {
     success: vi.fn(),
@@ -154,8 +172,9 @@ describe('ScanSession', () => {
       await user.click(startButton);
 
       await waitFor(() => {
-        // Quick Scan Mode is enabled by default, so button shows "Scan (Keep Going!)"
-        expect(screen.getByRole('button', { name: /Scan.*Keep Going/i })).toBeInTheDocument();
+        // After starting session, should show webcam and upload buttons
+        expect(screen.getByTitle('Use computer webcam')).toBeInTheDocument();
+        expect(screen.getByTitle('Upload image or use phone camera')).toBeInTheDocument();
       });
     });
 
@@ -174,6 +193,95 @@ describe('ScanSession', () => {
         expect(screen.getByText(/0 items scanned/i)).toBeInTheDocument();
         // "0 customers" only appears in review screen, not in the main session header
         expect(screen.getByRole('button', { name: /End Session/i })).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Webcam Camera Feature', () => {
+    it('should show webcam button after starting session', async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Start New Session/i)).toBeInTheDocument();
+      });
+
+      const startButton = screen.getByText(/Start New Session/i);
+      await user.click(startButton);
+
+      await waitFor(() => {
+        // Should have webcam button
+        expect(screen.getByTitle('Use computer webcam')).toBeInTheDocument();
+      });
+    });
+
+    it('should show upload button after starting session', async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Start New Session/i)).toBeInTheDocument();
+      });
+
+      const startButton = screen.getByText(/Start New Session/i);
+      await user.click(startButton);
+
+      await waitFor(() => {
+        // Should have upload button
+        expect(screen.getByTitle('Upload image or use phone camera')).toBeInTheDocument();
+      });
+    });
+
+    it('should open camera modal when webcam button is clicked', async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Start New Session/i)).toBeInTheDocument();
+      });
+
+      const startButton = screen.getByText(/Start New Session/i);
+      await user.click(startButton);
+
+      await waitFor(() => {
+        expect(screen.getByTitle('Use computer webcam')).toBeInTheDocument();
+      });
+
+      // Click webcam button
+      const webcamButton = screen.getByTitle('Use computer webcam');
+      await user.click(webcamButton);
+
+      // Camera modal should open
+      await waitFor(() => {
+        expect(screen.getByTestId('camera-modal')).toBeInTheDocument();
+      });
+    });
+
+    it('should close camera modal when close button is clicked', async () => {
+      const user = userEvent.setup();
+      renderComponent();
+
+      await waitFor(() => {
+        expect(screen.getByText(/Start New Session/i)).toBeInTheDocument();
+      });
+
+      const startButton = screen.getByText(/Start New Session/i);
+      await user.click(startButton);
+
+      // Open camera modal
+      const webcamButton = screen.getByTitle('Use computer webcam');
+      await user.click(webcamButton);
+
+      await waitFor(() => {
+        expect(screen.getByTestId('camera-modal')).toBeInTheDocument();
+      });
+
+      // Close the modal
+      const closeButton = screen.getByTestId('camera-close');
+      await user.click(closeButton);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('camera-modal')).not.toBeInTheDocument();
       });
     });
   });

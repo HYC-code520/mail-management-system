@@ -154,6 +154,24 @@ exports.createMailItem = async (req, res, next) => {
       }
     }
 
+    // Log action history for item creation
+    try {
+      await supabase
+        .from('action_history')
+        .insert({
+          mail_item_id: mailItem.mail_item_id,
+          action_type: 'created',
+          action_description: `${mailItem.item_type} logged (qty: ${mailItem.quantity || 1})${mailItem.description ? ` - ${mailItem.description}` : ''}`,
+          performed_by: req.user.email || 'Staff',
+          action_timestamp: new Date().toISOString()
+        });
+      
+      console.log(`✅ Logged creation action for mail_item ${mailItem.mail_item_id}`);
+    } catch (historyError) {
+      console.error('❌ Error logging action history for creation:', historyError);
+      // Don't fail the request if history logging fails
+    }
+
     res.status(201).json(mailItem);
   } catch (error) {
     next(error);
@@ -246,6 +264,70 @@ exports.updateMailItemStatus = async (req, res, next) => {
         console.error('⚠️  Warning: Failed to create fee record for converted package:', feeError);
         // Don't fail the entire request if fee creation fails
       }
+    }
+
+    // Log action history for all changes
+    try {
+      const actionDescriptions = [];
+      let previousValue = null;
+      let newValue = null;
+      
+      // Status change
+      if (status !== undefined && status !== existingMailItem.status) {
+        actionDescriptions.push(`Status: ${existingMailItem.status} → ${status}`);
+        previousValue = existingMailItem.status;
+        newValue = status;
+      }
+      
+      // Quantity change
+      if (quantity !== undefined && quantity !== existingMailItem.quantity) {
+        actionDescriptions.push(`Quantity: ${existingMailItem.quantity || 1} → ${quantity}`);
+        // Only set if not already set by status
+        if (!previousValue) {
+          previousValue = String(existingMailItem.quantity || 1);
+          newValue = String(quantity);
+        }
+      }
+      
+      // Item type change
+      if (item_type !== undefined && item_type !== existingMailItem.item_type) {
+        actionDescriptions.push(`Type: ${existingMailItem.item_type} → ${item_type}`);
+        if (!previousValue) {
+          previousValue = existingMailItem.item_type;
+          newValue = item_type;
+        }
+      }
+      
+      // Description change
+      if (description !== undefined && description !== existingMailItem.description) {
+        actionDescriptions.push(`Notes updated`);
+      }
+      
+      if (actionDescriptions.length > 0) {
+        // Determine action type based on what changed
+        let actionType = 'updated';
+        if (status === 'Picked Up') actionType = 'picked_up';
+        else if (status === 'Forward') actionType = 'forwarded';
+        else if (status === 'Scanned' || status === 'Scanned Document') actionType = 'scanned';
+        else if (status === 'Abandoned' || status === 'Abandoned Package') actionType = 'abandoned';
+        
+        await supabase
+          .from('action_history')
+          .insert({
+            mail_item_id: id,
+            action_type: actionType,
+            action_description: actionDescriptions.join('; '),
+            previous_value: previousValue,
+            new_value: newValue,
+            performed_by: req.user.email || 'Staff',
+            action_timestamp: new Date().toISOString()
+          });
+        
+        console.log(`✅ Logged action history for mail_item ${id}: ${actionDescriptions.join('; ')}`);
+      }
+    } catch (historyError) {
+      console.error('❌ Error logging action history:', historyError);
+      // Don't fail the request if history logging fails
     }
 
     res.json({ mailItem });

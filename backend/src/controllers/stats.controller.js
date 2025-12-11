@@ -1,5 +1,5 @@
 const { getSupabaseClient } = require('../services/supabase.service');
-const { getDaysSinceNY, getDaysBetweenNY, getDaysAgoNY, toNYDateString } = require('../utils/timezone');
+const { getDaysSinceNY, getDaysBetweenNY, getDaysAgoNY, toNYDateString, getTodayNY } = require('../utils/timezone');
 const feeService = require('../services/fee.service');
 
 /**
@@ -107,28 +107,40 @@ function groupNeedsFollowUpByPerson(items, packageFees) {
 }
 
 /**
- * Get revenue collected this month
+ * Get revenue collected this month (using NY timezone)
  */
 async function getMonthlyRevenue(userId, supabase) {
   try {
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-    const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).toISOString();
+    const { getTodayNY, toNYDateString } = require('../utils/timezone');
+    const todayNY = getTodayNY(); // e.g., "2025-12-11"
+    const [year, month] = todayNY.split('-');
+    
+    // First day of current month in NY
+    const startOfMonth = `${year}-${month}-01`;
+    
+    // Last day of current month
+    const lastDay = new Date(parseInt(year), parseInt(month), 0).getDate();
+    const endOfMonth = `${year}-${month}-${String(lastDay).padStart(2, '0')}`;
     
     const { data, error } = await supabase
       .from('package_fees')
-      .select('fee_amount')
+      .select('fee_amount, paid_date')
       .eq('user_id', userId)
       .eq('fee_status', 'paid')
-      .gte('paid_date', startOfMonth)
-      .lte('paid_date', endOfMonth);
+      .not('paid_date', 'is', null);
     
     if (error) {
       console.error('Error fetching monthly revenue:', error);
       return 0;
     }
     
-    const total = (data || []).reduce((sum, fee) => sum + parseFloat(fee.fee_amount || 0), 0);
+    // Filter by NY date
+    const monthlyFees = (data || []).filter(fee => {
+      const paidDateNY = toNYDateString(fee.paid_date);
+      return paidDateNY >= startOfMonth && paidDateNY <= endOfMonth;
+    });
+    
+    const total = monthlyFees.reduce((sum, fee) => sum + parseFloat(fee.fee_amount || 0), 0);
     return parseFloat(total.toFixed(2));
   } catch (error) {
     console.error('Error in getMonthlyRevenue:', error);
@@ -208,8 +220,7 @@ exports.getDashboardStats = async (req, res, next) => {
     }));
 
     // Calculate stats
-    const now = new Date();
-    const todayString = now.toISOString().split('T')[0]; // YYYY-MM-DD in UTC
+    const todayString = getTodayNY(); // YYYY-MM-DD in NY timezone
     
     // Active contacts (not archived)
     const activeContacts = contacts.filter(c => c.status !== 'No');
@@ -217,15 +228,15 @@ exports.getDashboardStats = async (req, res, next) => {
     // New customers today
     const newCustomersToday = activeContacts.filter(c => {
       if (!c.created_at) return false;
-      return c.created_at.split('T')[0] === todayString;
+      return toNYDateString(c.created_at) === todayString;
     }).length;
     
     // Recent customers (last 5)
     const recentCustomers = activeContacts.slice(0, 5);
     
-    // Mail items received today
+    // Mail items received today (NY timezone)
     const todaysMail = enrichedMailItems.filter(item => 
-      item.received_date && item.received_date.split('T')[0] === todayString
+      item.received_date && toNYDateString(item.received_date) === todayString
     ).length;
     
     // Pending pickups (not picked up, not abandoned)
@@ -235,25 +246,20 @@ exports.getDashboardStats = async (req, res, next) => {
       item.status !== 'Scanned'
     ).length;
     
-    // Overdue mail (7+ days old, not picked up)
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // Overdue mail (7+ days old, not picked up) - using NY timezone
     const overdueMail = enrichedMailItems.filter(item => {
       if (item.status === 'Picked Up' || item.status.includes('Abandoned')) return false;
-      const receivedDate = new Date(item.received_date);
-      return receivedDate < sevenDaysAgo;
+      return getDaysSinceNY(item.received_date) >= 7;
     }).length;
     
-    // Completed today
+    // Completed today (picked up today in NY timezone)
     const completedToday = enrichedMailItems.filter(item => 
       item.status === 'Picked Up' && 
       item.pickup_date && 
-      item.pickup_date.split('T')[0] === todayString
+      toNYDateString(item.pickup_date) === todayString
     ).length;
     
-    // Needs follow-up (never notified OR notified 3+ days ago)
-    const threeDaysAgo = new Date(now);
-    threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+    // Needs follow-up (never notified OR notified 3+ days ago) - using NY timezone
     const needsFollowUpRaw = enrichedMailItems.filter(item => {
       // Exclude completed/handled statuses
       if (item.status === 'Picked Up' || 
@@ -266,9 +272,8 @@ exports.getDashboardStats = async (req, res, next) => {
       // Include items never notified (status = "Received")
       if (!item.last_notified) return true;
       
-      // Include items notified 3+ days ago
-      const lastNotifiedDate = new Date(item.last_notified);
-      return lastNotifiedDate < threeDaysAgo;
+      // Include items notified 3+ days ago (NY timezone)
+      return getDaysSinceNY(item.last_notified) >= 3;
     });
     
     // Fetch package fees for all mail items (including waived fees for display)

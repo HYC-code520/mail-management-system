@@ -55,7 +55,7 @@ export default function RevenueWidget({
             <p className="text-sm font-medium text-gray-600">This Month</p>
           </div>
           <p className="text-3xl font-bold text-green-600">
-            ${monthlyRevenue.toFixed(2)}
+            ${(monthlyRevenue ?? 0).toFixed(2)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Collected</p>
         </div>
@@ -67,7 +67,7 @@ export default function RevenueWidget({
             <p className="text-sm font-medium text-gray-600">Outstanding</p>
           </div>
           <p className="text-3xl font-bold text-orange-600">
-            ${outstandingFees.toFixed(2)}
+            ${(outstandingFees ?? 0).toFixed(2)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Owed</p>
         </div>
@@ -79,7 +79,7 @@ export default function RevenueWidget({
             <p className="text-sm font-medium text-gray-600">Total (All Time)</p>
           </div>
           <p className="text-3xl font-bold text-blue-600">
-            ${totalRevenue.toFixed(2)}
+            ${(totalRevenue ?? 0).toFixed(2)}
           </p>
           <p className="text-xs text-gray-500 mt-1">Lifetime</p>
         </div>
