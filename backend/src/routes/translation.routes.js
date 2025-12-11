@@ -15,12 +15,12 @@ const translateRateLimiter = rateLimit({
   },
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
-  // Use user ID as key for rate limiting (requires auth middleware first)
+  // Use user ID as key for rate limiting (authenticated users have req.user)
   keyGenerator: (req) => {
-    // Use user ID if available, otherwise use IP
-    return req.user?.id || req.ip;
+    // Use user ID if authenticated, which is always the case after auth middleware
+    return req.user?.id || 'anonymous';
   },
-  // Don't skip anyone - rate limit applies to all users
+  validate: { xForwardedForHeader: false }, // Disable IPv6 validation warning
 });
 
 // Apply auth middleware to all routes in this router

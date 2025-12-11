@@ -47,6 +47,86 @@ interface ActionHistory {
   action_timestamp: string;
 }
 
+// Grouped mail items for same person, same day, same type
+interface GroupedMailItem {
+  groupKey: string;           // contact_id|date|item_type
+  contact: MailItem['contacts'];
+  contactId: string;
+  date: string;               // YYYY-MM-DD
+  itemType: string;
+  items: MailItem[];          // All individual items in this group
+  totalQuantity: number;
+  statuses: string[];         // Unique statuses
+  displayStatus: string;      // "Mixed" if different, otherwise the status
+  latestReceivedDate: string; // For sorting
+  hasDescription: boolean;
+}
+
+// Group mail items by contact + day + type
+function groupMailItems(items: MailItem[]): GroupedMailItem[] {
+  const groups = new Map<string, GroupedMailItem>();
+
+  for (const item of items) {
+    // Extract date (YYYY-MM-DD) from received_date
+    const date = item.received_date.split('T')[0];
+    const groupKey = `${item.contact_id}|${date}|${item.item_type}`;
+
+    if (!groups.has(groupKey)) {
+      groups.set(groupKey, {
+        groupKey,
+        contact: item.contacts,
+        contactId: item.contact_id,
+        date,
+        itemType: item.item_type,
+        items: [],
+        totalQuantity: 0,
+        statuses: [],
+        displayStatus: '',
+        latestReceivedDate: item.received_date,
+        hasDescription: false,
+      });
+    }
+
+    const group = groups.get(groupKey)!;
+    group.items.push(item);
+    group.totalQuantity += item.quantity || 1;
+    
+    if (!group.statuses.includes(item.status)) {
+      group.statuses.push(item.status);
+    }
+    
+    if (item.description) {
+      group.hasDescription = true;
+    }
+
+    // Track latest received date for sorting
+    if (item.received_date > group.latestReceivedDate) {
+      group.latestReceivedDate = item.received_date;
+    }
+  }
+
+  // Calculate display status for each group
+  for (const group of groups.values()) {
+    if (group.statuses.length === 1) {
+      group.displayStatus = group.statuses[0];
+    } else {
+      // Prioritize certain statuses for display
+      const priorityOrder = ['Picked Up', 'Notified', 'Received', 'Forwarded', 'Scanned & Sent', 'Abandoned'];
+      const sortedStatuses = group.statuses.sort((a, b) => 
+        priorityOrder.indexOf(a) - priorityOrder.indexOf(b)
+      );
+      group.displayStatus = `Mixed (${sortedStatuses.join(', ')})`;
+    }
+
+    // Sort items within group by received_date (newest first)
+    group.items.sort((a, b) => 
+      new Date(b.received_date).getTime() - new Date(a.received_date).getTime()
+    );
+  }
+
+  return Array.from(groups.values());
+}
+
 interface LogPageProps {
   embedded?: boolean;
   showAddForm?: boolean;
@@ -482,6 +562,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         
         toast.success('Mail item updated successfully!');
         closeModal();
+        
+        // Clear action history cache for the edited item so it reloads with new history
+        setActionHistory(prev => {
+          const newHistory = { ...prev };
+          delete newHistory[editingMailItem.mail_item_id];
+          return newHistory;
+        });
+        
         await loadMailItems(); // Ensure we wait for reload
       }
     } catch (err) {
@@ -567,27 +655,45 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   };
 
   const handleQuickNotifySuccess = () => {
-    loadMailItems();
-    // Reload action history if the row is expanded
-    if (notifyingMailItem && expandedRows.has(notifyingMailItem.mail_item_id)) {
+    // Clear action history cache for the item so it reloads fresh
+    if (notifyingMailItem) {
+      setActionHistory(prev => {
+        const newHistory = { ...prev };
+        delete newHistory[notifyingMailItem.mail_item_id];
+        return newHistory;
+      });
+      // Reload immediately for expanded groups
       loadActionHistory(notifyingMailItem.mail_item_id);
     }
+    loadMailItems();
   };
 
   const handleSendEmailSuccess = () => {
-    loadMailItems();
-    // Reload action history if the row is expanded
-    if (emailingMailItem && expandedRows.has(emailingMailItem.mail_item_id)) {
+    // Clear action history cache for the item so it reloads fresh
+    if (emailingMailItem) {
+      setActionHistory(prev => {
+        const newHistory = { ...prev };
+        delete newHistory[emailingMailItem.mail_item_id];
+        return newHistory;
+      });
+      // Reload immediately for expanded groups
       loadActionHistory(emailingMailItem.mail_item_id);
     }
+    loadMailItems();
   };
 
   const handleActionSuccess = () => {
-    loadMailItems();
-    // Reload action history if the row is expanded
-    if (actionMailItem && expandedRows.has(actionMailItem.mail_item_id)) {
+    // Clear action history cache for the item so it reloads fresh
+    if (actionMailItem) {
+      setActionHistory(prev => {
+        const newHistory = { ...prev };
+        delete newHistory[actionMailItem.mail_item_id];
+        return newHistory;
+      });
+      // Reload immediately for expanded groups
       loadActionHistory(actionMailItem.mail_item_id);
     }
+    loadMailItems();
   };
 
   const loadActionHistory = async (mailItemId: string) => {
@@ -602,6 +708,28 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
+  // Load action history for all items in a group
+  const loadGroupActionHistory = async (group: GroupedMailItem) => {
+    for (const item of group.items) {
+      if (!actionHistory[item.mail_item_id]) {
+        await loadActionHistory(item.mail_item_id);
+      }
+    }
+  };
+
+  // Get combined action history for a group, sorted by timestamp
+  const getGroupActionHistory = (group: GroupedMailItem): ActionHistory[] => {
+    const allHistory: ActionHistory[] = [];
+    for (const item of group.items) {
+      const itemHistory = actionHistory[item.mail_item_id] || [];
+      allHistory.push(...itemHistory);
+    }
+    // Sort by timestamp descending (newest first)
+    return allHistory.sort((a, b) => 
+      new Date(b.action_timestamp).getTime() - new Date(a.action_timestamp).getTime()
+    );
+  };
+
   const toggleRow = (id: string) => {
     const newExpanded = new Set(expandedRows);
     if (newExpanded.has(id)) {
@@ -612,6 +740,19 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       if (!actionHistory[id]) {
         loadActionHistory(id);
       }
+    }
+    setExpandedRows(newExpanded);
+  };
+
+  // Toggle for grouped rows
+  const toggleGroupRow = (group: GroupedMailItem) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(group.groupKey)) {
+      newExpanded.delete(group.groupKey);
+    } else {
+      newExpanded.add(group.groupKey);
+      // Load action history for all items in the group
+      loadGroupActionHistory(group);
     }
     setExpandedRows(newExpanded);
   };
@@ -687,7 +828,38 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     return matchesSearch && matchesStatus && matchesType && matchesDateRange && matchesMailbox;
   });
 
-  // Sorting
+  // Group filtered items by contact + day + type
+  const groupedItems = groupMailItems(filteredItems);
+
+  // Sorting for grouped items
+  const sortedGroups = [...groupedItems].sort((a, b) => {
+    let comparison = 0;
+    
+    switch (sortColumn) {
+      case 'date':
+        comparison = new Date(a.latestReceivedDate).getTime() - new Date(b.latestReceivedDate).getTime();
+        break;
+      case 'status':
+        comparison = a.displayStatus.localeCompare(b.displayStatus);
+        break;
+      case 'customer': {
+        const nameA = a.contact?.contact_person || a.contact?.company_name || '';
+        const nameB = b.contact?.contact_person || b.contact?.company_name || '';
+        comparison = nameA.localeCompare(nameB);
+        break;
+      }
+      case 'type':
+        comparison = a.itemType.localeCompare(b.itemType);
+        break;
+      case 'quantity':
+        comparison = a.totalQuantity - b.totalQuantity;
+        break;
+    }
+    
+    return sortDirection === 'asc' ? comparison : -comparison;
+  });
+
+  // Keep legacy sortedItems for backwards compatibility with modals
   const sortedItems = [...filteredItems].sort((a, b) => {
     let comparison = 0;
     
@@ -1116,18 +1288,19 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       {/* Results Counter */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-600">
-          Showing <span className="font-semibold text-gray-900">{sortedItems.length}</span> of{' '}
-          <span className="font-semibold text-gray-900">{mailItems.length}</span> mail items
+          Showing <span className="font-semibold text-gray-900">{sortedGroups.length}</span> groups{' '}
+          (<span className="font-semibold text-gray-900">{filteredItems.length}</span> items) of{' '}
+          <span className="font-semibold text-gray-900">{mailItems.length}</span> total
         </p>
         <p className="text-sm text-gray-500 italic">
-          💡 Click column headers to sort
+          💡 Items grouped by customer, date, and type. Click to expand.
         </p>
       </div>
 
       {/* Log Table */}
       <div className="bg-white border border-gray-200 rounded-lg shadow-sm">
         <div className="overflow-x-auto">
-        {sortedItems.length === 0 ? (
+        {sortedGroups.length === 0 ? (
           <div className="text-center py-12">
             <Mail className="w-16 h-16 text-gray-300 mx-auto mb-4" />
             <p className="text-gray-600 mb-4">
@@ -1237,18 +1410,18 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
               </tr>
             </thead>
             <tbody>
-              {sortedItems.map((item) => (
-                  <React.Fragment key={item.mail_item_id}>
+              {sortedGroups.map((group) => (
+                  <React.Fragment key={group.groupKey}>
                     {/* Main Row - Clickable to expand */}
                     <tr 
                       className="group border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
-                      onClick={() => toggleRow(item.mail_item_id)}
+                      onClick={() => toggleGroupRow(group)}
                     >
                     <td className="py-3 px-4">
                       <button
                         className="text-gray-500 hover:text-gray-700 transition-transform pointer-events-none"
                         style={{
-                          transform: expandedRows.has(item.mail_item_id) ? 'rotate(90deg)' : 'rotate(0deg)',
+                          transform: expandedRows.has(group.groupKey) ? 'rotate(90deg)' : 'rotate(0deg)',
                           display: 'inline-block',
                         }}
                       >
@@ -1257,49 +1430,45 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     </td>
                     <td className="py-3 px-4 text-gray-900">
                       <span 
-                        title={`Logged at: ${new Date(item.received_date).toLocaleString('en-US', {
-                          timeZone: 'America/New_York',
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true,
-                          timeZoneName: 'short'
-                        })}`}
+                        title={`${group.items.length} item${group.items.length > 1 ? 's' : ''} on this date`}
                         className="cursor-help border-b border-dotted border-gray-400"
                       >
-                        {new Date(item.received_date).toLocaleDateString('en-US', {
+                        {new Date(group.date + 'T12:00:00').toLocaleDateString('en-US', {
                           timeZone: 'America/New_York',
                           year: 'numeric',
                           month: '2-digit',
                           day: '2-digit'
                         })}
                       </span>
+                      {group.items.length > 1 && (
+                        <span className="ml-2 text-xs text-gray-500">
+                          ({group.items.length} entries)
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2 text-gray-700">
-                        {item.item_type === 'Package' ? (
+                        {group.itemType === 'Package' || group.itemType === 'Large Package' ? (
                           <Package className="w-4 h-4 text-gray-500" />
                         ) : (
                           <Mail className="w-4 h-4 text-gray-500" />
                         )}
-                        <span>{item.item_type}</span>
+                        <span>{group.itemType}</span>
                       </div>
                     </td>
                     <td className="py-3 px-4 text-gray-900 font-semibold">
-                      {item.quantity || 1}
+                      {group.totalQuantity}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-900">
-                          {item.contacts?.contact_person || item.contacts?.company_name || 'Unknown'}
+                          {group.contact?.contact_person || group.contact?.company_name || 'Unknown'}
                         </span>
-                        {item.contact_id && (
+                        {group.contactId && (
                           <button
                             onClick={(e) => {
-                              e.stopPropagation(); // Prevent row expansion when clicking view button
-                              navigate(`/dashboard/contacts/${item.contact_id}`);
+                              e.stopPropagation();
+                              navigate(`/dashboard/contacts/${group.contactId}`);
                             }}
                             className="p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
                             title="View Customer Profile"
@@ -1310,71 +1479,87 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                       </div>
                     </td>
                     <td className="py-3 px-4">
-                      <span className={`px-3 py-1 rounded text-xs font-medium ${
-                        item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
-                        item.status === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
-                        item.status === 'Notified' ? 'bg-purple-100 text-purple-700' :
-                        item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
-                        item.status === 'Scanned Document' ? 'bg-cyan-100 text-cyan-700' :
-                        item.status === 'Scanned' ? 'bg-cyan-100 text-cyan-700' :
-                        item.status === 'Forward' ? 'bg-orange-100 text-orange-700' :
-                        item.status === 'Abandoned Package' ? 'bg-red-100 text-red-700' :
-                        item.status === 'Abandoned' ? 'bg-red-100 text-red-700' :
-                        'bg-gray-200 text-gray-700'
-                      }`}>
-                        {item.status === 'Scanned Document' ? 'Scanned' : 
-                         item.status === 'Abandoned Package' ? 'Abandoned' : 
-                         item.status}
-                      </span>
+                      {group.statuses.length === 1 ? (
+                        <span className={`px-3 py-1 rounded text-xs font-medium ${
+                          group.displayStatus === 'Received' ? 'bg-blue-100 text-blue-700' :
+                          group.displayStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
+                          group.displayStatus === 'Notified' ? 'bg-purple-100 text-purple-700' :
+                          group.displayStatus === 'Picked Up' ? 'bg-green-100 text-green-700' :
+                          group.displayStatus === 'Scanned Document' ? 'bg-cyan-100 text-cyan-700' :
+                          group.displayStatus === 'Scanned' ? 'bg-cyan-100 text-cyan-700' :
+                          group.displayStatus === 'Forward' ? 'bg-orange-100 text-orange-700' :
+                          group.displayStatus === 'Abandoned Package' ? 'bg-red-100 text-red-700' :
+                          group.displayStatus === 'Abandoned' ? 'bg-red-100 text-red-700' :
+                          'bg-gray-200 text-gray-700'
+                        }`}>
+                          {group.displayStatus === 'Scanned Document' ? 'Scanned' : 
+                           group.displayStatus === 'Abandoned Package' ? 'Abandoned' : 
+                           group.displayStatus}
+                        </span>
+                      ) : (
+                        <span className="px-3 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
+                          Mixed
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-gray-700">
-                      {item.last_notified ? (
-                        new Date(item.last_notified).toLocaleString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          hour: 'numeric',
-                          minute: '2-digit',
-                          hour12: true
-                        })
+                      {(() => {
+                        // Find the most recent notification in the group
+                        const lastNotified = group.items
+                          .filter(item => item.last_notified)
+                          .sort((a, b) => new Date(b.last_notified!).getTime() - new Date(a.last_notified!).getTime())[0]?.last_notified;
+                        return lastNotified ? (
+                          new Date(lastNotified).toLocaleString('en-US', {
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                            hour12: true
+                          })
+                        ) : '—';
+                      })()}
+                    </td>
+                    <td className="py-3 px-4 text-gray-700">
+                      {group.hasDescription ? (
+                        <span title="Has notes - expand to view">📝</span>
                       ) : '—'}
-                    </td>
-                    <td className="py-3 px-4 text-gray-700">
-                      {item.description || '—'}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
-                        {/* Edit and Delete buttons first */}
-                        <div className="flex items-center gap-2">
-                          <button
-                            onClick={() => openEditModal(item)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors group relative"
-                            title="Edit"
-                          >
-                            <Edit className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDelete(item.mail_item_id)}
-                            disabled={deletingItemId === item.mail_item_id}
-                            className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed group relative"
-                            title="Delete"
-                          >
-                            {deletingItemId === item.mail_item_id ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="w-4 h-4" />
-                            )}
-                          </button>
-                        </div>
+                        {/* For groups with single item, show edit/delete */}
+                        {group.items.length === 1 && (
+                          <>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => openEditModal(group.items[0])}
+                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                title="Edit"
+                              >
+                                <Edit className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(group.items[0].mail_item_id)}
+                                disabled={deletingItemId === group.items[0].mail_item_id}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
+                                title="Delete"
+                              >
+                                {deletingItemId === group.items[0].mail_item_id ? (
+                                  <Loader2 className="w-4 h-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="w-4 h-4" />
+                                )}
+                              </button>
+                            </div>
+                            <div className="border-l border-gray-300 h-6 mx-1"></div>
+                          </>
+                        )}
                         
-                        {/* Separator */}
-                        <div className="border-l border-gray-300 h-6 mx-1"></div>
-                        
-                        {/* More Actions Dropdown - on the far right */}
+                        {/* More Actions - works on first item in group */}
                         <div className="relative">
                           <button
-                            id={`more-btn-${item.mail_item_id}`}
+                            id={`more-btn-${group.groupKey}`}
                             onClick={(_e) => {
-                              setOpenDropdownId(openDropdownId === item.mail_item_id ? null : item.mail_item_id);
+                              setOpenDropdownId(openDropdownId === group.groupKey ? null : group.groupKey);
                             }}
                             className="p-2 text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                             title="More Actions"
@@ -1382,27 +1567,23 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                             <MoreVertical className="w-4 h-4" />
                           </button>
                           
-                          {/* Dropdown Menu */}
-                          {openDropdownId === item.mail_item_id && (
+                          {openDropdownId === group.groupKey && (
                             <>
-                              {/* Backdrop to close dropdown */}
                               <div 
                                 className="fixed inset-0 z-30" 
                                 onClick={() => setOpenDropdownId(null)}
                               ></div>
                               
-                              {/* Dropdown content - using fixed positioning */}
                               <div 
                                 className="fixed w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-40 max-h-96 overflow-y-auto"
                                 style={{
-                                  top: `${(document.getElementById(`more-btn-${item.mail_item_id}`)?.getBoundingClientRect().bottom ?? 0) + 4}px`,
-                                  right: `${window.innerWidth - (document.getElementById(`more-btn-${item.mail_item_id}`)?.getBoundingClientRect().right ?? 0)}px`,
+                                  top: `${(document.getElementById(`more-btn-${group.groupKey}`)?.getBoundingClientRect().bottom ?? 0) + 4}px`,
+                                  right: `${window.innerWidth - (document.getElementById(`more-btn-${group.groupKey}`)?.getBoundingClientRect().right ?? 0)}px`,
                                 }}
                               >
-                                {/* Send Email - Always visible */}
                                 <button
                                   onClick={() => {
-                                    openSendEmailModal(item);
+                                    openSendEmailModal(group.items[0]);
                                     setOpenDropdownId(null);
                                   }}
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3"
@@ -1411,10 +1592,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   Send Email
                                 </button>
                                 
-                                {/* Mark as Scanned - Always visible */}
+                                {/* Mark as Scanned */}
                                 <button
                                   onClick={() => {
-                                    setActionMailItem(item);
+                                    setActionMailItem(group.items[0]);
                                     setActionModalType('scanned');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -1425,10 +1606,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   Mark as Scanned
                                 </button>
                                 
-                                {/* Mark as Picked Up - Always visible */}
+                                {/* Mark as Picked Up */}
                                 <button
                                   onClick={() => {
-                                    setActionMailItem(item);
+                                    setActionMailItem(group.items[0]);
                                     setActionModalType('picked_up');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -1439,10 +1620,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   Mark as Picked Up
                                 </button>
                                 
-                                {/* Mark as Forward - Always visible */}
+                                {/* Mark as Forward */}
                                 <button
                                   onClick={() => {
-                                    setActionMailItem(item);
+                                    setActionMailItem(group.items[0]);
                                     setActionModalType('forward');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -1453,10 +1634,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   Mark as Forward
                                 </button>
                                 
-                                {/* Mark as Abandoned - Always visible */}
+                                {/* Mark as Abandoned */}
                                 <button
                                   onClick={() => {
-                                    setActionMailItem(item);
+                                    setActionMailItem(group.items[0]);
                                     setActionModalType('abandoned');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -1467,14 +1648,12 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   Mark as Abandoned
                                 </button>
                                 
-                                {/* Separator */}
                                 <div className="border-t border-gray-200 my-1"></div>
                                 
-                                {/* View Customer Profile - Always available */}
-                                {item.contact_id && (
+                                {group.contactId && (
                                   <button
                                     onClick={() => {
-                                      navigate(`/dashboard/contacts/${item.contact_id}`);
+                                      navigate(`/dashboard/contacts/${group.contactId}`);
                                       setOpenDropdownId(null);
                                     }}
                                     className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-3"
@@ -1491,40 +1670,108 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     </td>
                   </tr>
 
-                  {/* Expanded Row Details */}
-                  {expandedRows.has(item.mail_item_id) && (
+                  {/* Expanded Row Details - Shows all items in group */}
+                  {expandedRows.has(group.groupKey) && (
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <td colSpan={9} className="py-6 px-4">
                         <div className="space-y-6">
-                          {/* Action History Timeline */}
-                          <ActionHistorySection
-                            actions={actionHistory[item.mail_item_id] || []}
-                            loading={false}
-                          />
+                          {/* Items in this group */}
+                          <div>
+                            <h3 className="font-bold text-gray-900 mb-3">
+                              {group.items.length} {group.itemType}{group.items.length > 1 ? 's' : ''} on {new Date(group.date + 'T12:00:00').toLocaleDateString('en-US', {
+                                timeZone: 'America/New_York',
+                                weekday: 'long',
+                                month: 'long',
+                                day: 'numeric',
+                                year: 'numeric'
+                              })}
+                            </h3>
+                            <div className="space-y-3">
+                              {group.items.map((item, index) => (
+                                <div key={item.mail_item_id} className="bg-white rounded-lg border border-gray-200 p-4">
+                                  <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                      <div className="flex items-center gap-3 mb-2">
+                                        <span className="text-sm font-medium text-gray-500">
+                                          #{index + 1}
+                                        </span>
+                                        <span className="text-sm text-gray-600">
+                                          {new Date(item.received_date).toLocaleString('en-US', {
+                                            timeZone: 'America/New_York',
+                                            hour: 'numeric',
+                                            minute: '2-digit',
+                                            hour12: true
+                                          })}
+                                        </span>
+                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                          item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
+                                          item.status === 'Notified' ? 'bg-purple-100 text-purple-700' :
+                                          item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
+                                          'bg-gray-200 text-gray-700'
+                                        }`}>
+                                          {item.status}
+                                        </span>
+                                        <span className="text-sm text-gray-700">
+                                          Qty: {item.quantity || 1}
+                                        </span>
+                                      </div>
+                                      {item.description && (
+                                        <p className="text-sm text-gray-600 ml-8">
+                                          📝 {item.description}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                                      <button
+                                        onClick={() => openEditModal(item)}
+                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                                        title="Edit this item"
+                                      >
+                                        <Edit className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDelete(item.mail_item_id)}
+                                        disabled={deletingItemId === item.mail_item_id}
+                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
+                                        title="Delete this item"
+                                      >
+                                        {deletingItemId === item.mail_item_id ? (
+                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        )}
+                                      </button>
+                                    </div>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Combined Action History Timeline */}
+                          <div>
+                            <h3 className="font-bold text-gray-900 mb-3">Action History</h3>
+                            <ActionHistorySection
+                              actions={getGroupActionHistory(group)}
+                              loading={false}
+                            />
+                          </div>
 
                           {/* Mail Item Details */}
                           <div>
-                            <h3 className="font-bold text-gray-900 mb-3">Mail Item Details</h3>
+                            <h3 className="font-bold text-gray-900 mb-3">Customer Details</h3>
                             <div className="grid grid-cols-2 gap-4 text-sm">
-                              {item.pickup_date && (
-                                <div>
-                                  <span className="text-gray-600">Picked Up:</span>
-                                  <span className="ml-2 text-gray-900 font-medium">
-                                    {new Date(item.pickup_date).toLocaleDateString()}
-                                  </span>
-                                </div>
-                              )}
                               <div>
                                 <span className="text-gray-600">Mailbox:</span>
                                 <span className="ml-2 text-gray-900 font-medium">
-                                  {item.contacts?.mailbox_number || 'N/A'}
+                                  {group.contact?.mailbox_number || 'N/A'}
                                 </span>
                               </div>
-                              {item.contacts?.unit_number && (
+                              {group.contact?.unit_number && (
                                 <div>
                                   <span className="text-gray-600">Unit:</span>
                                   <span className="ml-2 text-gray-900 font-medium">
-                                    {item.contacts.unit_number}
+                                    {group.contact.unit_number}
                                   </span>
                                 </div>
                               )}
@@ -1542,9 +1789,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         </div>
       </div>
 
-      {filteredItems.length > 0 && (
+      {sortedGroups.length > 0 && (
         <div className="mt-4 text-sm text-gray-600 text-center">
-          Showing {filteredItems.length} of {mailItems.length} items
+          Showing {sortedGroups.length} groups ({filteredItems.length} items) of {mailItems.length} total
         </div>
       )}
 
