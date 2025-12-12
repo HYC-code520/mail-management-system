@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, Bell, CheckCircle, FileText, Send, AlertTriangle, Eye, MoreVertical, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
@@ -134,12 +134,14 @@ interface LogPageProps {
 
 export default function LogPage({ embedded = false, showAddForm = false }: LogPageProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [mailItems, setMailItems] = useState<MailItem[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [actionHistory, setActionHistory] = useState<Record<string, ActionHistory[]>>({});
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
+  const [highlightedGroupKeys, setHighlightedGroupKeys] = useState<Set<string>>(new Set()); // Changed to Set for multiple highlights
   
   // Filter states
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -203,14 +205,17 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const [showDropdown, setShowDropdown] = useState(false);
   const [addingMail, setAddingMail] = useState(false);
   
-  // Duplicate detection states
+  // Duplicate detection state
   const [existingTodayMail, setExistingTodayMail] = useState<MailItem | null>(null);
-  const [showDuplicatePrompt, setShowDuplicatePrompt] = useState(false);
 
   useEffect(() => {
     loadMailItems();
     loadContacts();
   }, []);
+
+  // State to track pending jump after data refresh (used in useEffect after groupedItems is defined)
+  const [pendingJumpGroupKey, setPendingJumpGroupKey] = useState<string | null>(null);
+  const [pendingJumpGroupKeys, setPendingJumpGroupKeys] = useState<string[]>([]); // For bulk emails
 
   const loadMailItems = async () => {
     try {
@@ -329,10 +334,22 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
 
     if (existingMail) {
-      // Always show prompt when duplicate is found
-      console.log('Showing duplicate prompt modal');
+      // Automatically add to existing item since we're using grouped view
+      console.log('Found existing mail, automatically adding to it');
       setExistingTodayMail(existingMail);
-      setShowDuplicatePrompt(true);
+      
+      // Calculate new quantity
+      const currentQuantity = typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity);
+      const newQuantity = (existingMail.quantity || 1) + currentQuantity;
+      
+      // Show confirmation toast before adding
+      toast.success(
+        `Adding ${currentQuantity} more ${itemType}${currentQuantity > 1 ? 's' : ''} to existing entry (total will be: ${newQuantity})`,
+        { duration: 3000 }
+      );
+      
+      // Add to existing
+      await submitNewMail(true);
       return;
     }
 
@@ -405,7 +422,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       setSearchQuery('');
       setSelectedContact(null);
       setDate(getTodayNY()); // Use NY timezone
-      setShowDuplicatePrompt(false);
       setExistingTodayMail(null);
       
       // Small delay before reloading to ensure database has committed the timestamp
@@ -512,7 +528,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         
         // Update the mail item (exclude performed_by and edit_notes from the update payload)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { performed_by: _performed_by, edit_notes: _edit_notes, ...updateData } = formData;
+        const { performed_by, edit_notes: _edit_notes, ...updateData } = formData;
         
         // Ensure quantity is a number (convert empty string to 1)
         updateData.quantity = typeof updateData.quantity === 'string' && updateData.quantity === '' ? 1 : Number(updateData.quantity);
@@ -522,55 +538,79 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           updateData.received_date = `${updateData.received_date}T12:00:00-05:00`;
         }
         
-        await api.mailItems.update(editingMailItem.mail_item_id, updateData);
+        // Pass performed_by to backend for action history logging
+        await api.mailItems.update(editingMailItem.mail_item_id, {
+          ...updateData,
+          performed_by: performed_by || 'Staff' // Include performed_by in the update
+        });
         
-        // Log quantity change to action history
-        if (quantityChanged) {
-          await api.actionHistory.create({
-            mail_item_id: editingMailItem.mail_item_id,
-            action_type: 'updated',
-            action_description: `Quantity changed from ${oldQuantity} to ${newQuantity}`,
-            previous_value: oldQuantity.toString(),
-            new_value: newQuantity.toString(),
-            performed_by: formData.performed_by,
-            notes: formData.edit_notes.trim() || null
-          });
-        }
-        
-        // Log status change to action history if status ACTUALLY changed (not just name migration)
-        if (statusActuallyChanged) {
-          const statusDescriptions: { [key: string]: string } = {
-            'Received': 'Status changed to Received',
-            'Pending': 'Status changed to Pending',
-            'Notified': 'Status changed to Notified',
-            'Picked Up': 'Marked as Picked Up',
-            'Scanned': 'Marked as Scanned',
-            'Forward': 'Forwarded',
-            'Abandoned': 'Marked as Abandoned'
-          };
-          
-          await api.actionHistory.create({
-            mail_item_id: editingMailItem.mail_item_id,
-            action_type: 'status_change',
-            action_description: statusDescriptions[normalizedNewStatus] || `Status changed to ${normalizedNewStatus}`,
-            previous_value: normalizedOldStatus,
-            new_value: normalizedNewStatus,
-            performed_by: formData.performed_by,
-            notes: formData.edit_notes.trim() || null
-          });
-        }
+        // Backend automatically logs action history, so no need to manually create it here
         
         toast.success('Mail item updated successfully!');
+        
+        // Get the group key for the updated item
+        const updatedDate = updateData.received_date 
+          ? new Date(updateData.received_date).toISOString().split('T')[0]
+          : editingMailItem.received_date.split('T')[0];
+        const updatedGroupKey = `${editingMailItem.contact_id}|${updatedDate}|${updateData.item_type || editingMailItem.item_type}`;
+        
         closeModal();
         
-        // Clear action history cache for the edited item so it reloads with new history
+        // Clear action history cache for ALL items in the edited group
+        // This ensures we reload fresh history after the edit
+        const itemsInGroup = mailItems.filter(item => {
+          const itemDate = item.received_date.split('T')[0];
+          const itemGroupKey = `${item.contact_id}|${itemDate}|${item.item_type}`;
+          return itemGroupKey === updatedGroupKey;
+        });
+        
         setActionHistory(prev => {
           const newHistory = { ...prev };
-          delete newHistory[editingMailItem.mail_item_id];
+          // Clear history for all items in this group
+          itemsInGroup.forEach(item => {
+            delete newHistory[item.mail_item_id];
+          });
           return newHistory;
         });
         
         await loadMailItems(); // Ensure we wait for reload
+        
+        // Force reload action history for the group after items are loaded
+        setTimeout(async () => {
+          for (const item of itemsInGroup) {
+            await loadActionHistory(item.mail_item_id);
+          }
+        }, 300); // Small delay to ensure backend has committed the new action history
+        
+        // Show toast with "View" button to jump to the updated row
+        const customerName = editingMailItem.contacts?.contact_person || 
+                            editingMailItem.contacts?.company_name || 
+                            'Customer';
+        const itemTypeDisplay = updateData.item_type || editingMailItem.item_type;
+        const dateDisplay = new Date(updatedDate).toLocaleDateString('en-US', { 
+          month: 'short', 
+          day: 'numeric' 
+        });
+        
+        toast.success(
+          (t) => (
+            <div className="flex items-center justify-between gap-4">
+              <span>Updated {customerName} ({itemTypeDisplay}, {dateDisplay})</span>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  jumpToRow(updatedGroupKey);
+                }}
+                className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded transition-colors"
+              >
+                View
+              </button>
+            </div>
+          ),
+          {
+            duration: 8000,
+          }
+        );
       }
     } catch (err) {
       console.error('Failed to update mail item:', err);
@@ -767,14 +807,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     setSortDirection('desc');
   };
 
-  const handleSort = (column: 'date' | 'status' | 'customer' | 'type' | 'quantity') => {
+  const handleSort = (column: 'date' | 'status' | 'customer' | 'type' | 'quantity' | 'lastNotified') => {
     if (sortColumn === column) {
       // Toggle direction if clicking the same column
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
     } else {
-      // New column, default to ascending (except date defaults to descending)
+      // New column, default to ascending (except date and lastNotified default to descending)
       setSortColumn(column);
-      setSortDirection(column === 'date' ? 'desc' : 'asc');
+      setSortDirection(column === 'date' || column === 'lastNotified' ? 'desc' : 'asc');
     }
   };
 
@@ -831,6 +871,158 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   // Group filtered items by contact + day + type
   const groupedItems = groupMailItems(filteredItems);
 
+  // Handle navigation from Dashboard with jumpToGroupKey or jumpToGroupKeys
+  useEffect(() => {
+    const state = location.state as { 
+      jumpToGroupKey?: string; 
+      jumpToGroupKeys?: string[];
+      sortByLastNotified?: boolean; // New flag for auto-sorting
+    } | null;
+    
+    if (state?.jumpToGroupKey || state?.jumpToGroupKeys) {
+      // Clear the state immediately to prevent re-triggering
+      const sortByLastNotified = state.sortByLastNotified || false;
+      navigate(location.pathname, { replace: true, state: {} });
+      
+      // Clear action history cache to force fresh load
+      setActionHistory({});
+      
+      // Auto-sort by Last Notified if requested (for email actions)
+      if (sortByLastNotified) {
+        setSortColumn('lastNotified');
+        setSortDirection('desc');
+      }
+      
+      // Store the target group key(s) - we'll jump after data is loaded
+      if (state.jumpToGroupKeys && state.jumpToGroupKeys.length > 0) {
+        // Bulk email case - multiple group keys
+        setPendingJumpGroupKeys(state.jumpToGroupKeys);
+        setPendingJumpGroupKey(null);
+      } else if (state.jumpToGroupKey) {
+        // Single email case
+        setPendingJumpGroupKey(state.jumpToGroupKey);
+        setPendingJumpGroupKeys([]);
+      }
+      
+      // Force reload mail items from backend
+      setLoading(true);
+      api.mailItems.getAll()
+        .then(data => {
+          setMailItems(Array.isArray(data) ? data : []);
+        })
+        .catch(err => {
+          console.error('Error reloading mail items:', err);
+        })
+        .finally(() => {
+          setLoading(false);
+        });
+    }
+  }, [location.state, navigate]);
+
+  // Jump to row after data is loaded and grouped (single row)
+  useEffect(() => {
+    if (pendingJumpGroupKey && groupedItems.length > 0 && !loading) {
+      const targetGroupKey = pendingJumpGroupKey;
+      // Check if the target group exists
+      const group = groupedItems.find(g => g.groupKey === targetGroupKey);
+      if (group) {
+        // Small delay for DOM to fully render
+        setTimeout(() => {
+          // 1. Scroll to the row
+          const rowElement = document.getElementById(`row-${targetGroupKey}`);
+          if (rowElement) {
+            rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          
+          // 2. Highlight the row (no auto-expand for better UX)
+          setHighlightedGroupKeys(new Set([targetGroupKey]));
+          setTimeout(() => setHighlightedGroupKeys(new Set()), 6000); // Highlight for 6 seconds
+          
+          setPendingJumpGroupKey(null);
+        }, 150);
+      } else {
+        // Group not found
+        setPendingJumpGroupKey(null);
+      }
+    }
+  }, [pendingJumpGroupKey, groupedItems, loading]);
+
+  // Jump to multiple rows after data is loaded (bulk email case)
+  useEffect(() => {
+    if (pendingJumpGroupKeys.length > 0 && groupedItems.length > 0 && !loading) {
+      const targetGroupKeys = pendingJumpGroupKeys;
+      
+      // Find all matching groups
+      const matchingGroups = groupedItems.filter(g => targetGroupKeys.includes(g.groupKey));
+      
+      if (matchingGroups.length > 0) {
+        setTimeout(() => {
+          // 1. Scroll to the first row
+          const firstGroupKey = matchingGroups[0].groupKey;
+          const firstRowElement = document.getElementById(`row-${firstGroupKey}`);
+          if (firstRowElement) {
+            firstRowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          
+          // 2. Highlight ALL matching rows SIMULTANEOUSLY
+          const groupKeysSet = new Set(matchingGroups.map(g => g.groupKey));
+          setHighlightedGroupKeys(groupKeysSet);
+          setTimeout(() => setHighlightedGroupKeys(new Set()), 6000); // Highlight for 6 seconds
+          
+          setPendingJumpGroupKeys([]);
+        }, 150);
+      } else {
+        // No groups found
+        setPendingJumpGroupKeys([]);
+      }
+    }
+  }, [pendingJumpGroupKeys, groupedItems, loading]);
+
+  // Jump to a specific row (scroll + highlight + expand + load history)
+  // This is used by the edit toast to jump to the updated row
+  const jumpToRow = useCallback(async (groupKey: string) => {
+    // Find the group
+    const group = groupedItems.find(g => g.groupKey === groupKey);
+    if (!group) return;
+    
+    // 1. Scroll to the row
+    const rowElement = document.getElementById(`row-${groupKey}`);
+    if (rowElement) {
+      rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    
+    // 2. Highlight the row
+    setHighlightedGroupKeys(new Set([groupKey]));
+    setTimeout(() => setHighlightedGroupKeys(new Set()), 6000); // Highlight for 6 seconds
+    
+    // 3. Expand the row
+    setExpandedRows(prev => {
+      const newSet = new Set(prev);
+      newSet.add(groupKey);
+      return newSet;
+    });
+    
+    // 4. Wait a bit then load action history
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    // 5. Load action history for all items in the group
+    try {
+      const historyPromises = group.items.map(item => 
+        api.actionHistory.getByMailItem(item.mail_item_id)
+      );
+      const histories = await Promise.all(historyPromises);
+      const combinedHistory = histories.flat().sort((a, b) => 
+        new Date(a.action_timestamp).getTime() - new Date(b.action_timestamp).getTime()
+      );
+      setActionHistory(prev => ({
+        ...prev,
+        [groupKey]: combinedHistory
+      }));
+    } catch (err) {
+      console.error('Failed to load action history:', err);
+    }
+  }, [groupedItems]);
+
   // Sorting for grouped items
   const sortedGroups = [...groupedItems].sort((a, b) => {
     let comparison = 0;
@@ -854,6 +1046,34 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       case 'quantity':
         comparison = a.totalQuantity - b.totalQuantity;
         break;
+      case 'lastNotified': {
+        // Find the most recent last_notified from items in each group
+        const lastNotifiedA = a.items.reduce((latest, item) => {
+          if (!item.last_notified) return latest;
+          const itemDate = new Date(item.last_notified).getTime();
+          return itemDate > latest ? itemDate : latest;
+        }, 0);
+        const lastNotifiedB = b.items.reduce((latest, item) => {
+          if (!item.last_notified) return latest;
+          const itemDate = new Date(item.last_notified).getTime();
+          return itemDate > latest ? itemDate : latest;
+        }, 0);
+        
+        // Always push empty values to the bottom (regardless of sort direction)
+        if (lastNotifiedA === 0 && lastNotifiedB === 0) {
+          comparison = 0;
+        } else if (lastNotifiedA === 0) {
+          // A is empty, put it after B (positive = A goes down)
+          return 1;
+        } else if (lastNotifiedB === 0) {
+          // B is empty, put it after A (negative = A goes up)
+          return -1;
+        } else {
+          // Both have values, compare normally
+          comparison = lastNotifiedA - lastNotifiedB;
+        }
+        break;
+      }
     }
     
     return sortDirection === 'asc' ? comparison : -comparison;
@@ -1403,8 +1623,22 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                   </div>
                 </th>
                 
+                {/* Last Notified Column - Sortable */}
+                <th 
+                  className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700 cursor-pointer hover:bg-gray-100 transition-colors select-none"
+                  onClick={() => handleSort('lastNotified')}
+                >
+                  <div className="flex items-center gap-2">
+                    Last Notified
+                    {sortColumn === 'lastNotified' ? (
+                      sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
+                    ) : (
+                      <ArrowUpDown className="w-4 h-4 text-gray-400" />
+                    )}
+                  </div>
+                </th>
+                
                 {/* Non-sortable columns */}
-                  <th className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700">Last Notified</th>
                   <th className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700">Notes</th>
                   <th className="text-left py-2.5 px-4 text-sm font-semibold text-gray-700">Actions</th>
               </tr>
@@ -1414,7 +1648,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                   <React.Fragment key={group.groupKey}>
                     {/* Main Row - Clickable to expand */}
                     <tr 
-                      className="group border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
+                      id={`row-${group.groupKey}`}
+                      className={`group border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${
+                        highlightedGroupKeys.has(group.groupKey) ? 'animate-flash-green' : ''
+                      }`}
                       onClick={() => toggleGroupRow(group)}
                     >
                     <td className="py-3 px-4">
@@ -1526,33 +1763,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
-                        {/* For groups with single item, show edit/delete */}
-                        {group.items.length === 1 && (
-                          <>
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => openEditModal(group.items[0])}
-                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                                title="Edit"
-                              >
-                                <Edit className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(group.items[0].mail_item_id)}
-                                disabled={deletingItemId === group.items[0].mail_item_id}
-                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
-                                title="Delete"
-                              >
-                                {deletingItemId === group.items[0].mail_item_id ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="w-4 h-4" />
-                                )}
-                              </button>
-                            </div>
-                            <div className="border-l border-gray-300 h-6 mx-1"></div>
-                          </>
-                        )}
+                        {/* Edit button - always visible for quick access */}
+                        <button
+                          onClick={() => openEditModal(group.items[0])}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Edit className="w-4 h-4" />
+                        </button>
                         
                         {/* More Actions - works on first item in group */}
                         <div className="relative">
@@ -1662,6 +1880,25 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                     View Customer Profile
                                   </button>
                                 )}
+                                
+                                <div className="border-t border-gray-200 my-1"></div>
+                                
+                                {/* Delete - destructive action at bottom */}
+                                <button
+                                  onClick={() => {
+                                    handleDelete(group.items[0].mail_item_id);
+                                    setOpenDropdownId(null);
+                                  }}
+                                  disabled={deletingItemId === group.items[0].mail_item_id}
+                                  className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-3 disabled:opacity-50"
+                                >
+                                  {deletingItemId === group.items[0].mail_item_id ? (
+                                    <Loader2 className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <Trash2 className="w-4 h-4" />
+                                  )}
+                                  Delete
+                                </button>
                               </div>
                             </>
                           )}
@@ -1720,27 +1957,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                           📝 {item.description}
                                         </p>
                                       )}
-                                    </div>
-                                    <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
-                                      <button
-                                        onClick={() => openEditModal(item)}
-                                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                        title="Edit this item"
-                                      >
-                                        <Edit className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDelete(item.mail_item_id)}
-                                        disabled={deletingItemId === item.mail_item_id}
-                                        className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors disabled:opacity-50"
-                                        title="Delete this item"
-                                      >
-                                        {deletingItemId === item.mail_item_id ? (
-                                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                        ) : (
-                                          <Trash2 className="w-3.5 h-3.5" />
-                                        )}
-                                      </button>
                                     </div>
                                   </div>
                                 </div>
@@ -1925,17 +2141,33 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                   <label className="block text-sm font-medium text-gray-900 mb-2">
                     Who is making this change? *
                   </label>
-                  <select
-                    name="performed_by"
-                    value={formData.performed_by}
-                    onChange={handleChange}
-                    required
-                    className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <option value="">Select staff member...</option>
-                    <option value="Merlin">Merlin</option>
-                    <option value="Madison">Madison</option>
-                  </select>
+                  <div className="flex gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, performed_by: 'Madison' }))}
+                      className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                        formData.performed_by === 'Madison'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                      }`}
+                    >
+                      👤 Madison
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFormData(prev => ({ ...prev, performed_by: 'Merlin' }))}
+                      className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                        formData.performed_by === 'Merlin'
+                          ? 'border-blue-500 bg-blue-50 text-blue-700'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                      }`}
+                    >
+                      👤 Merlin
+                    </button>
+                  </div>
+                  {!formData.performed_by && (
+                    <p className="mt-1 text-xs text-red-600">Please select who is making this change</p>
+                  )}
                 </div>
 
                 {/* Notes */}
@@ -2036,66 +2268,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         />
       )}
 
-      {/* Duplicate Mail Prompt Modal */}
-      {showDuplicatePrompt && existingTodayMail && selectedContact && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-            <div className="mb-4">
-              <h2 className="text-xl font-bold text-gray-900 mb-2">Mail Already Logged Today</h2>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
-                <p className="text-sm text-gray-700 mb-2">
-                  <span className="font-semibold">
-                    {selectedContact.contact_person || selectedContact.company_name}
-                  </span>
-                  {' '}already has mail logged today:
-                </p>
-                <div className="text-sm text-gray-600 pl-4 border-l-2 border-yellow-400">
-                  <p><strong>{existingTodayMail.quantity || 1}x {existingTodayMail.item_type}</strong></p>
-                  <p>Status: {existingTodayMail.status}</p>
-                  <p>Logged: {new Date(existingTodayMail.received_date).toLocaleDateString()}</p>
-                </div>
-              </div>
-              <p className="text-sm text-gray-600 mb-4">
-                Would you like to <strong>add {typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity)} more {itemType}{(typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity)) > 1 ? 's' : ''}</strong> to the existing log, 
-                or create a separate entry?
-              </p>
-            </div>
-
-            <div className="flex flex-col gap-3">
-              <button
-                onClick={async () => {
-                  await submitNewMail(true);
-                }}
-                disabled={addingMail}
-                className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {addingMail ? 'Adding...' : `Add to Existing (Total: ${(existingTodayMail.quantity || 1) + (typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity))})`}
-              </button>
-              
-              <button
-                onClick={async () => {
-                  await submitNewMail(false);
-                }}
-                disabled={addingMail}
-                className="w-full px-4 py-3 bg-gray-600 hover:bg-gray-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {addingMail ? 'Creating...' : 'Create Separate Entry'}
-              </button>
-
-              <button
-                onClick={() => {
-                  setShowDuplicatePrompt(false);
-                  setExistingTodayMail(null);
-                }}
-                disabled={addingMail}
-                className="w-full px-4 py-3 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Duplicate prompt modal removed - now auto-adds to existing items */}
     </div>
   );
 }

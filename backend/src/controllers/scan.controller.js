@@ -29,53 +29,72 @@ async function smartMatchWithGemini(req, res, next) {
       model: 'gemini-2.5-flash'
     });
 
-    // Build contact list string for Gemini
+    // Build contact list string for Gemini - show BOTH personal name and business name
     const contactListStr = contacts
       .map((c, idx) => {
-        const name = c.contact_person || c.company_name || 'Unknown';
+        const personName = c.contact_person || '';
+        const businessName = c.company_name || '';
+        // Show both names separated by " / " if both exist
+        const displayName = [personName, businessName].filter(Boolean).join(' / ') || 'Unknown';
         const mailbox = c.mailbox_number || 'N/A';
-        return `${idx + 1}. ${name} (Mailbox: ${mailbox})`;
+        return `${idx + 1}. ${displayName} (Mailbox: ${mailbox})`;
       })
       .join('\n');
 
     // Smart prompt that asks Gemini to do BOTH extraction AND matching
+    // Updated to recognize both personal names AND business/company names
     const prompt = `You are analyzing a photograph of a mail label or envelope. Your task is to:
-1. Find and extract the RECIPIENT'S FULL NAME from the image
+1. Find and extract the RECIPIENT'S NAME OR BUSINESS NAME from the image
 2. Match it to one of the customers in the list below
 
 CUSTOMER LIST:
 ${contactListStr}
 
+NOTE: Some customers have both a personal name AND a business name (shown as "Personal Name / Business Name").
+Mail may be addressed to EITHER the personal name OR the business name.
+
 INSTRUCTIONS FOR TEXT EXTRACTION:
-- Look carefully at the ENTIRE image for the recipient's name
+- Look carefully at the ENTIRE image for the recipient's name or business name
+- The recipient could be:
+  * A PERSON'S NAME (e.g., "John Smith", "CHEN HOUYU")
+  * A BUSINESS/COMPANY NAME (e.g., "ACME Corp", "Smith Consulting LLC")
 - The name is usually:
   * Near the center or top of the label
   * After keywords like "TO:", "ATTN:", "ATTENTION:", "RECIPIENT:", "DELIVER TO:"
   * The largest or most prominent text
   * Above the address lines
+- Business names often include: LLC, Inc, Corp, Co., Ltd, Company, Enterprises, Services
 - Extract the COMPLETE name, not just initials or partial text
 - Ignore address lines, city names, zip codes, sender information
 
 INSTRUCTIONS FOR MATCHING:
 - Compare the extracted name to the customer list
+- Match on EITHER the personal name OR the business name
+- If mail says "ACME Corp" and customer is "John Smith / ACME Corp", that's a match!
 - Handle variations like:
   * First name / last name order (e.g., "Chen Houyu" vs "Houyu Chen")
   * Missing spaces (e.g., "HouYu Chen" vs "Hou Yu Chen")  
   * Partial names (e.g., "H. Chen" → "Houyu Chen")
   * Abbreviations or nicknames
   * Different capitalization
+  * Business name variations (e.g., "ACME" vs "ACME Corp")
 
 RETURN FORMAT (must be EXACT):
-EXTRACTED: [the complete recipient name you found]
+EXTRACTED: [the complete recipient name or business name you found]
 MATCHED: [customer number from list, or "NONE" if no match]
 CONFIDENCE: [0-100, how confident you are in the match]
 REASON: [brief explanation of your match or why no match]
 
-Example response:
+Example responses:
 EXTRACTED: CHEN HOUYU
 MATCHED: 5
 CONFIDENCE: 95
 REASON: Name matches customer #5 "Houyu Chen", just reversed order (last name first)
+
+EXTRACTED: ACME CONSULTING LLC
+MATCHED: 3
+CONFIDENCE: 90
+REASON: Business name matches customer #3 "John Doe / ACME Consulting LLC"
 
 Now analyze the image and provide your response:`;
 
@@ -337,10 +356,13 @@ async function bulkSubmitScanSession(req, res, next) {
                     message_content: fallbackTemplate.message_body,
                   });
                 
-                // Update mail items to "Notified" status
+                // Update mail items to "Notified" status and set last_notified
                 await supabaseAdmin
                   .from('mail_items')
-                  .update({ status: 'Notified' })
+                  .update({ 
+                    status: 'Notified',
+                    last_notified: new Date().toISOString()
+                  })
                   .in('mail_item_id', createdItems.map(i => i.mail_item_id));
                 
                 emailSent = true;
@@ -382,10 +404,13 @@ async function bulkSubmitScanSession(req, res, next) {
                   message_content: template.message_body,
                 });
               
-              // Update mail items to "Notified" status
+              // Update mail items to "Notified" status and set last_notified
               await supabaseAdmin
                 .from('mail_items')
-                .update({ status: 'Notified' })
+                .update({ 
+                  status: 'Notified',
+                  last_notified: new Date().toISOString()
+                })
                 .in('mail_item_id', createdItems.map(i => i.mail_item_id));
               
               emailSent = true;

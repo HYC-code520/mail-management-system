@@ -24,6 +24,9 @@ router.get('/outstanding', feeController.getOutstandingFees);
 // Get revenue statistics
 router.get('/revenue', feeController.getRevenueStats);
 
+// Get unpaid fees for a specific contact (debt tracking)
+router.get('/unpaid/:contactId', feeController.getUnpaidFeesByContact);
+
 // Waive a fee
 router.post('/:feeId/waive', feeController.waiveFee);
 

@@ -186,7 +186,7 @@ exports.updateMailItemStatus = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
-    const { status, item_type, description, contact_id, received_date, quantity } = req.body;
+    const { status, item_type, description, contact_id, received_date, quantity, performed_by } = req.body;
 
     // Fetch existing mail item to detect item_type changes
     const { data: existingMailItem, error: fetchError } = await supabase
@@ -319,7 +319,7 @@ exports.updateMailItemStatus = async (req, res, next) => {
             action_description: actionDescriptions.join('; '),
             previous_value: previousValue,
             new_value: newValue,
-            performed_by: req.user.email || 'Staff',
+            performed_by: performed_by || req.user.email || 'Staff', // Use performed_by from request, fallback to email
             action_timestamp: new Date().toISOString()
           });
         

@@ -3,7 +3,8 @@ const router = express.Router();
 const { 
   sendNotificationEmail, 
   sendCustomEmail,
-  testEmailConfig 
+  testEmailConfig,
+  sendBulkNotification
 } = require('../controllers/email.controller');
 const authenticateUser = require('../middleware/auth.middleware');
 
@@ -17,6 +18,14 @@ router.use(authenticateUser);
  * @body    { contact_id, template_id, mail_item_id?, message_type?, custom_variables? }
  */
 router.post('/send', sendNotificationEmail);
+
+/**
+ * @route   POST /api/emails/send-bulk
+ * @desc    Send summary notification for ALL items of a contact
+ * @access  Private
+ * @body    { contact_id, template_id, mail_item_ids: string[] }
+ */
+router.post('/send-bulk', sendBulkNotification);
 
 /**
  * @route   POST /api/emails/send-custom

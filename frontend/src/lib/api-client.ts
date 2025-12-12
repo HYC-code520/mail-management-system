@@ -144,7 +144,13 @@ export const api = {
       mail_item_id?: string;
       message_type?: string;
       custom_variables?: Record<string, string>;
+      sent_by?: string;
     }) => apiClient.post('/emails/send', data),
+    sendBulk: (data: {
+      contact_id: string;
+      template_id: string;
+      mail_item_ids: string[];
+    }) => apiClient.post('/emails/send-bulk', data),
     sendCustom: (data: {
       to: string;
       subject: string;
@@ -223,6 +229,7 @@ export const api = {
   fees: {
     getAll: () => apiClient.get('/fees'),
     getOutstanding: () => apiClient.get('/fees/outstanding'),
+    getUnpaidByContact: (contactId: string) => apiClient.get(`/fees/unpaid/${contactId}`),
     getRevenue: (startDate?: string, endDate?: string) => {
       const params = new URLSearchParams();
       if (startDate) params.append('startDate', startDate);

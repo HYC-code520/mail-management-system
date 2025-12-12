@@ -54,6 +54,23 @@ interface NotificationHistory {
   notes?: string;
 }
 
+interface UnpaidFee {
+  fee_id: string;
+  mail_item_id: string;
+  fee_amount: number;
+  days_charged: number;
+  fee_status: 'pending' | 'paid' | 'waived';
+  created_at: string;
+  isDebt: boolean; // True if picked up without paying
+  mail_items?: {
+    mail_item_id: string;
+    item_type: string;
+    received_date: string;
+    status: string;
+    pickup_date?: string;
+  };
+}
+
 interface GroupedMailItem {
   groupKey: string; // e.g., "2024-12-11_Letter"
   itemType: string;
@@ -125,6 +142,7 @@ export default function ContactDetailPage() {
   const [actionHistory, setActionHistory] = useState<Record<string, any[]>>({});
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [unpaidFees, setUnpaidFees] = useState<UnpaidFee[]>([]);
   
   // Send Email Modal states
   const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
@@ -168,12 +186,23 @@ export default function ContactDetailPage() {
     }
   }, [id]);
 
+  const loadUnpaidFees = useCallback(async () => {
+    if (!id) return;
+    try {
+      const data = await api.fees.getUnpaidByContact(id);
+      setUnpaidFees(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Error loading unpaid fees:', err);
+    }
+  }, [id]);
+
   useEffect(() => {
     if (id) {
       void loadContactDetails(); // Explicitly ignore the promise
       void loadMailHistory(); // Explicitly ignore the promise
+      void loadUnpaidFees(); // Load unpaid fees
     }
-  }, [id, loadContactDetails, loadMailHistory]);
+  }, [id, loadContactDetails, loadMailHistory, loadUnpaidFees]);
 
   const loadNotificationHistoryForMailItem = async (mailItemId: string) => {
     try {
@@ -410,100 +439,100 @@ export default function ContactDetailPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
       {/* Back Button */}
       <button
         onClick={() => navigate('/dashboard/contacts')}
-        className="flex items-center gap-2 text-gray-900 hover:text-gray-700 mb-6 font-medium"
+        className="flex items-center gap-2 text-gray-900 hover:text-gray-700 mb-4 sm:mb-6 font-medium text-sm sm:text-base"
       >
         <span>←</span>
         <span>Back to Directory</span>
       </button>
 
       {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
+      <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">
-            {contact.contact_person || contact.company_name || 'Unnamed Contact'}
-          </h1>
-          <p className="text-gray-600">Customer Profile</p>
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+          {contact.contact_person || contact.company_name || 'Unnamed Contact'}
+        </h1>
+          <p className="text-sm sm:text-base text-gray-600">Customer Profile</p>
         </div>
         <button
           onClick={openEditModal}
-          className="px-4 py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+          className="w-full sm:w-auto px-4 py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2 text-sm sm:text-base"
         >
           <Edit className="w-4 h-4" />
           Edit Contact
         </button>
       </div>
 
-      {/* Two Column Layout */}
-      <div className="grid grid-cols-3 gap-6">
+      {/* Two Column Layout - Stack on mobile */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Left Column - Contact Information */}
-        <div className="col-span-1 bg-white border border-gray-200 rounded-lg p-6 shadow-sm h-fit">
-          <h2 className="text-lg font-bold text-gray-900 mb-6">Contact Information</h2>
+        <div className="lg:col-span-1 bg-white border border-gray-200 rounded-lg p-4 sm:p-6 shadow-sm h-fit">
+          <h2 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6">Contact Information</h2>
           
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             {/* Name */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Name</p>
-              <p className="text-gray-900 font-medium">{contact.contact_person || '—'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Name</p>
+              <p className="text-sm sm:text-base text-gray-900 font-medium break-words">{contact.contact_person || '—'}</p>
             </div>
 
             {/* Company */}
             {contact.company_name && (
               <div>
-                <p className="text-sm text-gray-600 mb-1">Company</p>
-                <p className="text-gray-900 font-medium">{contact.company_name}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Company</p>
+                <p className="text-sm sm:text-base text-gray-900 font-medium break-words">{contact.company_name}</p>
               </div>
             )}
 
             {/* Email */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Email</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Email</p>
               <div className="flex items-center gap-2">
-                <Mail className="w-4 h-4 text-gray-400" />
-                <p className="text-gray-900">{contact.email || '—'}</p>
+                <Mail className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400 flex-shrink-0" />
+                <p className="text-sm sm:text-base text-gray-900 break-all">{contact.email || '—'}</p>
               </div>
             </div>
 
             {/* Phone */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Phone</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Phone</p>
               <div className="flex items-center gap-2">
-                <span>📞</span>
-                <p className="text-gray-900">{contact.phone_number || '—'}</p>
+                <span className="text-sm sm:text-base">📞</span>
+                <p className="text-sm sm:text-base text-gray-900">{contact.phone_number || '—'}</p>
               </div>
             </div>
 
             {/* Mailbox # */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Mailbox #</p>
-              <p className="text-gray-900 font-medium">{contact.mailbox_number || '—'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Mailbox #</p>
+              <p className="text-sm sm:text-base text-gray-900 font-medium">{contact.mailbox_number || '—'}</p>
             </div>
 
             {/* Unit # */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Unit #</p>
-              <p className="text-gray-900 font-medium">{contact.unit_number || '—'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Unit #</p>
+              <p className="text-sm sm:text-base text-gray-900 font-medium">{contact.unit_number || '—'}</p>
             </div>
 
             {/* Service Tier */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Service Tier</p>
-              <p className="text-gray-900 font-medium">{contact.service_tier || '1'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Service Tier</p>
+              <p className="text-sm sm:text-base text-gray-900 font-medium">{contact.service_tier || '1'}</p>
             </div>
 
             {/* Language */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Language</p>
-              <p className="text-gray-900 font-medium">{contact.language_preference || 'English'}</p>
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Language</p>
+              <p className="text-sm sm:text-base text-gray-900 font-medium">{contact.language_preference || 'English'}</p>
             </div>
 
             {/* Subscription Status */}
             <div>
-              <p className="text-sm text-gray-600 mb-1">Status</p>
-              <span className={`inline-block px-3 py-1 rounded text-xs font-medium ${
+              <p className="text-xs sm:text-sm text-gray-600 mb-1">Status</p>
+              <span className={`inline-block px-2 sm:px-3 py-1 rounded text-xs font-medium ${
                 contact.status === 'Active' ? 'bg-green-100 text-green-700' :
                 contact.status === 'PENDING' ? 'bg-yellow-100 text-yellow-700' :
                 contact.status === 'No' ? 'bg-gray-100 text-gray-700' :
@@ -516,8 +545,8 @@ export default function ContactDetailPage() {
             {/* Customer Since */}
             {contact.created_at && (
               <div>
-                <p className="text-sm text-gray-600 mb-1">Customer Since</p>
-                <p className="text-gray-900 font-medium">
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Customer Since</p>
+                <p className="text-sm sm:text-base text-gray-900 font-medium">
                   {new Date(contact.created_at).toLocaleDateString('en-US', { 
                     year: 'numeric', 
                     month: 'long', 
@@ -527,36 +556,100 @@ export default function ContactDetailPage() {
               </div>
             )}
           </div>
+          
+          {/* Unpaid Fees Section */}
+          {unpaidFees.length > 0 && (
+            <div className="mt-4 sm:mt-6 pt-4 sm:pt-6 border-t border-gray-200">
+              <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-3 sm:mb-4 flex items-center gap-2">
+                <span className="text-orange-600">💰</span>
+                Outstanding Fees
+              </h3>
+              <div className="space-y-2 sm:space-y-3">
+                {unpaidFees.map(fee => {
+                  const receivedDate = fee.mail_items?.received_date 
+                    ? new Date(fee.mail_items.received_date).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric'
+                      })
+                    : 'Unknown';
+                  
+                  return (
+                    <div 
+                      key={fee.fee_id} 
+                      className={`p-2 sm:p-3 rounded-lg border ${
+                        fee.isDebt 
+                          ? 'bg-red-50 border-red-200' 
+                          : 'bg-orange-50 border-orange-200'
+                      }`}
+                    >
+                      <div className="flex justify-between items-center gap-2">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900 truncate">
+                            📦 Package from {receivedDate}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {fee.days_charged} days • {fee.mail_items?.status || 'Pending'}
+                          </p>
+                          {fee.isDebt && (
+                            <p className="text-xs text-red-600 font-medium mt-1">
+                              ⚠️ Picked up without paying
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className={`text-base sm:text-lg font-bold ${
+                            fee.isDebt ? 'text-red-600' : 'text-orange-600'
+                          }`}>
+                            ${fee.fee_amount.toFixed(2)}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                
+                {/* Total */}
+                <div className="pt-2 sm:pt-3 border-t border-gray-200">
+                  <div className="flex justify-between items-center">
+                    <p className="text-sm sm:text-base font-semibold text-gray-700">Total Outstanding:</p>
+                    <p className="text-lg sm:text-xl font-bold text-orange-600">
+                      ${unpaidFees.reduce((sum, f) => sum + f.fee_amount, 0).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Right Column - Mail History */}
-        <div className="col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-200">
-            <h2 className="text-lg font-bold text-gray-900">Mail History</h2>
+        <div className="lg:col-span-2 bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
+          <div className="p-4 sm:p-6 border-b border-gray-200">
+            <h2 className="text-base sm:text-lg font-bold text-gray-900">Mail History</h2>
           </div>
 
           <div className="overflow-x-auto">
             {mailHistory.length === 0 ? (
-              <div className="text-center py-12">
-                <Mail className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-600 mb-4">No mail history yet</p>
+              <div className="text-center py-8 sm:py-12 px-4">
+                <Mail className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
+                <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">No mail history yet</p>
                 <button
                   onClick={() => navigate('/dashboard/intake')}
-                  className="px-6 py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors"
+                  className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                 >
                   Add Mail Item
                 </button>
               </div>
             ) : (
-              <table className="w-full">
+              <table className="w-full min-w-[600px]">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700 w-10"></th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Date</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Type</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Qty</th>
-                    <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Status</th>
-                    <th className="text-right py-3 px-6 text-sm font-semibold text-gray-700">Actions</th>
+                    <th className="text-left py-2 sm:py-3 px-3 sm:px-6 text-xs sm:text-sm font-semibold text-gray-700 w-10"></th>
+                    <th className="text-left py-2 sm:py-3 px-3 sm:px-6 text-xs sm:text-sm font-semibold text-gray-700">Date</th>
+                    <th className="text-left py-2 sm:py-3 px-3 sm:px-6 text-xs sm:text-sm font-semibold text-gray-700">Type</th>
+                    <th className="text-left py-2 sm:py-3 px-3 sm:px-6 text-xs sm:text-sm font-semibold text-gray-700">Qty</th>
+                    <th className="text-left py-2 sm:py-3 px-3 sm:px-6 text-xs sm:text-sm font-semibold text-gray-700">Status</th>
+                    <th className="text-right py-2 sm:py-3 px-3 sm:px-6 text-xs sm:text-sm font-semibold text-gray-700">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -567,7 +660,7 @@ export default function ContactDetailPage() {
                         className="border-b border-gray-100 hover:bg-gray-50 cursor-pointer"
                         onClick={() => toggleRow(group.groupKey, group.items.map(i => i.mail_item_id))}
                       >
-                        <td className="py-4 px-6">
+                        <td className="py-3 sm:py-4 px-3 sm:px-6">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
@@ -579,10 +672,10 @@ export default function ContactDetailPage() {
                               display: 'inline-block',
                             }}
                           >
-                            <ChevronRight className="w-4 h-4" />
+                            <ChevronRight className="w-3 h-3 sm:w-4 sm:h-4" />
                           </button>
                         </td>
-                        <td className="py-4 px-6 text-gray-900">
+                        <td className="py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm text-gray-900">
                           {new Date(group.receivedDate + 'T12:00:00').toLocaleDateString('en-US', {
                             timeZone: 'America/New_York',
                             year: 'numeric',
@@ -590,23 +683,23 @@ export default function ContactDetailPage() {
                             day: '2-digit'
                           })}
                         </td>
-                        <td className="py-4 px-6">
-                          <div className="flex items-center gap-2 text-gray-700">
+                        <td className="py-3 sm:py-4 px-3 sm:px-6">
+                          <div className="flex items-center gap-1 sm:gap-2 text-xs sm:text-sm text-gray-700">
                             {group.itemType === 'Package' || group.itemType === 'Large Package' ? (
-                              <Package className="w-4 h-4 text-gray-500" />
+                              <Package className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
                             ) : (
-                              <Mail className="w-4 h-4 text-gray-500" />
+                              <Mail className="w-3 h-3 sm:w-4 sm:h-4 text-gray-500 flex-shrink-0" />
                             )}
-                            <span>{group.itemType}</span>
+                            <span className="truncate">{group.itemType}</span>
                           </div>
                         </td>
-                        <td className="py-4 px-6">
-                          <span className="px-2 py-1 bg-gray-100 text-gray-700 rounded text-sm font-medium">
+                        <td className="py-3 sm:py-4 px-3 sm:px-6">
+                          <span className="px-1.5 sm:px-2 py-0.5 sm:py-1 bg-gray-100 text-gray-700 rounded text-xs sm:text-sm font-medium">
                             {group.totalQuantity}
                           </span>
                         </td>
-                        <td className="py-4 px-6">
-                          <span className={`px-3 py-1 rounded text-xs font-medium ${
+                        <td className="py-3 sm:py-4 px-3 sm:px-6">
+                          <span className={`px-2 sm:px-3 py-0.5 sm:py-1 rounded text-xs font-medium whitespace-nowrap ${
                             group.latestStatus === 'Received' ? 'bg-blue-100 text-blue-700' :
                             group.latestStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
                             group.latestStatus === 'Notified' ? 'bg-purple-100 text-purple-700' :
@@ -619,14 +712,15 @@ export default function ContactDetailPage() {
                             {group.latestStatus}
                           </span>
                         </td>
-                        <td className="py-4 px-6 text-right" onClick={(e) => e.stopPropagation()}>
+                        <td className="py-3 sm:py-4 px-3 sm:px-6 text-right" onClick={(e) => e.stopPropagation()}>
                           {group.latestStatus !== 'Picked Up' && group.latestStatus !== 'Abandoned Package' && contact?.email && (
                             <button
                               onClick={() => openSendEmailModal(group.items[0])}
-                              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2 ml-auto"
+                              className="px-2 sm:px-3 py-1 sm:py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm rounded-lg transition-colors flex items-center gap-1 sm:gap-2 ml-auto whitespace-nowrap"
                             >
-                              <Send className="w-4 h-4" />
-                              Send Email
+                              <Send className="w-3 h-3 sm:w-4 sm:h-4" />
+                              <span className="hidden sm:inline">Send Email</span>
+                              <span className="sm:hidden">Send</span>
                             </button>
                           )}
                         </td>
@@ -635,21 +729,21 @@ export default function ContactDetailPage() {
                       {/* Expanded Row - Details & History */}
                       {expandedRows.has(group.groupKey) && (
                         <tr className="bg-gray-50 border-b border-gray-200">
-                          <td colSpan={6} className="py-6 px-6">
-                            <div className="ml-10 space-y-6">
+                          <td colSpan={6} className="py-3 sm:py-6 px-3 sm:px-6">
+                            <div className="ml-4 sm:ml-10 space-y-4 sm:space-y-6">
                               {/* Individual Items in Group */}
                               {group.items.length > 1 && (
                                 <div>
-                                  <h4 className="font-bold text-gray-900 mb-3">
+                                  <h4 className="text-sm sm:text-base font-bold text-gray-900 mb-2 sm:mb-3">
                                     Individual Items ({group.items.length})
                                   </h4>
                                   <div className="space-y-2">
                                     {group.items.map((item, index) => (
-                                      <div key={item.mail_item_id} className="bg-white p-3 rounded-lg border border-gray-200">
-                                        <div className="flex items-center justify-between">
-                                          <div className="flex items-center gap-3">
-                                            <span className="text-sm text-gray-500">#{index + 1}</span>
-                                            <span className="text-sm font-medium text-gray-900">
+                                      <div key={item.mail_item_id} className="bg-white p-2 sm:p-3 rounded-lg border border-gray-200">
+                                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+                                            <span className="text-xs sm:text-sm text-gray-500">#{index + 1}</span>
+                                            <span className="text-xs sm:text-sm font-medium text-gray-900">
                                               {new Date(item.received_date).toLocaleTimeString('en-US', {
                                                 timeZone: 'America/New_York',
                                                 hour: 'numeric',
@@ -658,11 +752,11 @@ export default function ContactDetailPage() {
                                               })}
                                             </span>
                                             {item.quantity && item.quantity > 1 && (
-                                              <span className="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
+                                              <span className="px-1.5 sm:px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
                                                 Qty: {item.quantity}
                                               </span>
                                             )}
-                                            <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                                            <span className={`px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium ${
                                               item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
                                               item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
                                               'bg-gray-100 text-gray-700'
@@ -693,49 +787,49 @@ export default function ContactDetailPage() {
 
                               {/* Notification History Section */}
                               <div>
-                                <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                  <Bell className="w-5 h-5 text-purple-600" />
-                                  Notification History
-                                </h4>
+                              <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
+                                <Bell className="w-5 h-5 text-purple-600" />
+                                Notification History
+                              </h4>
                                 {notificationHistory[group.groupKey]?.length > 0 ? (
-                                  <div className="space-y-3">
+                                <div className="space-y-3">
                                     {notificationHistory[group.groupKey].map((notif) => (
-                                      <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
-                                        <div className="flex items-start justify-between">
-                                          <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                              <span className="font-semibold text-gray-900">
-                                                {new Date(notif.notified_at).toLocaleString('en-US', {
-                                                  month: 'short',
-                                                  day: 'numeric',
-                                                  year: 'numeric',
-                                                  hour: 'numeric',
-                                                  minute: '2-digit',
-                                                  hour12: true
-                                                })}
-                                              </span>
-                                              <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
-                                                {notif.notification_method}
-                                              </span>
-                                            </div>
-                                            <p className="text-sm text-gray-600">
-                                              Notified by: <span className="font-medium text-gray-900">{notif.notified_by}</span>
-                                            </p>
-                                            {notif.notes && (
-                                              <p className="text-sm text-gray-600 mt-1 italic">
-                                                Note: {notif.notes}
-                                              </p>
-                                            )}
+                                    <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
+                                      <div className="flex items-start justify-between">
+                                        <div className="flex-1">
+                                          <div className="flex items-center gap-2 mb-1">
+                                            <span className="font-semibold text-gray-900">
+                                              {new Date(notif.notified_at).toLocaleString('en-US', {
+                                                month: 'short',
+                                                day: 'numeric',
+                                                year: 'numeric',
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                hour12: true
+                                              })}
+                                            </span>
+                                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
+                                              {notif.notification_method}
+                                            </span>
                                           </div>
+                                          <p className="text-sm text-gray-600">
+                                            Notified by: <span className="font-medium text-gray-900">{notif.notified_by}</span>
+                                          </p>
+                                          {notif.notes && (
+                                            <p className="text-sm text-gray-600 mt-1 italic">
+                                              Note: {notif.notes}
+                                            </p>
+                                          )}
                                         </div>
                                       </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <p className="text-sm text-gray-500 italic">
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <p className="text-sm text-gray-500 italic">
                                     No notifications sent yet.
-                                  </p>
-                                )}
+                                </p>
+                              )}
                               </div>
 
                               {/* Action History Section */}
