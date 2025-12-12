@@ -43,6 +43,7 @@ async function sendEmailWithGmailApi(userId, to, subject, htmlContent) {
   // Encode email in RFC 2822 format
   const message = [
     `From: "${process.env.SMTP_FROM_NAME || 'MeiWay Mail Service'}" <${gmailAddress}>`,
+    `Reply-To: ${gmailAddress}`,
     `To: ${to}`,
     `Subject: ${subject}`,
     'MIME-Version: 1.0',
@@ -187,11 +188,25 @@ async function sendTemplateEmail({ to, templateSubject, templateBody, variables,
       <style>
         body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
         .email-container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; font-size: 12px; color: #666; }
+        .footer-address { margin-top: 10px; }
       </style>
     </head>
     <body>
       <div class="email-container">
         ${body.replace(/\n/g, '<br>')}
+        
+        <div class="footer">
+          <div class="footer-address">
+            <strong>Mei Way Mail Plus</strong><br>
+            📍 [Your Business Address Here]<br>
+            📞 [Your Phone Number Here]<br>
+            📧 [Your Business Email Here]
+          </div>
+          <p style="margin-top: 10px; font-size: 11px; color: #999;">
+            This is an automated notification about your mail. Please do not reply to this email.
+          </p>
+        </div>
       </div>
     </body>
     </html>

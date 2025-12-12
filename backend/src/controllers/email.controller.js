@@ -458,9 +458,217 @@ async function testEmailConfig(req, res, next) {
   }
 }
 
+/**
+ * Send bulk notification email for ALL items of a contact
+ * POST /api/emails/send-bulk
+ * Body: { contact_id, template_id, mail_item_ids: string[] }
+ */
+async function sendBulkNotification(req, res, next) {
+  try {
+    const supabase = getSupabaseClient(req.user.token);
+    const { contact_id, template_id, mail_item_ids } = req.body;
+
+    // Validation
+    if (!contact_id || !template_id || !mail_item_ids || !Array.isArray(mail_item_ids) || mail_item_ids.length === 0) {
+      return res.status(400).json({ 
+        error: 'contact_id, template_id, and mail_item_ids array are required' 
+      });
+    }
+
+    // 1. Fetch contact
+    const { data: contact, error: contactError } = await supabase
+      .from('contacts')
+      .select('*')
+      .eq('contact_id', contact_id)
+      .single();
+
+    if (contactError || !contact) {
+      return res.status(404).json({ error: 'Contact not found' });
+    }
+
+    if (!contact.email) {
+      return res.status(400).json({ error: 'Contact has no email address' });
+    }
+
+    // 2. Fetch template
+    const { data: template, error: templateError } = await supabase
+      .from('message_templates')
+      .select('*')
+      .eq('template_id', template_id)
+      .single();
+
+    if (templateError || !template) {
+      return res.status(404).json({ error: 'Template not found' });
+    }
+
+    // 3. Fetch all mail items
+    const { data: mailItems, error: itemsError } = await supabase
+      .from('mail_items')
+      .select('*, package_fees(*)')
+      .in('mail_item_id', mail_item_ids);
+
+    if (itemsError) {
+      return res.status(500).json({ error: 'Failed to fetch mail items' });
+    }
+
+    // 4. Calculate summary statistics
+    const packages = mailItems.filter(item => item.item_type === 'Package' || item.item_type === 'Large Package');
+    const letters = mailItems.filter(item => item.item_type === 'Letter' || item.item_type === 'Certified Mail');
+    
+    const totalItems = mailItems.length;
+    const totalPackages = packages.length;
+    const totalLetters = letters.length;
+    
+    // Calculate oldest item
+    const now = new Date();
+    const oldestDays = Math.max(...mailItems.map(item => {
+      const received = new Date(item.received_date);
+      return Math.floor((now - received) / (1000 * 60 * 60 * 24));
+    }));
+
+    // Calculate total fees
+    const totalFees = packages.reduce((sum, pkg) => {
+      const fee = pkg.package_fees?.[0] || pkg.packageFee;
+      if (fee && fee.fee_status === 'pending') {
+        return sum + (fee.fee_amount || 0);
+      }
+      return sum;
+    }, 0);
+
+    // 5. Build item summary for template
+    let itemSummary = '';
+    let itemSummaryChinese = '';
+
+    if (totalPackages > 0) {
+      itemSummary += `• ${totalPackages} package${totalPackages > 1 ? 's' : ''}`;
+      itemSummaryChinese += `• ${totalPackages} 个包裹`;
+      if (totalFees > 0) {
+        itemSummary += ` (storage fees: $${totalFees.toFixed(2)})`;
+        itemSummaryChinese += `（存储费用：$${totalFees.toFixed(2)}）`;
+      }
+      itemSummary += '\n';
+      itemSummaryChinese += '\n';
+    }
+    if (totalLetters > 0) {
+      itemSummary += `• ${totalLetters} letter${totalLetters > 1 ? 's' : ''}`;
+      itemSummaryChinese += `• ${totalLetters} 封信件`;
+    }
+
+    // Fee summary
+    let feeSummary = '';
+    let feeSummaryChinese = '';
+    if (totalFees > 0) {
+      feeSummary = `• Storage fees: $${totalFees.toFixed(2)}`;
+      feeSummaryChinese = `• 存储费用：$${totalFees.toFixed(2)}`;
+    }
+
+    // 6. Build template variables
+    const variables = {
+      Name: contact.contact_person || contact.company_name || 'Customer',
+      BoxNumber: contact.mailbox_number || '',
+      TotalItems: totalItems,
+      TotalPackages: totalPackages,
+      TotalLetters: totalLetters,
+      OldestDays: oldestDays,
+      ItemSummary: itemSummary.trim(),
+      ItemSummaryChinese: itemSummaryChinese.trim(),
+      FeeSummary: feeSummary,
+      FeeSummaryChinese: feeSummaryChinese,
+      TotalFees: `$${totalFees.toFixed(2)}`
+    };
+
+    console.log('📧 Sending bulk notification with variables:', variables);
+
+    // 7. Send the email
+    const result = await sendTemplateEmail({
+      to: contact.email,
+      templateSubject: template.subject_line,
+      templateBody: template.message_body,
+      variables,
+      userId: req.user.id
+    });
+
+    // 8. Update ALL mail items to "Notified" status
+    const updatePromises = mail_item_ids.map(async (itemId) => {
+      return supabase
+        .from('mail_items')
+        .update({ 
+          status: 'Notified',
+          last_notified: new Date().toISOString()
+        })
+        .eq('mail_item_id', itemId);
+    });
+    await Promise.all(updatePromises);
+
+    // 9. Log outreach message
+    await supabase
+      .from('outreach_messages')
+      .insert({
+        mail_item_id: mail_item_ids[0], // Reference first item for the outreach record
+        contact_id: contact_id,
+        message_type: 'Summary',
+        channel: 'Email',
+        message_content: template.message_body,
+        sent_at: new Date().toISOString(),
+        responded: false,
+        follow_up_needed: true
+      });
+
+    // 10. Record action history for ALL items
+    const actionHistoryRecords = mail_item_ids.map(itemId => ({
+      mail_item_id: itemId,
+      action_type: 'bulk_notified',
+      action_description: `Summary notification sent (${totalItems} items total)`,
+      performed_by: req.user.email || 'System',
+      notes: `Template: ${template.template_name}, Items: ${totalPackages} packages, ${totalLetters} letters`
+    }));
+
+    await supabase
+      .from('action_history')
+      .insert(actionHistoryRecords);
+
+    // 11. Update notification_history for all items
+    const notificationRecords = mail_item_ids.map(itemId => ({
+      mail_item_id: itemId,
+      notification_method: 'Email',
+      notified_at: new Date().toISOString(),
+      notes: `Summary notification (${totalItems} items)`
+    }));
+
+    await supabase
+      .from('notification_history')
+      .insert(notificationRecords);
+
+    console.log(`✅ Bulk notification sent to ${contact.email} for ${totalItems} items`);
+
+    res.json({
+      success: true,
+      message: `Summary notification sent for ${totalItems} items`,
+      itemsUpdated: totalItems,
+      emailSent: true,
+      messageId: result.messageId
+    });
+
+  } catch (error) {
+    console.error('Bulk notification error:', error);
+    
+    if (error.message?.includes('invalid_grant') || error.message?.includes('Token has been expired')) {
+      return res.status(401).json({
+        error: 'Gmail authentication expired',
+        message: 'Your Gmail account is disconnected. Please reconnect in Settings to send emails.',
+        code: 'GMAIL_DISCONNECTED',
+        action: 'reconnect_gmail'
+      });
+    }
+    
+    next(error);
+  }
+}
+
 module.exports = {
   sendNotificationEmail,
   sendCustomEmail,
-  testEmailConfig
+  testEmailConfig,
+  sendBulkNotification
 };
 

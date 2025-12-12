@@ -83,8 +83,12 @@ export default function ScanSessionPage() {
         const now = new Date();
 
         if (now < expiresAt) {
-          // Session still valid
-          toast.success('Resumed previous scan session');
+          // Session still valid - only show toast once
+          const hasShownToast = sessionStorage.getItem('scanSessionResumedToast');
+          if (!hasShownToast) {
+            toast.success('Resumed previous scan session');
+            sessionStorage.setItem('scanSessionResumedToast', 'true');
+          }
           setSession(parsed);
         } else {
           // Session expired
@@ -479,6 +483,7 @@ export default function ScanSessionPage() {
         }
       });
       localStorage.removeItem('scanSession');
+      sessionStorage.removeItem('scanSessionResumedToast'); // Clear the toast flag
 
       // Navigate back after delay
       setTimeout(() => {
@@ -644,6 +649,7 @@ export default function ScanSessionPage() {
                   if (session.items.length === 0) {
                     setSession(null);
                     localStorage.removeItem('scanSession');
+                    sessionStorage.removeItem('scanSessionResumedToast'); // Clear the toast flag
                   } else {
                     endSession();
                   }

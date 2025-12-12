@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Archive, ArchiveRestore, Eye, MessageSquare, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
+import { Search, Archive, ArchiveRestore, Eye, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
@@ -391,6 +391,7 @@ export default function ContactsPage() {
                       )}
                     </div>
                   </th>
+                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Company</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Email</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Phone</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Service Tier</th>
@@ -439,8 +440,11 @@ export default function ContactsPage() {
                   >
                     <td className="py-4 px-6">
                       <div className="font-medium text-gray-900">
-                        {contact.contact_person || contact.company_name || 'Unnamed'}
+                        {contact.contact_person || 'Unnamed'}
                       </div>
+                    </td>
+                    <td className="py-4 px-6 text-gray-700">
+                      {contact.company_name || '—'}
                     </td>
                     <td className="py-4 px-6 text-gray-700">
                       {contact.email || '—'}
@@ -478,16 +482,6 @@ export default function ContactsPage() {
                               <Eye className="w-4 h-4" />
                               <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
                                 View
-                              </span>
-                            </button>
-                            <button
-                              onClick={() => navigate(`/dashboard/contacts/${contact.contact_id}/message`)}
-                              className="p-2 text-green-600 hover:text-green-700 hover:bg-green-50 rounded-lg transition-colors group relative"
-                              title="Message"
-                            >
-                              <MessageSquare className="w-4 h-4" />
-                              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none">
-                                Message
                               </span>
                             </button>
                             <button

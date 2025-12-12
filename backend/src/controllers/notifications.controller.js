@@ -130,10 +130,13 @@ exports.quickNotify = async (req, res, next) => {
       return res.status(500).json({ error: 'Failed to create notification' });
     }
 
-    // Update mail item status to 'Notified'
+    // Update mail item status to 'Notified' and set last_notified timestamp
     const { data: mailItem, error: mailError } = await supabase
       .from('mail_items')
-      .update({ status: 'Notified' })
+      .update({ 
+        status: 'Notified',
+        last_notified: new Date().toISOString()
+      })
       .eq('mail_item_id', mail_item_id)
       .select()
       .single();

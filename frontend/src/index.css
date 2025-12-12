@@ -231,3 +231,17 @@ html {
   animation: fadeIn 0.3s ease-out;
 }
 
+/* Flash green animation for updated rows */
+@keyframes flashGreen {
+  0% {
+    background-color: rgb(220, 252, 231); /* green-100 */
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.animate-flash-green {
+  animation: flashGreen 2s ease-out;
+}
+

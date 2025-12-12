@@ -65,8 +65,10 @@ describe('GroupedFollowUpSection', () => {
 
   const mockOnWaiveFee = vi.fn();
   const mockOnSendEmail = vi.fn();
+  const mockOnMarkAbandoned = vi.fn();
+  const mockOnCollectFee = vi.fn();
   const mockGetDaysSince = vi.fn((date) => {
-    const diff = new Date() - new Date(date);
+    const diff = new Date().getTime() - new Date(date).getTime();
     return Math.floor(diff / (1000 * 60 * 60 * 24));
   });
 
@@ -74,113 +76,90 @@ describe('GroupedFollowUpSection', () => {
     vi.clearAllMocks();
   });
 
-  it('should render follow-up section with groups', () => {
-    render(
+  const renderComponent = (groups = mockGroups, getDaysSince = mockGetDaysSince) => {
+    return render(
       <BrowserRouter>
         <GroupedFollowUpSection
-          groups={mockGroups}
+          groups={groups}
           onWaiveFee={mockOnWaiveFee}
           onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
+          onMarkAbandoned={mockOnMarkAbandoned}
+          onCollectFee={mockOnCollectFee}
+          getDaysSince={getDaysSince}
           loading={false}
         />
       </BrowserRouter>
     );
+  };
+
+  it('should render follow-up section with groups', () => {
+    renderComponent();
 
     expect(screen.getByText('Need Follow-up')).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
   });
 
-  it('should display package fees correctly', () => {
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={mockGroups}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
+  it('should display package fees in header', () => {
+    renderComponent();
 
-    // Fees are displayed with emoji prefix: 💰 $12.00
-    expect(screen.getByText(/💰 \$12\.00/)).toBeInTheDocument();
+    // Fees are displayed in header as: $12.00 storage fees
+    expect(screen.getByText('$12.00')).toBeInTheDocument();
+    expect(screen.getByText('storage fees')).toBeInTheDocument();
   });
 
   it('should expand/collapse card when clicked', async () => {
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={mockGroups}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
+    renderComponent();
 
-    const card = screen.getByText('John Doe').closest('div').parentElement;
+    const card = screen.getByText('John Doe').closest('div[class*="rounded-lg border"]');
     
-    // Initially collapsed (should not show package details)
-    expect(screen.queryByText(/Received/i)).not.toBeInTheDocument();
-
     // Click to expand
     fireEvent.click(card!);
     
     await waitFor(() => {
-      expect(screen.getByText(/Received/i)).toBeInTheDocument();
+      // John Doe has 1 package, so it shows "1 package waiting"
+      expect(screen.getByText(/1 package waiting/i)).toBeInTheDocument();
     });
 
     // Click again to collapse
     fireEvent.click(card!);
     
     await waitFor(() => {
-      expect(screen.queryByText(/Received/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/1 package waiting/i)).not.toBeInTheDocument();
     });
   });
 
-  it('should call onSendEmail when send email button is clicked', async () => {
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={mockGroups}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
+  it('should call onCollectFee when collect button is clicked', async () => {
+    renderComponent();
 
-    const sendButton = screen.getAllByText(/Package Fee Reminder|Send Reminder/i)[0];
-    fireEvent.click(sendButton);
+    // Find the Collect button (for customer with fees)
+    const collectButton = screen.getByRole('button', { name: /Collect \$12/i });
+    fireEvent.click(collectButton);
+
+    expect(mockOnCollectFee).toHaveBeenCalledWith(mockGroups[0]);
+  });
+
+  it('should call onSendEmail when remind button is clicked', async () => {
+    renderComponent();
+
+    // Find the Remind button (for customer with fees but not abandoned)
+    const remindButton = screen.getByText(/Remind/i);
+    fireEvent.click(remindButton);
 
     expect(mockOnSendEmail).toHaveBeenCalledWith(mockGroups[0]);
   });
 
-  it('should call onWaiveFee when waive fee button is clicked', async () => {
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={mockGroups}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
+  it('should call onWaiveFee when waive button is clicked', async () => {
+    renderComponent();
 
-    const waiveButton = screen.getByText(/Waive Fees/i);
+    // Find the Waive button
+    const waiveButton = screen.getByText(/Waive/i);
     fireEvent.click(waiveButton);
 
     expect(mockOnWaiveFee).toHaveBeenCalledWith(mockGroups[0]);
   });
 
-  it('should show "Final Notice" button for abandoned packages', () => {
+  it('should show Notice button and Abandon button for abandoned packages with fees', () => {
     const abandonedGroups = [
       {
         contact: {
@@ -209,24 +188,139 @@ describe('GroupedFollowUpSection', () => {
       },
     ];
 
-    mockGetDaysSince.mockReturnValue(30);
+    const mockGetDaysSinceAbandoned = vi.fn(() => 35);
 
+    renderComponent(abandonedGroups, mockGetDaysSinceAbandoned);
+
+    // Should show Notice button (not Final Notice, but Notice for fees + abandoned)
+    expect(screen.getByRole('button', { name: /Notice/i })).toBeInTheDocument();
+    // Should show Abandon button
+    expect(screen.getByRole('button', { name: /Abandon/i })).toBeInTheDocument();
+  });
+
+  it('should show Final Notice and Mark Abandoned for abandoned items without fees', () => {
+    const abandonedLettersGroup = [
+      {
+        contact: {
+          contact_id: 'contact-6',
+          contact_person: 'Abandoned Letters',
+          mailbox_number: 'B1',
+        },
+        packages: [],
+        letters: [
+          {
+            mail_item_id: 'mail-6',
+            item_type: 'Letter',
+            status: 'Received',
+            received_date: '2025-10-10T10:00:00Z',
+            contact_id: 'contact-6',
+          },
+        ],
+        totalFees: 0,
+        urgencyScore: 200,
+      },
+    ];
+
+    const mockGetDaysSinceAbandoned = vi.fn(() => 35);
+
+    renderComponent(abandonedLettersGroup, mockGetDaysSinceAbandoned);
+
+    // Should show Final Notice button
+    expect(screen.getByText(/Final Notice/i)).toBeInTheDocument();
+    // Should show Mark Abandoned button
+    expect(screen.getByText(/Mark Abandoned/i)).toBeInTheDocument();
+  });
+
+  it('should show loading state', () => {
     render(
       <BrowserRouter>
         <GroupedFollowUpSection
-          groups={abandonedGroups}
+          groups={[]}
           onWaiveFee={mockOnWaiveFee}
           onSendEmail={mockOnSendEmail}
+          onMarkAbandoned={mockOnMarkAbandoned}
+          onCollectFee={mockOnCollectFee}
+          getDaysSince={mockGetDaysSince}
+          loading={true}
+        />
+      </BrowserRouter>
+    );
+
+    expect(screen.getByText('Need Follow-up')).toBeInTheDocument();
+    // Should show skeleton loaders
+    const skeletons = document.querySelectorAll('.animate-pulse');
+    expect(skeletons.length).toBeGreaterThan(0);
+  });
+
+  it('should show empty state when no groups', () => {
+    render(
+      <BrowserRouter>
+        <GroupedFollowUpSection
+          groups={[]}
+          onWaiveFee={mockOnWaiveFee}
+          onSendEmail={mockOnSendEmail}
+          onMarkAbandoned={mockOnMarkAbandoned}
+          onCollectFee={mockOnCollectFee}
           getDaysSince={mockGetDaysSince}
           loading={false}
         />
       </BrowserRouter>
     );
 
-    expect(screen.getByText(/Final Notice/i)).toBeInTheDocument();
+    expect(screen.getByText(/No customers need follow-up/i)).toBeInTheDocument();
   });
 
-  it('should display waived fees with strikethrough', () => {
+  it('should render customer information correctly', () => {
+    renderComponent();
+
+    // Verify all customer names are displayed
+    expect(screen.getByText('John Doe')).toBeInTheDocument();
+    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
+    
+    // Verify mailbox numbers are displayed
+    expect(screen.getByText(/📮 Z1/)).toBeInTheDocument();
+    expect(screen.getByText(/📮 D2/)).toBeInTheDocument();
+    
+    // Verify the section header shows correct count
+    expect(screen.getByText(/2 people/)).toBeInTheDocument();
+  });
+
+  it('should call onSendEmail for Send Reminder button on letters', async () => {
+    // Customer with only letters (no fees, not abandoned)
+    const letterOnlyGroups = [
+      {
+        contact: {
+          contact_id: 'contact-7',
+          contact_person: 'Letter Customer',
+          mailbox_number: 'L1',
+        },
+        packages: [],
+        letters: [
+          {
+            mail_item_id: 'mail-7',
+            item_type: 'Letter',
+            status: 'Received',
+            received_date: new Date().toISOString(), // Fresh letter
+            contact_id: 'contact-7',
+          },
+        ],
+        totalFees: 0,
+        urgencyScore: 10,
+      },
+    ];
+
+    const mockGetDaysSinceRecent = vi.fn(() => 2); // 2 days old
+
+    renderComponent(letterOnlyGroups, mockGetDaysSinceRecent);
+
+    // Find the Send Reminder button
+    const sendReminderButton = screen.getByText(/Send Reminder/i);
+    fireEvent.click(sendReminderButton);
+
+    expect(mockOnSendEmail).toHaveBeenCalledWith(letterOnlyGroups[0]);
+  });
+
+  it('should display waived fees with appropriate styling', async () => {
     const waivedGroups = [
       {
         contact: {
@@ -255,136 +349,51 @@ describe('GroupedFollowUpSection', () => {
       },
     ];
 
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={waivedGroups}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
+    renderComponent(waivedGroups);
 
     // Expand the card to see fee details
-    const card = screen.getByText('Waived Customer').closest('div').parentElement;
+    const card = screen.getByText('Waived Customer').closest('div[class*="rounded-lg border"]');
     fireEvent.click(card!);
 
-    waitFor(() => {
+    await waitFor(() => {
       expect(screen.getByText(/fee waived/i)).toBeInTheDocument();
     });
   });
 
-  it('should show loading state', () => {
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={[]}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={true}
-        />
-      </BrowserRouter>
-    );
-
-    expect(screen.getByText('Need Follow-up')).toBeInTheDocument();
-    // Should show skeleton loaders
-    const skeletons = document.querySelectorAll('.animate-pulse');
-    expect(skeletons.length).toBeGreaterThan(0);
-  });
-
-  it('should show empty state when no groups', () => {
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={[]}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
-
-    expect(screen.getByText(/No customers need follow-up/i)).toBeInTheDocument();
-  });
-
-  it('should render customer information correctly', () => {
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={mockGroups}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSince}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
-
-    // Verify all customer names are displayed
-    expect(screen.getByText('John Doe')).toBeInTheDocument();
-    expect(screen.getByText('Jane Smith')).toBeInTheDocument();
-    
-    // Verify mailbox numbers are displayed
-    expect(screen.getByText(/📮 Z1/)).toBeInTheDocument();
-    expect(screen.getByText(/📮 D2/)).toBeInTheDocument();
-    
-    // Verify the section header shows correct count
-    expect(screen.getByText(/2 people/)).toBeInTheDocument();
-  });
-
-  it('should display correct fee amount for high fees', () => {
-    // Use a getDaysSince that returns less than 30 to avoid "abandoned" state
-    const mockGetDaysSinceNotAbandoned = vi.fn(() => 25);
-    
-    const highFeeGroups = [
+  it('should show ABANDONED warning for old items', () => {
+    const abandonedGroups = [
       {
         contact: {
-          contact_id: 'contact-5',
-          contact_person: 'High Fee Customer',
-          mailbox_number: 'H1',
+          contact_id: 'contact-8',
+          contact_person: 'Old Items Customer',
+          mailbox_number: 'O1',
         },
         packages: [
           {
-            mail_item_id: 'mail-5',
+            mail_item_id: 'mail-8',
             item_type: 'Package',
             status: 'Received',
-            received_date: '2025-11-15T10:00:00Z',
-            contact_id: 'contact-5',
+            received_date: '2025-10-01T10:00:00Z',
+            contact_id: 'contact-8',
             packageFee: {
-              fee_id: 'fee-5',
-              fee_amount: 60.00,
-              days_charged: 25,
+              fee_id: 'fee-8',
+              fee_amount: 70.00,
+              days_charged: 35,
               fee_status: 'pending',
             },
           },
         ],
         letters: [],
-        totalFees: 60.00,
-        urgencyScore: 150,
+        totalFees: 70.00,
+        urgencyScore: 200,
       },
     ];
 
-    render(
-      <BrowserRouter>
-        <GroupedFollowUpSection
-          groups={highFeeGroups}
-          onWaiveFee={mockOnWaiveFee}
-          onSendEmail={mockOnSendEmail}
-          getDaysSince={mockGetDaysSinceNotAbandoned}
-          loading={false}
-        />
-      </BrowserRouter>
-    );
+    const mockGetDaysSinceAbandoned = vi.fn(() => 37);
 
-    // Fee is displayed with emoji: 💰 $60.00
-    expect(screen.getByText(/💰 \$60\.00/)).toBeInTheDocument();
-    // Button shows with emoji: 📧 Fee Reminder ($60)
-    expect(screen.getByText(/📧 Fee Reminder \(\$60\)/i)).toBeInTheDocument();
+    renderComponent(abandonedGroups, mockGetDaysSinceAbandoned);
+
+    // Should show ABANDONED warning at the bottom of the card
+    expect(screen.getByText(/ABANDONED:.*days old/i)).toBeInTheDocument();
   });
 });
-
-

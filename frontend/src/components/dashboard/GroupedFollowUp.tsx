@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Package, Mail, ChevronDown, ChevronUp, Send, MoreVertical } from 'lucide-react';
+import { AlertCircle, Package, Mail, ChevronDown, ChevronUp, Send, MoreVertical, Banknote } from 'lucide-react';
 
 interface PackageFee {
   fee_id: string;
@@ -57,6 +57,8 @@ interface GroupedFollowUpProps {
   groups: GroupedFollowUp[];
   onWaiveFee: (group: GroupedFollowUp) => void;
   onSendEmail: (group: GroupedFollowUp) => void;
+  onMarkAbandoned: (group: GroupedFollowUp) => void;
+  onCollectFee: (group: GroupedFollowUp) => void;
   getDaysSince: (date: string) => number;
   loading?: boolean;
 }
@@ -65,6 +67,8 @@ export default function GroupedFollowUpSection({
   groups, 
   onWaiveFee, 
   onSendEmail, 
+  onMarkAbandoned,
+  onCollectFee,
   getDaysSince, 
   loading 
 }: GroupedFollowUpProps) {
@@ -166,7 +170,8 @@ export default function GroupedFollowUpSection({
               <div
                 key={group.contact.contact_id}
                 onClick={() => togglePersonExpand(group.contact.contact_id)}
-                className="p-4 rounded-lg border border-gray-300 transition-all bg-white cursor-pointer hover:shadow-md hover:border-gray-400"
+                className="p-4 rounded-lg border-2 border-gray-300 transition-all duration-200 bg-white cursor-pointer hover:shadow-lg hover:border-green-400 hover:bg-green-50 hover:scale-[1.02] active:scale-100"
+                title={isPersonExpanded ? "Click to collapse details" : "Click to expand and see full details"}
               >
                 {/* Header with customer name and fees */}
                 <div className="flex items-center justify-between mb-3">
@@ -203,7 +208,7 @@ export default function GroupedFollowUpSection({
                   {hasFees && (
                     <div className="text-right">
                       <p className="text-2xl font-bold text-orange-600">
-                        💰 ${group.totalFees.toFixed(2)}
+                        ${group.totalFees.toFixed(2)}
                       </p>
                       <p className="text-xs text-gray-600">storage fees</p>
                     </div>
@@ -216,10 +221,12 @@ export default function GroupedFollowUpSection({
                     {/* Package details - Date-first format */}
                     {group.packages.length > 0 && (
                       <div className="mb-3">
-                        <p className="text-sm font-semibold text-gray-700 mb-2 flex items-center gap-1">
-                          <Package className="w-4 h-4" />
-                          Packages ({group.packages.length}){group.totalFees > 0 && ` - Total fees: $${group.totalFees.toFixed(2)}`}
-                        </p>
+                        <div className="flex items-center gap-2 text-sm mb-2">
+                          <Package className="w-4 h-4 text-gray-600" />
+                          <span className="font-semibold text-gray-900">
+                            {group.packages.length} {group.packages.length === 1 ? 'package' : 'packages'} waiting
+                          </span>
+                        </div>
                         <div className="ml-5 space-y-2">
                           {group.packages.map(pkg => {
                             const days = getDaysSince(pkg.received_date);
@@ -228,16 +235,16 @@ export default function GroupedFollowUpSection({
                             const isGracePeriod = days <= 1;
                             const isWaived = feeStatus === 'waived';
                             const isPaid = feeStatus === 'paid';
-                            const isApproachingAbandonment = days >= 28;
+                            const isApproachingAbandonment = days >= 28 && days < 30; // Only show for 28-29 days
                             const isLongWait = days >= 14 && days < 28;
                             
                             // Format the date (e.g., "Nov 26")
                             const receivedDateStr = format(new Date(pkg.received_date), 'MMM d');
                             
-                            return (
+                              return (
                               <div key={pkg.mail_item_id} className="text-sm">
                                 <div className="flex items-start gap-2">
-                                  <span className="text-gray-900 font-medium">📦 Received {receivedDateStr}</span>
+                                  <span className="text-gray-900 font-medium">• Received {receivedDateStr}</span>
                                   <span className="text-gray-500">({days} day{days !== 1 ? 's' : ''} ago)</span>
                                 </div>
                                 <div className="ml-5 text-gray-600">
@@ -265,7 +272,7 @@ export default function GroupedFollowUpSection({
                                     <span className="text-red-600 font-medium"> • ⚠️ Approaching abandonment</span>
                                   )}
                                   {isLongWait && !isWaived && !isPaid && !isApproachingAbandonment && (
-                                    <span className="text-orange-600"> • ⚠️ Long wait</span>
+                                    <span className="text-orange-600"> • Fee accumulating</span>
                                   )}
                                 </div>
                               </div>
@@ -278,13 +285,15 @@ export default function GroupedFollowUpSection({
                     {/* Letter details */}
                     {group.letters.length > 0 && (
                       <div className="mb-3">
-                        <p className="text-sm font-semibold text-gray-700 mb-1 flex items-center gap-1">
-                          <Mail className="w-4 h-4" />
-                          Letters ({group.letters.length}):
-                        </p>
-                        <p className="text-sm text-gray-600 ml-5">
-                          • Oldest: {Math.max(...group.letters.map(l => getDaysSince(l.received_date)))} days
-                        </p>
+                        <div className="flex items-center gap-2 text-sm mb-2">
+                          <Mail className="w-4 h-4 text-gray-600" />
+                          <span className="font-semibold text-gray-900">
+                            {group.letters.length} {group.letters.length === 1 ? 'letter' : 'letters'} waiting
+                          </span>
+                        </div>
+                        <div className="ml-5 text-sm text-gray-600">
+                          • Oldest: {Math.max(...group.letters.map(l => getDaysSince(l.received_date)))} days ago
+                        </div>
                       </div>
                     )}
                     
@@ -297,11 +306,76 @@ export default function GroupedFollowUpSection({
                   </div>
                 )}
                 
-                {/* Context-aware action buttons */}
+                {/* Context-aware action buttons - Fee collection always takes priority */}
                 <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
-                  {/* Determine primary action based on urgency */}
-                  {isAbandoned ? (
-                    // Near abandonment (28+ days)
+                  {/* Priority 1: Has fees AND abandoned - show Collect + Final Notice + Mark Abandoned */}
+                  {hasFees && isAbandoned ? (
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCollectFee(group);
+                        }}
+                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Banknote className="w-4 h-4" />
+                        Collect ${group.totalFees.toFixed(0)}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSendEmail(group);
+                        }}
+                        className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Send className="w-4 h-4" />
+                        Notice
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onMarkAbandoned(group);
+                        }}
+                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
+                        title="Mark items 30+ days old as abandoned"
+                      >
+                        Abandon
+                      </button>
+                    </>
+                  ) : hasFees ? (
+                    // Priority 2: Has fees (not abandoned) - show Collect + Remind + Waive
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCollectFee(group);
+                        }}
+                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        <Banknote className="w-4 h-4" />
+                        Collect ${group.totalFees >= 50 ? group.totalFees.toFixed(0) : group.totalFees.toFixed(2)}
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSendEmail(group);
+                        }}
+                        className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Remind
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onWaiveFee(group);
+                        }}
+                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
+                      >
+                        Waive
+                      </button>
+                    </>
+                  ) : isAbandoned ? (
+                    // Priority 3: Abandoned but no fees - show Final Notice + Mark Abandoned
                     <>
                       <button
                         onClick={(e) => {
@@ -311,64 +385,21 @@ export default function GroupedFollowUpSection({
                         className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-red-100 hover:bg-red-200 text-red-700"
                       >
                         <Send className="w-4 h-4" />
-                        ⚠️ Final Notice
-                      </button>
-                      <button
-                        onClick={(e) => e.stopPropagation()}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
-                        title="Mark as abandoned (coming soon)"
-                      >
-                        📦 Mark Abandoned
-                      </button>
-                    </>
-                  ) : hasFees && group.totalFees >= 50 ? (
-                    // High fees (>= $50)
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSendEmail(group);
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-orange-100 hover:bg-orange-200 text-orange-700"
-                      >
-                        <Send className="w-4 h-4" />
-                        📧 Fee Reminder (${group.totalFees.toFixed(0)})
+                        Final Notice
                       </button>
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
-                          onWaiveFee(group);
+                          onMarkAbandoned(group);
                         }}
                         className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
+                        title="Mark items 30+ days old as abandoned"
                       >
-                        💰 Waive Fees
-                      </button>
-                    </>
-                  ) : hasFees ? (
-                    // Has fees but < $50
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSendEmail(group);
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-orange-50 hover:bg-orange-100 text-orange-600"
-                      >
-                        <Send className="w-4 h-4" />
-                        📧 Package Fee Reminder
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onWaiveFee(group);
-                        }}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        💰 Waive Fees
+                        Mark Abandoned
                       </button>
                     </>
                   ) : (
-                    // No fees - general reminder
+                    // Priority 4: No fees, not abandoned - general reminder
                     <>
                       <button
                         onClick={(e) => {
@@ -378,16 +409,7 @@ export default function GroupedFollowUpSection({
                         className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-blue-50 hover:bg-blue-100 text-blue-600"
                       >
                         <Send className="w-4 h-4" />
-                        📧 Send Reminder
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          navigate(`/dashboard/contacts/${group.contact.contact_id}`);
-                        }}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        📋 View Details
+                        Send Reminder
                       </button>
                     </>
                   )}
@@ -414,19 +436,9 @@ export default function GroupedFollowUpSection({
                             navigate(`/dashboard/contacts/${group.contact.contact_id}`);
                             setOpenDropdownId(null);
                           }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-t-lg"
+                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-lg"
                         >
                           👤 View Profile
-                        </button>
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate('/dashboard/log', { state: { contactFilter: group.contact.contact_id } });
-                            setOpenDropdownId(null);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-b-lg"
-                        >
-                          📋 View Mail History
                         </button>
                       </div>
                     )}
@@ -438,7 +450,7 @@ export default function GroupedFollowUpSection({
                   <div className="mt-3 pt-3 border-t border-red-200">
                     <p className="text-xs text-red-700 font-medium flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
-                      ⚠️ ABANDONED: {oldestDays} days old - requires immediate attention
+                      ABANDONED: {oldestDays} days old - requires immediate attention
                     </p>
                   </div>
                 )}
