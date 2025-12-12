@@ -191,8 +191,8 @@ describe('ScanSession', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/0 items scanned/i)).toBeInTheDocument();
-        // "0 customers" only appears in review screen, not in the main session header
-        expect(screen.getByRole('button', { name: /End Session/i })).toBeInTheDocument();
+        // "End Session" button only shows when items exist (> 0)
+        expect(screen.queryByRole('button', { name: /End Session/i })).not.toBeInTheDocument();
       });
     });
   });

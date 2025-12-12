@@ -126,6 +126,12 @@ export default function ScanSessionPage() {
   };
   
   const handleCameraCapture = (photoBlob: Blob) => {
+    // Show immediate feedback
+    toast.loading('Processing photo...', { 
+      id: 'photo-processing',
+      duration: 2000 
+    });
+    
     if (quickScanMode) {
       processPhotoBackground(photoBlob);
     } else {
@@ -141,6 +147,12 @@ export default function ScanSessionPage() {
     }
 
     console.log(`📸 File selected: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
+
+    // Show immediate feedback
+    toast.loading('Processing photo...', { 
+      id: 'photo-processing',
+      duration: 2000 
+    });
 
     // In Quick Scan Mode: Process in background, allow next photo immediately!
     if (quickScanMode) {
@@ -215,6 +227,13 @@ export default function ScanSessionPage() {
         console.log(`🚀 [${processingId}] Auto-accepting high confidence match`);
         confirmScan(result);
         
+        // Dismiss loading and show success
+        toast.dismiss('photo-processing');
+        toast.success(`Matched: ${result.matchedContact.contact_person || result.matchedContact.company_name}`, {
+          duration: 2000,
+          icon: '✅'
+        });
+        
         // Haptic feedback
         if (navigator.vibrate) {
           navigator.vibrate([50, 30, 50]);
@@ -222,9 +241,11 @@ export default function ScanSessionPage() {
       } else if (result) {
         // Low confidence: Show modal
         console.log(`⚠️ [${processingId}] Low confidence (${(result.confidence * 100).toFixed(0)}%), showing modal`);
+        toast.dismiss('photo-processing');
         setPendingItem(result);
       } else {
         console.warn(`⚠️ [${processingId}] No result from processing`);
+        toast.dismiss('photo-processing');
       }
     } catch (error) {
       console.error(`❌ [${processingId}] Background processing failed:`, error);
@@ -643,22 +664,6 @@ export default function ScanSessionPage() {
                 {session.items.length} items scanned
               </p>
             </div>
-            <button
-              onClick={() => {
-                if (confirm('End this scan session?')) {
-                  if (session.items.length === 0) {
-                    setSession(null);
-                    localStorage.removeItem('scanSession');
-                    sessionStorage.removeItem('scanSessionResumedToast'); // Clear the toast flag
-                  } else {
-                    endSession();
-                  }
-                }
-              }}
-              className="px-6 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-semibold shadow-md"
-            >
-              End Session
-            </button>
           </div>
           
           {/* Quick Scan Mode Toggle */}
@@ -715,10 +720,12 @@ export default function ScanSessionPage() {
             <button
               onClick={handleWebcamClick}
               disabled={isProcessing && !quickScanMode}
-              className="py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              className={`py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 ${
+                processingQueue > 0 ? 'ring-2 ring-purple-300 ring-offset-2' : ''
+              }`}
               title="Use computer webcam"
             >
-              <Video className="w-5 h-5" />
+              <Video className={`w-5 h-5 ${processingQueue > 0 ? 'animate-pulse' : ''}`} />
               <span className="hidden sm:inline">Webcam</span>
               <span className="sm:hidden">📹</span>
             </button>
@@ -727,7 +734,9 @@ export default function ScanSessionPage() {
             <button
               onClick={handleCameraClick}
               disabled={isProcessing && !quickScanMode}
-              className="py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+              className={`py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 ${
+                processingQueue > 0 ? 'ring-2 ring-blue-300 ring-offset-2' : ''
+              }`}
               title="Upload image or use phone camera"
             >
               {isProcessing && !quickScanMode ? (
@@ -737,7 +746,7 @@ export default function ScanSessionPage() {
                 </>
               ) : (
                 <>
-                  <Camera className="w-5 h-5" />
+                  <Camera className={`w-5 h-5 ${processingQueue > 0 ? 'animate-pulse' : ''}`} />
                   <span className="hidden sm:inline">
                     {quickScanMode ? 'Upload/Camera' : 'Upload'}
                   </span>
@@ -746,6 +755,27 @@ export default function ScanSessionPage() {
               )}
             </button>
           </div>
+          
+          {/* End Session Button */}
+          {session.items.length > 0 && (
+            <button
+              onClick={() => {
+                if (confirm('End this scan session?')) {
+                  if (session.items.length === 0) {
+                    setSession(null);
+                    localStorage.removeItem('scanSession');
+                    sessionStorage.removeItem('scanSessionResumedToast');
+                  } else {
+                    endSession();
+                  }
+                }
+              }}
+              className="w-full mt-3 py-3 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+            >
+              <XCircle className="w-4 h-4" />
+              End Session & Review
+            </button>
+          )}
           
           {quickScanMode && processingQueue === 0 && session.items.length > 0 && (
             <p className="text-center text-sm text-gray-600 mt-2">
