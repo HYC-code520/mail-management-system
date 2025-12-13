@@ -223,17 +223,25 @@ async function waiveFee(feeId, reason, waivedByUserId) {
  * 
  * @param {string} feeId - UUID of fee to mark as paid
  * @param {string} paymentMethod - How customer paid (cash/card/venmo/etc)
+ * @param {number|null} collectedAmount - Actual amount collected (if discounted from fee_amount)
  * @returns {Promise<Object>} Updated fee record
  */
-async function markFeePaid(feeId, paymentMethod = 'cash') {
+async function markFeePaid(feeId, paymentMethod = 'cash', collectedAmount = null) {
   try {
+    const updateData = {
+      fee_status: 'paid',
+      paid_date: new Date().toISOString(),
+      payment_method: paymentMethod
+    };
+    
+    // If a collected amount is provided and it's different from the fee, store it
+    if (collectedAmount !== null && collectedAmount !== undefined) {
+      updateData.collected_amount = collectedAmount;
+    }
+    
     const { data, error } = await supabaseAdmin
       .from('package_fees')
-      .update({
-        fee_status: 'paid',
-        paid_date: new Date().toISOString(),
-        payment_method: paymentMethod
-      })
+      .update(updateData)
       .eq('fee_id', feeId)
       .eq('fee_status', 'pending') // Only mark pending fees as paid
       .select()
@@ -248,7 +256,8 @@ async function markFeePaid(feeId, paymentMethod = 'cash') {
       throw new Error('Fee not found or already processed');
     }
     
-    console.log(`✅ Marked fee ${feeId} as paid: $${data.fee_amount} via ${paymentMethod}`);
+    const actualAmount = collectedAmount !== null ? collectedAmount : data.fee_amount;
+    console.log(`✅ Marked fee ${feeId} as paid: $${actualAmount} via ${paymentMethod}${collectedAmount !== null ? ` (discounted from $${data.fee_amount})` : ''}`);
     return data;
   } catch (error) {
     console.error('Error in markFeePaid:', error);
@@ -307,10 +316,10 @@ async function getOutstandingFees(userId) {
  */
 async function getRevenueStats(userId, startDate = null, endDate = null) {
   try {
-    // Build query for paid fees
+    // Build query for paid fees - include collected_amount for discounted fees
     let paidQuery = supabaseAdmin
       .from('package_fees')
-      .select('fee_amount, paid_date')
+      .select('fee_amount, collected_amount, paid_date')
       .eq('user_id', userId)
       .eq('fee_status', 'paid');
     
@@ -353,8 +362,13 @@ async function getRevenueStats(userId, startDate = null, endDate = null) {
       throw waivedError;
     }
     
-    // Calculate totals
-    const totalPaid = paidFees.reduce((sum, fee) => sum + parseFloat(fee.fee_amount || 0), 0);
+    // Calculate totals - use collected_amount if present (for discounted fees), otherwise fee_amount
+    const totalPaid = paidFees.reduce((sum, fee) => {
+      const amount = fee.collected_amount !== null && fee.collected_amount !== undefined 
+        ? parseFloat(fee.collected_amount) 
+        : parseFloat(fee.fee_amount || 0);
+      return sum + amount;
+    }, 0);
     const totalPending = pendingFees.reduce((sum, fee) => sum + parseFloat(fee.fee_amount || 0), 0);
     const totalWaived = waivedFees.reduce((sum, fee) => sum + parseFloat(fee.fee_amount || 0), 0);
     

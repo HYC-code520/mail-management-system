@@ -194,8 +194,8 @@ exports.markFeePaid = async (req, res, next) => {
       return res.status(400).json({ error: `Fee is already ${fee.fee_status}` });
     }
     
-    // Mark as paid
-    const updatedFee = await feeService.markFeePaid(feeId, paymentMethod || 'cash');
+    // Mark as paid - pass collected_amount to store in database for revenue tracking
+    const updatedFee = await feeService.markFeePaid(feeId, paymentMethod || 'cash', collected_amount);
     
     // Use collected amount if provided, otherwise use fee amount
     const actualAmount = collected_amount !== undefined ? collected_amount : fee.fee_amount;
