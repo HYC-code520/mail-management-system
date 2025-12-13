@@ -10,6 +10,7 @@ import Modal from './Modal.tsx';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import { CreditCard, Banknote, Smartphone, CheckCircle, XCircle, ArrowRight, PackageCheck } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext.tsx';
 
 interface PackageFee {
   fee_id: string;
@@ -71,6 +72,7 @@ export default function CollectFeeModal({
   isPickupFlow = false,
   onMarkPickedUp
 }: CollectFeeModalProps) {
+  const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [waiveReason, setWaiveReason] = useState('');
   const [showWaiveInput, setShowWaiveInput] = useState(false);
@@ -78,6 +80,7 @@ export default function CollectFeeModal({
   const [markAsPickedUp, setMarkAsPickedUp] = useState(false);
   const [isEditingAmount, setIsEditingAmount] = useState(false);
   const [editedAmount, setEditedAmount] = useState('');
+  const [collectedBy, setCollectedBy] = useState<'Madison' | 'Merlin' | ''>(''); // Staff selection
 
   if (!group) return null;
 
@@ -91,16 +94,24 @@ export default function CollectFeeModal({
   const finalAmount = isNaN(displayAmount) ? group.totalFees : displayAmount;
 
   const handleCollect = async () => {
+    if (!collectedBy) {
+      toast.error('Please select who collected the fee');
+      return;
+    }
+    
     setSaving(true);
     try {
-      let collectedCount = 0;
-      let totalCollected = finalAmount; // Use the edited/final amount
+      const totalCollected = finalAmount; // Use the edited/final amount
 
       // Collect fees for all pending packages in this group
       for (const pkg of pendingPackages) {
         if (pkg.packageFee) {
-          await api.fees.markPaid(pkg.packageFee.fee_id, paymentMethod);
-          collectedCount++;
+          await api.fees.markPaid(
+            pkg.packageFee.fee_id, 
+            paymentMethod,
+            totalCollected / pendingPackages.length, // Split edited amount evenly across packages
+            collectedBy
+          );
         }
       }
 
@@ -148,13 +159,11 @@ export default function CollectFeeModal({
 
     setSaving(true);
     try {
-      let waivedCount = 0;
       let totalWaived = 0;
 
       for (const pkg of pendingPackages) {
         if (pkg.packageFee) {
           await api.fees.waive(pkg.packageFee.fee_id, waiveReason.trim());
-          waivedCount++;
           totalWaived += pkg.packageFee.fee_amount;
         }
       }
@@ -239,6 +248,7 @@ export default function CollectFeeModal({
     setMarkAsPickedUp(false);
     setIsEditingAmount(false);
     setEditedAmount('');
+    setCollectedBy('');
   };
 
   const handleClose = () => {
@@ -325,6 +335,41 @@ export default function CollectFeeModal({
             ))}
           </div>
         </div>
+
+        {/* Staff Selection - Who collected the fee */}
+        {!showWaiveInput && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Collected By: <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setCollectedBy('Madison')}
+                disabled={saving}
+                className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                  collectedBy === 'Madison'
+                    ? 'bg-purple-600 border-purple-600 text-white shadow-md'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-purple-400 hover:bg-purple-50'
+                } disabled:opacity-50`}
+              >
+                Madison
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollectedBy('Merlin')}
+                disabled={saving}
+                className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                  collectedBy === 'Merlin'
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50'
+                } disabled:opacity-50`}
+              >
+                Merlin
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Payment Method Selection */}
         {!showWaiveInput && (

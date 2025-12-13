@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mail, Package, Bell, ChevronRight, Send, Edit } from 'lucide-react';
+import { Mail, Package, ChevronRight, Send, Edit } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import SendEmailModal from '../components/SendEmailModal.tsx';
 import CollectFeeModal from '../components/CollectFeeModal.tsx';
@@ -207,30 +207,6 @@ export default function ContactDetailPage() {
       void loadUnpaidFees(); // Load unpaid fees
     }
   }, [id, loadContactDetails, loadMailHistory, loadUnpaidFees]);
-
-  const loadNotificationHistoryForMailItem = async (mailItemId: string) => {
-    try {
-      const data = await api.notifications.getByMailItem(mailItemId);
-      setNotificationHistory(prev => ({
-        ...prev,
-        [mailItemId]: data
-      }));
-    } catch (err) {
-      console.error('Error loading notification history:', err);
-    }
-  };
-
-  const loadActionHistoryForMailItem = async (mailItemId: string) => {
-    try {
-      const data = await api.actionHistory.getByMailItem(mailItemId);
-      setActionHistory(prev => ({
-        ...prev,
-        [mailItemId]: data
-      }));
-    } catch (err) {
-      console.error('Error loading action history:', err);
-    }
-  };
 
   // Load action history for all items in a group (combined)
   const loadActionHistoryForGroup = async (groupKey: string, mailItemIds: string[]) => {

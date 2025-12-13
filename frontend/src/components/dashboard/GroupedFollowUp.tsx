@@ -163,7 +163,6 @@ export default function GroupedFollowUpSection({
               ...allItems.map(item => getDaysSince(item.received_date))
             );
             const isAbandoned = oldestDays >= 30;
-            const isUrgent = hasFees || isAbandoned;
             const isPersonExpanded = expandedPersons.has(group.contact.contact_id);
             
             return (

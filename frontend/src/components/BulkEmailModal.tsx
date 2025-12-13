@@ -9,7 +9,7 @@ import React, { useState, useEffect } from 'react';
 import Modal from './Modal.tsx';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
-import { Mail, Send, X } from 'lucide-react';
+import { Mail, Send } from 'lucide-react';
 
 interface Contact {
   contact_id: string;

@@ -159,12 +159,12 @@ exports.waiveFee = async (req, res, next) => {
 /**
  * POST /api/fees/:feeId/pay
  * Mark a fee as paid
- * Body: { paymentMethod: string }
+ * Body: { paymentMethod: string, collected_amount?: number, collected_by?: string }
  */
 exports.markFeePaid = async (req, res, next) => {
   try {
     const { feeId } = req.params;
-    const { paymentMethod } = req.body;
+    const { paymentMethod, collected_amount, collected_by } = req.body;
     const userId = req.user.id;
     
     // Validate payment method
@@ -197,6 +197,11 @@ exports.markFeePaid = async (req, res, next) => {
     // Mark as paid
     const updatedFee = await feeService.markFeePaid(feeId, paymentMethod || 'cash');
     
+    // Use collected amount if provided, otherwise use fee amount
+    const actualAmount = collected_amount !== undefined ? collected_amount : fee.fee_amount;
+    const discount = actualAmount < fee.fee_amount ? ` (discounted from $${fee.fee_amount.toFixed(2)})` : '';
+    const staffName = collected_by || req.user.email || 'Unknown';
+    
     // Log action to action_history
     try {
       await require('../services/supabase.service').supabaseAdmin
@@ -204,9 +209,9 @@ exports.markFeePaid = async (req, res, next) => {
         .insert({
           mail_item_id: fee.mail_item_id,
           action_type: 'Fee Collected',
-          action_description: `Collected $${fee.fee_amount.toFixed(2)} storage fee`,
+          action_description: `Collected $${actualAmount.toFixed(2)} storage fee${discount}`,
           notes: `Payment method: ${paymentMethod || 'cash'}`,
-          performed_by: req.user.email || 'Unknown',
+          performed_by: staffName,
           action_timestamp: new Date().toISOString()
         });
       
