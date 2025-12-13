@@ -1,10 +1,11 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Archive, ArchiveRestore, Eye, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2 } from 'lucide-react';
+import { Search, Archive, ArchiveRestore, Eye, Edit, ArrowUpDown, ArrowUp, ArrowDown, Loader2, Mail } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
 import LoadingSpinner from '../components/LoadingSpinner.tsx';
+import BulkEmailModal from '../components/BulkEmailModal.tsx';
 import { validateContactForm } from '../utils/validation.ts';
 
 interface Contact {
@@ -28,6 +29,7 @@ export default function ContactsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [showArchived, setShowArchived] = useState(false); // Toggle for showing archived
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isBulkEmailModalOpen, setIsBulkEmailModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editingContact, setEditingContact] = useState<Contact | null>(null);
   const [deletingContactId, setDeletingContactId] = useState<string | null>(null);
@@ -313,6 +315,16 @@ export default function ContactsPage() {
           <p className="text-gray-600">Manage customer information</p>
         </div>
         <div className="flex items-center gap-4">
+          {/* Bulk Email Button */}
+          <button
+            onClick={() => setIsBulkEmailModalOpen(true)}
+            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            title="Send bulk emails to multiple customers"
+          >
+            <Mail className="w-4 h-4" />
+            <span>Bulk Email</span>
+          </button>
+          
           {/* Show Archived Toggle */}
           <button
             onClick={() => setShowArchived(!showArchived)}
@@ -699,6 +711,13 @@ export default function ContactsPage() {
           </div>
         </form>
       </Modal>
+
+      {/* Bulk Email Modal */}
+      <BulkEmailModal
+        isOpen={isBulkEmailModalOpen}
+        onClose={() => setIsBulkEmailModalOpen(false)}
+        contacts={filteredContacts}
+      />
     </div>
   );
 }

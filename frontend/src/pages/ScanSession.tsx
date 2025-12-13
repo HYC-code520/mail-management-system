@@ -93,7 +93,10 @@ export default function ScanSessionPage() {
         } else {
           // Session expired
           localStorage.removeItem('scanSession');
-          toast.error('Previous session expired (4 hours)');
+          toast('Previous session expired (4 hours)', {
+            icon: 'ℹ️',
+            duration: 4000
+          });
         }
       } catch (error) {
         console.error('Failed to parse saved session:', error);
@@ -126,10 +129,22 @@ export default function ScanSessionPage() {
   };
   
   const handleCameraCapture = (photoBlob: Blob) => {
-    // Show immediate feedback
-    toast.loading('Processing photo...', { 
+    // Show immediate feedback - non-blocking position at top
+    toast.loading('Processing... Keep scanning!', { 
       id: 'photo-processing',
-      duration: 2000 
+      duration: 3000,
+      position: 'top-center',
+      icon: '🔄',
+      style: {
+        background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)',
+        color: '#fff',
+        fontWeight: '600',
+        padding: '14px 28px',
+        fontSize: '15px',
+        borderRadius: '12px',
+        boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)',
+        marginTop: '20px'
+      }
     });
     
     if (quickScanMode) {
@@ -148,10 +163,22 @@ export default function ScanSessionPage() {
 
     console.log(`📸 File selected: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
 
-    // Show immediate feedback
-    toast.loading('Processing photo...', { 
+    // Show immediate feedback - non-blocking position at top
+    toast.loading('Processing... Keep scanning!', { 
       id: 'photo-processing',
-      duration: 2000 
+      duration: 3000,
+      position: 'top-center',
+      icon: '🔄',
+      style: {
+        background: 'linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%)',
+        color: '#fff',
+        fontWeight: '600',
+        padding: '14px 28px',
+        fontSize: '15px',
+        borderRadius: '12px',
+        boxShadow: '0 8px 24px rgba(124, 58, 237, 0.4)',
+        marginTop: '20px'
+      }
     });
 
     // In Quick Scan Mode: Process in background, allow next photo immediately!

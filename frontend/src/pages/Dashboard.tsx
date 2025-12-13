@@ -525,7 +525,7 @@ export default function DashboardPage() {
               </button>
             </div>
           ),
-          { duration: 12000 }
+          { duration: 15000 } // Increased from 12000 to 15000ms for better visibility
         );
       } else {
         // Single email - original behavior
@@ -552,7 +552,7 @@ export default function DashboardPage() {
               </button>
             </div>
           ),
-          { duration: 10000 }
+          { duration: 15000 } // Increased from 10000 to 15000ms for better visibility
         );
       }
     }

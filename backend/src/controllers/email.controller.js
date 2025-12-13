@@ -466,7 +466,7 @@ async function testEmailConfig(req, res, next) {
 async function sendBulkNotification(req, res, next) {
   try {
     const supabase = getSupabaseClient(req.user.token);
-    const { contact_id, template_id, mail_item_ids } = req.body;
+    const { contact_id, template_id, mail_item_ids, sent_by } = req.body;
 
     // Validation
     if (!contact_id || !template_id || !mail_item_ids || !Array.isArray(mail_item_ids) || mail_item_ids.length === 0) {
@@ -614,24 +614,28 @@ async function sendBulkNotification(req, res, next) {
         follow_up_needed: true
       });
 
-    // 10. Record action history for ALL items
+    // 10. Record action history for ALL items in the bulk send
+    // This ensures each date group shows the bulk notification in its action history
+    // Use the same timestamp for all entries to keep them synchronized
+    const actionTimestamp = new Date().toISOString();
     const actionHistoryRecords = mail_item_ids.map(itemId => ({
       mail_item_id: itemId,
       action_type: 'bulk_notified',
       action_description: `Summary notification sent (${totalItems} items total)`,
-      performed_by: req.user.email || 'System',
-      notes: `Template: ${template.template_name}, Items: ${totalPackages} packages, ${totalLetters} letters`
+      performed_by: sent_by || req.user.email || 'System',
+      notes: `Template: ${template.template_name}, Items: ${totalPackages} packages, ${totalLetters} letters`,
+      created_at: actionTimestamp
     }));
 
     await supabase
       .from('action_history')
       .insert(actionHistoryRecords);
 
-    // 11. Update notification_history for all items
+    // 11. Update notification_history for all items (use same timestamp for consistency)
     const notificationRecords = mail_item_ids.map(itemId => ({
       mail_item_id: itemId,
       notification_method: 'Email',
-      notified_at: new Date().toISOString(),
+      notified_at: actionTimestamp, // Use same timestamp as action history
       notes: `Summary notification (${totalItems} items)`
     }));
 
