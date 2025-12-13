@@ -23,7 +23,7 @@ class MockMediaStream {
 }
 
 // Mock video element behavior
-const mockVideoElement = {
+const _mockVideoElement = {
   srcObject: null as MediaStream | null,
   play: vi.fn().mockResolvedValue(undefined),
   pause: vi.fn(),

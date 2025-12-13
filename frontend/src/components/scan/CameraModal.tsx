@@ -26,6 +26,7 @@ export default function CameraModal({ isOpen, onClose, onCapture }: CameraModalP
     return () => {
       stopCamera();
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen, facingMode]);
 
   const startCamera = async () => {

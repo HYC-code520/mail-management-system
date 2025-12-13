@@ -428,7 +428,31 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       await new Promise(resolve => setTimeout(resolve, 100));
       
       // Reload mail items
-      loadMailItems();
+      await loadMailItems();
+      
+      // After reload, highlight the newly added/updated item
+      // Calculate the group key for the item we just added/updated
+      const groupKey = addToExisting && existingTodayMail
+        ? `${existingTodayMail.contact_id}|${date}|${existingTodayMail.item_type}`
+        : `${selectedContact!.contact_id}|${date}|${itemType}`;
+      
+      // Wait a bit for the UI to settle after reload
+      setTimeout(() => {
+        // Find the row element by group key
+        const rowElement = document.querySelector(`[data-group-key="${groupKey}"]`);
+        if (rowElement) {
+          // Scroll into view
+          rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          // Highlight the row
+          setHighlightedGroupKeys(new Set([groupKey]));
+          
+          // Clear highlight after 8 seconds
+          setTimeout(() => {
+            setHighlightedGroupKeys(new Set());
+          }, 8000);
+        }
+      }, 300);
     } catch (err) {
       console.error('Error in submitNewMail:', err);
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -1122,9 +1146,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   if (loading) {
     return (
       <div className="max-w-7xl mx-auto px-6 py-8">
-        <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-48"></div>
-          <div className="h-96 bg-gray-100 rounded-lg"></div>
+        <div className="flex flex-col items-center justify-center py-20">
+          {/* Spinner */}
+          <div className="relative">
+            <div className="w-16 h-16 border-4 border-gray-200 rounded-full"></div>
+            <div className="w-16 h-16 border-4 border-green-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+          </div>
+          <p className="mt-4 text-lg font-medium text-gray-700">Loading mail log...</p>
+          <p className="text-sm text-gray-500 mt-1">Please wait while we fetch your data</p>
         </div>
       </div>
     );
@@ -1135,7 +1164,19 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       {/* Header - only show if not embedded */}
       {!embedded && (
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Mail Log</h1>
+          <div className="flex justify-between items-center mb-2">
+            <h1 className="text-3xl font-bold text-gray-900">Mail Log</h1>
+            <button
+              onClick={() => navigate('/dashboard/scan')}
+              className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-semibold transition-colors flex items-center gap-2 shadow-md"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+              </svg>
+              Scan Mail
+            </button>
+          </div>
           <p className="text-gray-600">Complete history of mail activities</p>
         </div>
       )}
@@ -1649,6 +1690,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     {/* Main Row - Clickable to expand */}
                     <tr 
                       id={`row-${group.groupKey}`}
+                      data-group-key={group.groupKey}
                       className={`group border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer ${
                         highlightedGroupKeys.has(group.groupKey) ? 'animate-flash-green' : ''
                       }`}
@@ -1717,7 +1759,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     </td>
                     <td className="py-3 px-4">
                       {group.statuses.length === 1 ? (
-                        <span className={`px-3 py-1 rounded text-xs font-medium ${
+                      <span className={`px-3 py-1 rounded text-xs font-medium ${
                           group.displayStatus === 'Received' ? 'bg-blue-100 text-blue-700' :
                           group.displayStatus === 'Pending' ? 'bg-yellow-100 text-yellow-700' :
                           group.displayStatus === 'Notified' ? 'bg-purple-100 text-purple-700' :
@@ -1727,12 +1769,12 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                           group.displayStatus === 'Forward' ? 'bg-orange-100 text-orange-700' :
                           group.displayStatus === 'Abandoned Package' ? 'bg-red-100 text-red-700' :
                           group.displayStatus === 'Abandoned' ? 'bg-red-100 text-red-700' :
-                          'bg-gray-200 text-gray-700'
-                        }`}>
+                        'bg-gray-200 text-gray-700'
+                      }`}>
                           {group.displayStatus === 'Scanned Document' ? 'Scanned' : 
                            group.displayStatus === 'Abandoned Package' ? 'Abandoned' : 
                            group.displayStatus}
-                        </span>
+                      </span>
                       ) : (
                         <span className="px-3 py-1 rounded text-xs font-medium bg-gray-200 text-gray-700">
                           Mixed
@@ -1747,12 +1789,12 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                           .sort((a, b) => new Date(b.last_notified!).getTime() - new Date(a.last_notified!).getTime())[0]?.last_notified;
                         return lastNotified ? (
                           new Date(lastNotified).toLocaleString('en-US', {
-                            month: 'short',
-                            day: 'numeric',
-                            hour: 'numeric',
-                            minute: '2-digit',
-                            hour12: true
-                          })
+                          month: 'short',
+                          day: 'numeric',
+                          hour: 'numeric',
+                          minute: '2-digit',
+                          hour12: true
+                        })
                         ) : '—';
                       })()}
                     </td>
@@ -1764,13 +1806,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
                         {/* Edit button - always visible for quick access */}
-                        <button
+                          <button
                           onClick={() => openEditModal(group.items[0])}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                          title="Edit"
-                        >
-                          <Edit className="w-4 h-4" />
-                        </button>
+                            title="Edit"
+                          >
+                            <Edit className="w-4 h-4" />
+                          </button>
                         
                         {/* More Actions - works on first item in group */}
                         <div className="relative">
@@ -1912,58 +1954,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     <tr className="bg-gray-50 border-b border-gray-200">
                       <td colSpan={9} className="py-6 px-4">
                         <div className="space-y-6">
-                          {/* Items in this group */}
-                          <div>
-                            <h3 className="font-bold text-gray-900 mb-3">
-                              {group.items.length} {group.itemType}{group.items.length > 1 ? 's' : ''} on {new Date(group.date + 'T12:00:00').toLocaleDateString('en-US', {
-                                timeZone: 'America/New_York',
-                                weekday: 'long',
-                                month: 'long',
-                                day: 'numeric',
-                                year: 'numeric'
-                              })}
-                            </h3>
-                            <div className="space-y-3">
-                              {group.items.map((item, index) => (
-                                <div key={item.mail_item_id} className="bg-white rounded-lg border border-gray-200 p-4">
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-3 mb-2">
-                                        <span className="text-sm font-medium text-gray-500">
-                                          #{index + 1}
-                                        </span>
-                                        <span className="text-sm text-gray-600">
-                                          {new Date(item.received_date).toLocaleString('en-US', {
-                                            timeZone: 'America/New_York',
-                                            hour: 'numeric',
-                                            minute: '2-digit',
-                                            hour12: true
-                                          })}
-                                        </span>
-                                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${
-                                          item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
-                                          item.status === 'Notified' ? 'bg-purple-100 text-purple-700' :
-                                          item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
-                                          'bg-gray-200 text-gray-700'
-                                        }`}>
-                                          {item.status}
-                                        </span>
-                                        <span className="text-sm text-gray-700">
-                                          Qty: {item.quantity || 1}
-                                        </span>
-                                      </div>
-                                      {item.description && (
-                                        <p className="text-sm text-gray-600 ml-8">
-                                          📝 {item.description}
-                                        </p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
-
                           {/* Combined Action History Timeline */}
                           <div>
                             <h3 className="font-bold text-gray-900 mb-3">Action History</h3>
@@ -2126,9 +2116,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
             <>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 {formData.status !== editingMailItem.status && (
-                  <p className="text-sm text-blue-800 font-medium mb-3">
-                    Status is being changed from "{editingMailItem.status}" to "{formData.status}"
-                  </p>
+                <p className="text-sm text-blue-800 font-medium mb-3">
+                  Status is being changed from "{editingMailItem.status}" to "{formData.status}"
+                </p>
                 )}
                 {formData.quantity !== (editingMailItem.quantity || 1) && (
                   <p className="text-sm text-blue-800 font-medium mb-3">

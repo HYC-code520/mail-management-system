@@ -163,7 +163,6 @@ export default function GroupedFollowUpSection({
               ...allItems.map(item => getDaysSince(item.received_date))
             );
             const isAbandoned = oldestDays >= 30;
-            const isUrgent = hasFees || isAbandoned;
             const isPersonExpanded = expandedPersons.has(group.contact.contact_id);
             
             return (
@@ -440,6 +439,20 @@ export default function GroupedFollowUpSection({
                         >
                           👤 View Profile
                         </button>
+                        
+                        {/* Show Waive Fee option whenever there are fees */}
+                        {hasFees && (
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onWaiveFee(group);
+                              setOpenDropdownId(null);
+                            }}
+                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-lg text-gray-900"
+                          >
+                            Waive Fee
+                          </button>
+                        )}
                       </div>
                     )}
                   </div>

@@ -1,8 +1,9 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Mail, Package, Bell, ChevronRight, Send, Edit } from 'lucide-react';
+import { Mail, Package, ChevronRight, Send, Edit } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import SendEmailModal from '../components/SendEmailModal.tsx';
+import CollectFeeModal from '../components/CollectFeeModal.tsx';
 import ActionHistorySection from '../components/ActionHistorySection.tsx';
 import Modal from '../components/Modal.tsx';
 import { validateContactForm } from '../utils/validation.ts';
@@ -148,6 +149,9 @@ export default function ContactDetailPage() {
   const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
   const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
   
+  // Collect Fee Modal state
+  const [isCollectFeeModalOpen, setIsCollectFeeModalOpen] = useState(false);
+  
   // Edit Contact Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -203,30 +207,6 @@ export default function ContactDetailPage() {
       void loadUnpaidFees(); // Load unpaid fees
     }
   }, [id, loadContactDetails, loadMailHistory, loadUnpaidFees]);
-
-  const loadNotificationHistoryForMailItem = async (mailItemId: string) => {
-    try {
-      const data = await api.notifications.getByMailItem(mailItemId);
-      setNotificationHistory(prev => ({
-        ...prev,
-        [mailItemId]: data
-      }));
-    } catch (err) {
-      console.error('Error loading notification history:', err);
-    }
-  };
-
-  const loadActionHistoryForMailItem = async (mailItemId: string) => {
-    try {
-      const data = await api.actionHistory.getByMailItem(mailItemId);
-      setActionHistory(prev => ({
-        ...prev,
-        [mailItemId]: data
-      }));
-    } catch (err) {
-      console.error('Error loading action history:', err);
-    }
-  };
 
   // Load action history for all items in a group (combined)
   const loadActionHistoryForGroup = async (groupKey: string, mailItemIds: string[]) => {
@@ -617,6 +597,15 @@ export default function ContactDetailPage() {
                     </p>
                   </div>
                 </div>
+                
+                {/* Collect Fees Button */}
+                <button
+                  onClick={() => setIsCollectFeeModalOpen(true)}
+                  className="w-full mt-3 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>💵</span>
+                  <span>Collect Fees</span>
+                </button>
               </div>
             </div>
           )}
@@ -731,107 +720,6 @@ export default function ContactDetailPage() {
                         <tr className="bg-gray-50 border-b border-gray-200">
                           <td colSpan={6} className="py-3 sm:py-6 px-3 sm:px-6">
                             <div className="ml-4 sm:ml-10 space-y-4 sm:space-y-6">
-                              {/* Individual Items in Group */}
-                              {group.items.length > 1 && (
-                                <div>
-                                  <h4 className="text-sm sm:text-base font-bold text-gray-900 mb-2 sm:mb-3">
-                                    Individual Items ({group.items.length})
-                                  </h4>
-                                  <div className="space-y-2">
-                                    {group.items.map((item, index) => (
-                                      <div key={item.mail_item_id} className="bg-white p-2 sm:p-3 rounded-lg border border-gray-200">
-                                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                                          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                                            <span className="text-xs sm:text-sm text-gray-500">#{index + 1}</span>
-                                            <span className="text-xs sm:text-sm font-medium text-gray-900">
-                                              {new Date(item.received_date).toLocaleTimeString('en-US', {
-                                                timeZone: 'America/New_York',
-                                                hour: 'numeric',
-                                                minute: '2-digit',
-                                                hour12: true
-                                              })}
-                                            </span>
-                                            {item.quantity && item.quantity > 1 && (
-                                              <span className="px-1.5 sm:px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded">
-                                                Qty: {item.quantity}
-                                              </span>
-                                            )}
-                                            <span className={`px-1.5 sm:px-2 py-0.5 rounded text-xs font-medium ${
-                                              item.status === 'Received' ? 'bg-blue-100 text-blue-700' :
-                                              item.status === 'Picked Up' ? 'bg-green-100 text-green-700' :
-                                              'bg-gray-100 text-gray-700'
-                                            }`}>
-                                              {item.status}
-                                            </span>
-                                          </div>
-                                          {item.description && (
-                                            <span className="text-sm text-gray-600 italic">
-                                              {item.description}
-                                            </span>
-                                          )}
-                                        </div>
-                                      </div>
-                                    ))}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* Single item description if only one item */}
-                              {group.items.length === 1 && group.items[0].description && (
-                                <div className="bg-white p-3 rounded-lg border border-gray-200">
-                                  <p className="text-sm text-gray-600">
-                                    <span className="font-medium">Note:</span> {group.items[0].description}
-                                  </p>
-                                </div>
-                              )}
-
-                              {/* Notification History Section */}
-                              <div>
-                              <h4 className="font-bold text-gray-900 mb-3 flex items-center gap-2">
-                                <Bell className="w-5 h-5 text-purple-600" />
-                                Notification History
-                              </h4>
-                                {notificationHistory[group.groupKey]?.length > 0 ? (
-                                <div className="space-y-3">
-                                    {notificationHistory[group.groupKey].map((notif) => (
-                                    <div key={notif.notification_id} className="bg-white p-3 rounded-lg border border-gray-200">
-                                      <div className="flex items-start justify-between">
-                                        <div className="flex-1">
-                                          <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-semibold text-gray-900">
-                                              {new Date(notif.notified_at).toLocaleString('en-US', {
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                                hour: 'numeric',
-                                                minute: '2-digit',
-                                                hour12: true
-                                              })}
-                                            </span>
-                                            <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full font-medium">
-                                              {notif.notification_method}
-                                            </span>
-                                          </div>
-                                          <p className="text-sm text-gray-600">
-                                            Notified by: <span className="font-medium text-gray-900">{notif.notified_by}</span>
-                                          </p>
-                                          {notif.notes && (
-                                            <p className="text-sm text-gray-600 mt-1 italic">
-                                              Note: {notif.notes}
-                                            </p>
-                                          )}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <p className="text-sm text-gray-500 italic">
-                                    No notifications sent yet.
-                                </p>
-                              )}
-                              </div>
-
                               {/* Action History Section */}
                               <ActionHistorySection 
                                 actions={actionHistory[group.groupKey] || []}
@@ -859,6 +747,42 @@ export default function ContactDetailPage() {
           }}
           mailItem={emailingMailItem}
           onSuccess={handleEmailSuccess}
+        />
+      )}
+      
+      {/* Collect Fee Modal */}
+      {contact && unpaidFees.length > 0 && (
+        <CollectFeeModal
+          isOpen={isCollectFeeModalOpen}
+          onClose={() => setIsCollectFeeModalOpen(false)}
+          group={{
+            contact: {
+              contact_id: contact.contact_id,
+              contact_person: contact.contact_person,
+              company_name: contact.company_name,
+              mailbox_number: contact.mailbox_number
+            },
+            packages: unpaidFees.map(fee => ({
+              mail_item_id: fee.mail_item_id,
+              item_type: 'Package',
+              received_date: fee.mail_items?.received_date || '',
+              status: fee.mail_items?.status || 'Pending',
+              packageFee: {
+                fee_id: fee.fee_id,
+                mail_item_id: fee.mail_item_id,
+                fee_amount: fee.fee_amount,
+                days_charged: fee.days_charged,
+                fee_status: 'pending'
+              }
+            })),
+            letters: [],
+            totalFees: unpaidFees.reduce((sum, f) => sum + f.fee_amount, 0),
+            urgencyScore: 0
+          }}
+          onSuccess={() => {
+            loadUnpaidFees();
+            loadMailHistory();
+          }}
         />
       )}
       

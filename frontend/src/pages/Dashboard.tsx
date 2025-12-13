@@ -1,7 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Package, UserPlus, FileText, Clock, AlertCircle, CheckCircle2, TrendingUp, ChevronDown, ChevronUp, AlertTriangle, MoreVertical, Send } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { Mail, Package, AlertCircle, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
@@ -525,7 +524,7 @@ export default function DashboardPage() {
               </button>
             </div>
           ),
-          { duration: 12000 }
+          { duration: 15000 } // Increased from 12000 to 15000ms for better visibility
         );
       } else {
         // Single email - original behavior
@@ -552,7 +551,7 @@ export default function DashboardPage() {
               </button>
             </div>
           ),
-          { duration: 10000 }
+          { duration: 15000 } // Increased from 10000 to 15000ms for better visibility
         );
       }
     }

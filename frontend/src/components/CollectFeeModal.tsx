@@ -10,6 +10,7 @@ import Modal from './Modal.tsx';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import { CreditCard, Banknote, Smartphone, CheckCircle, XCircle, ArrowRight, PackageCheck } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext.tsx';
 
 interface PackageFee {
   fee_id: string;
@@ -71,11 +72,15 @@ export default function CollectFeeModal({
   isPickupFlow = false,
   onMarkPickedUp
 }: CollectFeeModalProps) {
+  const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [waiveReason, setWaiveReason] = useState('');
   const [showWaiveInput, setShowWaiveInput] = useState(false);
   const [saving, setSaving] = useState(false);
   const [markAsPickedUp, setMarkAsPickedUp] = useState(false);
+  const [isEditingAmount, setIsEditingAmount] = useState(false);
+  const [editedAmount, setEditedAmount] = useState('');
+  const [collectedBy, setCollectedBy] = useState<'Madison' | 'Merlin' | ''>(''); // Staff selection
 
   if (!group) return null;
 
@@ -84,18 +89,29 @@ export default function CollectFeeModal({
     pkg => pkg.packageFee && pkg.packageFee.fee_status === 'pending' && pkg.packageFee.fee_amount > 0
   );
 
+  // Calculate total fee - use edited amount if in edit mode, otherwise use original
+  const displayAmount = isEditingAmount && editedAmount ? parseFloat(editedAmount) : group.totalFees;
+  const finalAmount = isNaN(displayAmount) ? group.totalFees : displayAmount;
+
   const handleCollect = async () => {
+    if (!collectedBy) {
+      toast.error('Please select who collected the fee');
+      return;
+    }
+    
     setSaving(true);
     try {
-      let collectedCount = 0;
-      let totalCollected = 0;
+      const totalCollected = finalAmount; // Use the edited/final amount
 
       // Collect fees for all pending packages in this group
       for (const pkg of pendingPackages) {
         if (pkg.packageFee) {
-          await api.fees.markPaid(pkg.packageFee.fee_id, paymentMethod);
-          collectedCount++;
-          totalCollected += pkg.packageFee.fee_amount;
+          await api.fees.markPaid(
+            pkg.packageFee.fee_id, 
+            paymentMethod,
+            totalCollected / pendingPackages.length, // Split edited amount evenly across packages
+            collectedBy
+          );
         }
       }
 
@@ -143,13 +159,11 @@ export default function CollectFeeModal({
 
     setSaving(true);
     try {
-      let waivedCount = 0;
       let totalWaived = 0;
 
       for (const pkg of pendingPackages) {
         if (pkg.packageFee) {
           await api.fees.waive(pkg.packageFee.fee_id, waiveReason.trim());
-          waivedCount++;
           totalWaived += pkg.packageFee.fee_amount;
         }
       }
@@ -232,6 +246,9 @@ export default function CollectFeeModal({
     setWaiveReason('');
     setShowWaiveInput(false);
     setMarkAsPickedUp(false);
+    setIsEditingAmount(false);
+    setEditedAmount('');
+    setCollectedBy('');
   };
 
   const handleClose = () => {
@@ -255,10 +272,55 @@ export default function CollectFeeModal({
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-gray-700">Total Outstanding:</span>
-            <span className="text-2xl font-bold text-green-600">
-              ${group.totalFees.toFixed(2)}
-            </span>
+            {!isEditingAmount ? (
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-bold text-green-600">
+                  ${group.totalFees.toFixed(2)}
+                </span>
+                <button
+                  onClick={() => {
+                    setIsEditingAmount(true);
+                    setEditedAmount(group.totalFees.toFixed(2));
+                  }}
+                  disabled={saving}
+                  className="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors"
+                  title="Edit amount (for discounts/adjustments)"
+                >
+                  Edit
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-600">$</span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={editedAmount}
+                  onChange={(e) => setEditedAmount(e.target.value)}
+                  disabled={saving}
+                  className="w-24 px-2 py-1 text-xl font-bold text-green-600 border border-green-300 rounded focus:ring-2 focus:ring-green-500"
+                  autoFocus
+                />
+                <button
+                  onClick={() => {
+                    setIsEditingAmount(false);
+                    setEditedAmount('');
+                  }}
+                  disabled={saving}
+                  className="px-2 py-1 text-xs bg-gray-200 hover:bg-gray-300 text-gray-700 rounded transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
           </div>
+          
+          {isEditingAmount && parseFloat(editedAmount) < group.totalFees && (
+            <p className="text-xs text-blue-600 mb-2">
+              💡 Discount: ${(group.totalFees - parseFloat(editedAmount || '0')).toFixed(2)} off
+            </p>
+          )}
           
           {/* Package Details */}
           <div className="mt-3 space-y-1">
@@ -273,6 +335,41 @@ export default function CollectFeeModal({
             ))}
           </div>
         </div>
+
+        {/* Staff Selection - Who collected the fee */}
+        {!showWaiveInput && (
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Collected By: <span className="text-red-500">*</span>
+            </label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setCollectedBy('Madison')}
+                disabled={saving}
+                className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                  collectedBy === 'Madison'
+                    ? 'bg-purple-600 border-purple-600 text-white shadow-md'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-purple-400 hover:bg-purple-50'
+                } disabled:opacity-50`}
+              >
+                Madison
+              </button>
+              <button
+                type="button"
+                onClick={() => setCollectedBy('Merlin')}
+                disabled={saving}
+                className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                  collectedBy === 'Merlin'
+                    ? 'bg-blue-600 border-blue-600 text-white shadow-md'
+                    : 'bg-white border-gray-300 text-gray-700 hover:border-blue-400 hover:bg-blue-50'
+                } disabled:opacity-50`}
+              >
+                Merlin
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Payment Method Selection */}
         {!showWaiveInput && (
@@ -352,7 +449,7 @@ export default function CollectFeeModal({
                 className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 <Banknote className="w-5 h-5" />
-                {saving ? 'Processing...' : `Collect $${group.totalFees.toFixed(2)} (${paymentMethod})`}
+                {saving ? 'Processing...' : `Collect $${finalAmount.toFixed(2)} (${paymentMethod})`}
               </button>
 
               {/* Secondary Options */}

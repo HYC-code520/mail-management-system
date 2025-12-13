@@ -239,8 +239,8 @@ export const api = {
     },
     waive: (feeId: string, reason: string) => 
       apiClient.post(`/fees/${feeId}/waive`, { reason }),
-    markPaid: (feeId: string, paymentMethod: string) => 
-      apiClient.post(`/fees/${feeId}/pay`, { paymentMethod }),
+    markPaid: (feeId: string, paymentMethod: string, collected_amount?: number, collected_by?: string) => 
+      apiClient.post(`/fees/${feeId}/pay`, { paymentMethod, collected_amount, collected_by }),
     recalculate: () => apiClient.post('/fees/recalculate', {}),
   },
 };

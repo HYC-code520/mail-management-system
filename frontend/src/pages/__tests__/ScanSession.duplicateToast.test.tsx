@@ -4,13 +4,28 @@ import '@testing-library/jest-dom';
 import { BrowserRouter } from 'react-router-dom';
 import ScanSession from '../ScanSession';
 
+// Use vi.hoisted to ensure mocks are properly initialized before they're used
+const { mockToastFn, mockToastSuccess, mockToastError, mockToastLoading } = vi.hoisted(() => ({
+  mockToastFn: vi.fn((message, options) => ({ message, ...options })),
+  mockToastSuccess: vi.fn(),
+  mockToastError: vi.fn(),
+  mockToastLoading: vi.fn()
+}));
+
 // Mock react-hot-toast
-vi.mock('react-hot-toast', () => ({
-  default: {
-    success: vi.fn(),
-    error: vi.fn(),
-    loading: vi.fn()
-  }
+vi.mock('react-hot-toast', () => {
+  const toast: any = mockToastFn;
+  toast.success = mockToastSuccess;
+  toast.error = mockToastError;
+  toast.loading = mockToastLoading;
+  return {
+    default: toast
+  };
+});
+
+// Mock canvas-confetti to prevent import errors
+vi.mock('canvas-confetti', () => ({
+  default: vi.fn()
 }));
 
 // Mock the API client
@@ -30,8 +45,6 @@ vi.mock('../../utils/ocr', () => ({
   initOCRWorker: vi.fn().mockResolvedValue(undefined),
   terminateOCRWorker: vi.fn()
 }));
-
-import toast from 'react-hot-toast';
 
 describe('ScanSession - Duplicate Toast Prevention', () => {
   // Helper to create a valid session
@@ -73,7 +86,7 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
 
       // Toast should be shown when session is resumed
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Resumed previous scan session');
+        expect(mockToastSuccess).toHaveBeenCalledWith('Resumed previous scan session');
       }, { timeout: 3000 });
     });
 
@@ -97,7 +110,7 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Toast should NOT be called because flag already exists
-      expect(toast.success).not.toHaveBeenCalledWith('Resumed previous scan session');
+      expect(mockToastSuccess).not.toHaveBeenCalledWith('Resumed previous scan session');
     });
 
     it('should set sessionStorage flag after showing toast', async () => {
@@ -111,7 +124,7 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       );
 
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Resumed previous scan session');
+        expect(mockToastSuccess).toHaveBeenCalledWith('Resumed previous scan session');
       });
 
       // sessionStorage flag should be set to 'true'
@@ -136,7 +149,7 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Toast should NOT be called because flag already exists
-      expect(toast.success).not.toHaveBeenCalledWith('Resumed previous scan session');
+      expect(mockToastSuccess).not.toHaveBeenCalledWith('Resumed previous scan session');
     });
   });
 
@@ -152,7 +165,7 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       );
 
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Resumed previous scan session');
+        expect(mockToastSuccess).toHaveBeenCalledWith('Resumed previous scan session');
       });
 
       // Flag should be in sessionStorage, not localStorage
@@ -172,13 +185,13 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       await new Promise(resolve => setTimeout(resolve, 500));
 
       // Toast should NOT be called when there's no session to resume
-      expect(toast.success).not.toHaveBeenCalledWith('Resumed previous scan session');
+      expect(mockToastSuccess).not.toHaveBeenCalledWith('Resumed previous scan session');
       expect(sessionStorage.getItem('scanSessionResumedToast')).toBeNull();
     });
   });
 
   describe('Session Expiration', () => {
-    it('should show error toast when session is expired', async () => {
+    it('should show info toast when session is expired', async () => {
       // Create an expired session
       const now = new Date();
       const expiredSession = {
@@ -195,11 +208,15 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       );
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Previous session expired (4 hours)');
+        // Now expects regular toast (not toast.error) with the message
+        expect(mockToastFn).toHaveBeenCalledWith('Previous session expired (4 hours)', expect.objectContaining({
+          icon: 'ℹ️',
+          duration: 4000
+        }));
       });
 
       // Should NOT show success toast
-      expect(toast.success).not.toHaveBeenCalledWith('Resumed previous scan session');
+      expect(mockToastSuccess).not.toHaveBeenCalledWith('Resumed previous scan session');
     });
   });
 
@@ -215,10 +232,10 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       );
 
       await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith('Resumed previous scan session');
+        expect(mockToastSuccess).toHaveBeenCalledWith('Resumed previous scan session');
       });
 
-      const callCount = (toast.success as any).mock.calls.filter(
+      const callCount = (mockToastSuccess as any).mock.calls.filter(
         (call: any[]) => call[0] === 'Resumed previous scan session'
       ).length;
       expect(callCount).toBe(1);
@@ -234,7 +251,7 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Toast should still only be called once for resume message
-      const finalCount = (toast.success as any).mock.calls.filter(
+      const finalCount = (mockToastSuccess as any).mock.calls.filter(
         (call: any[]) => call[0] === 'Resumed previous scan session'
       ).length;
       expect(finalCount).toBe(1);
@@ -259,7 +276,7 @@ describe('ScanSession - Duplicate Toast Prevention', () => {
       await new Promise(resolve => setTimeout(resolve, 300));
 
       // Should NOT show resume toast for invalid session
-      expect(toast.success).not.toHaveBeenCalledWith('Resumed previous scan session');
+      expect(mockToastSuccess).not.toHaveBeenCalledWith('Resumed previous scan session');
     });
 
     it('should handle missing expiresAt field', async () => {
