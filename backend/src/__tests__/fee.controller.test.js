@@ -274,7 +274,8 @@ describe('Fee Controller', () => {
       expect(response.body.fee).toEqual(mockPaidFee);
       expect(feeService.markFeePaid).toHaveBeenCalledWith(
         'fee-1',
-        'cash'
+        'cash',
+        undefined // collected_amount (optional, for discounted fees)
       );
     });
 

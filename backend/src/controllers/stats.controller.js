@@ -124,7 +124,7 @@ async function getMonthlyRevenue(userId, supabase) {
     
     const { data, error } = await supabase
       .from('package_fees')
-      .select('fee_amount, paid_date')
+      .select('fee_amount, collected_amount, paid_date')
       .eq('user_id', userId)
       .eq('fee_status', 'paid')
       .not('paid_date', 'is', null);
@@ -140,7 +140,13 @@ async function getMonthlyRevenue(userId, supabase) {
       return paidDateNY >= startOfMonth && paidDateNY <= endOfMonth;
     });
     
-    const total = monthlyFees.reduce((sum, fee) => sum + parseFloat(fee.fee_amount || 0), 0);
+    // Use collected_amount if present (for discounted fees), otherwise fee_amount
+    const total = monthlyFees.reduce((sum, fee) => {
+      const amount = fee.collected_amount !== null && fee.collected_amount !== undefined 
+        ? parseFloat(fee.collected_amount) 
+        : parseFloat(fee.fee_amount || 0);
+      return sum + amount;
+    }, 0);
     return parseFloat(total.toFixed(2));
   } catch (error) {
     console.error('Error in getMonthlyRevenue:', error);
@@ -259,24 +265,7 @@ exports.getDashboardStats = async (req, res, next) => {
       toNYDateString(item.pickup_date) === todayString
     ).length;
     
-    // Needs follow-up (never notified OR notified 3+ days ago) - using NY timezone
-    const needsFollowUpRaw = enrichedMailItems.filter(item => {
-      // Exclude completed/handled statuses
-      if (item.status === 'Picked Up' || 
-          item.status === 'Forwarded' || 
-          item.status === 'Scanned' ||
-          item.status.includes('Abandoned')) {
-        return false;
-      }
-      
-      // Include items never notified (status = "Received")
-      if (!item.last_notified) return true;
-      
-      // Include items notified 3+ days ago (NY timezone)
-      return getDaysSinceNY(item.last_notified) >= 3;
-    });
-    
-    // Fetch package fees for all mail items (including waived fees for display)
+    // Fetch package fees FIRST so we can identify customers with pending fees
     const { data: packageFees, error: feesError } = await supabase
       .from('package_fees')
       .select('*')
@@ -286,6 +275,49 @@ exports.getDashboardStats = async (req, res, next) => {
       console.error('Error fetching package fees:', feesError);
       // Continue without fees rather than failing
     }
+    
+    // Build a map of mail_item_id -> pending fee
+    const pendingFeeLookup = {};
+    (packageFees || []).forEach(fee => {
+      if (fee.fee_status === 'pending') {
+        pendingFeeLookup[fee.mail_item_id] = fee;
+      }
+    });
+    
+    // Get ALL non-completed mail items (we'll filter by contact later)
+    const allActiveItems = enrichedMailItems.filter(item => {
+      // Exclude completed/handled statuses
+      if (item.status === 'Picked Up' || 
+          item.status === 'Forwarded' || 
+          item.status === 'Scanned' ||
+          item.status.includes('Abandoned')) {
+        return false;
+      }
+      return true;
+    });
+    
+    // Build a Set of contact_ids that should appear in Needs Follow-Up
+    // Criteria: Has pending fees OR has items needing notification follow-up
+    const contactIdsToShow = new Set();
+    
+    allActiveItems.forEach(item => {
+      // Check if this item has pending fees
+      if (pendingFeeLookup[item.mail_item_id]) {
+        contactIdsToShow.add(item.contact_id);
+      }
+      
+      // Check if this item needs notification follow-up
+      // (never notified OR notified 3+ days ago)
+      if (!item.last_notified || getDaysSinceNY(item.last_notified) >= 3) {
+        contactIdsToShow.add(item.contact_id);
+      }
+    });
+    
+    // Now get ALL active items for contacts that should appear
+    // This ensures we show ALL of a customer's items, not just filtered ones
+    const needsFollowUpRaw = allActiveItems.filter(item => 
+      contactIdsToShow.has(item.contact_id)
+    );
     
     // Group by person with fee data and urgency
     const needsFollowUp = groupNeedsFollowUpByPerson(
