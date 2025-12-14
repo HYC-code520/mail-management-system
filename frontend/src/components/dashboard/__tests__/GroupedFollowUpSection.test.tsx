@@ -111,11 +111,12 @@ describe('GroupedFollowUpSection', () => {
   it('should expand/collapse card when clicked', async () => {
     renderComponent();
 
-    const card = screen.getByText('John Doe').closest('div[class*="rounded-lg border"]');
-    
+    // Find the card by looking for the element with cursor-pointer class that contains "John Doe"
+    const card = screen.getByText('John Doe').closest('div[class*="rounded-xl"]');
+
     // Click to expand
     fireEvent.click(card!);
-    
+
     await waitFor(() => {
       // John Doe has 1 package, so it shows "1 package waiting"
       expect(screen.getByText(/1 package waiting/i)).toBeInTheDocument();
@@ -123,7 +124,7 @@ describe('GroupedFollowUpSection', () => {
 
     // Click again to collapse
     fireEvent.click(card!);
-    
+
     await waitFor(() => {
       expect(screen.queryByText(/1 package waiting/i)).not.toBeInTheDocument();
     });
@@ -352,7 +353,7 @@ describe('GroupedFollowUpSection', () => {
     renderComponent(waivedGroups);
 
     // Expand the card to see fee details
-    const card = screen.getByText('Waived Customer').closest('div[class*="rounded-lg border"]');
+    const card = screen.getByText('Waived Customer').closest('div[class*="rounded-xl"]');
     fireEvent.click(card!);
 
     await waitFor(() => {

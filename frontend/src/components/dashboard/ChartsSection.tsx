@@ -46,9 +46,9 @@ export default function ChartsSection({
   }
 
   return (
-    <div className="lg:col-span-2 space-y-6 h-full">
+    <div className="space-y-6">
       {/* Time Range Toggle - Shared for both charts */}
-      <div className="flex items-center justify-center gap-2 bg-gray-100 p-1 rounded-lg">
+      <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-gray-50 to-gray-100 p-1.5 rounded-xl shadow-sm border border-gray-200">
         <button
           type="button"
           onClick={(e) => {
@@ -56,10 +56,10 @@ export default function ChartsSection({
             e.stopPropagation();
             handleRangeChange(7);
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
             chartTimeRange === 7
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white text-blue-700 shadow-md'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
           }`}
         >
           7 Days
@@ -71,10 +71,10 @@ export default function ChartsSection({
             e.stopPropagation();
             handleRangeChange(14);
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
             chartTimeRange === 14
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white text-blue-700 shadow-md'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
           }`}
         >
           14 Days
@@ -86,98 +86,105 @@ export default function ChartsSection({
             e.stopPropagation();
             handleRangeChange(30);
           }}
-          className={`px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
             chartTimeRange === 30
-              ? 'bg-white text-gray-900 shadow-sm'
-              : 'text-gray-600 hover:text-gray-900'
+              ? 'bg-white text-blue-700 shadow-md'
+              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
           }`}
         >
           30 Days
         </button>
       </div>
 
-      {/* Mail Volume Chart */}
-      <div className="bg-white border-2 border-gray-300 rounded-lg p-6 shadow-sm h-[calc(50%-3rem)]">
-        <div className="flex items-center gap-3 mb-6">
-          <TrendingUp className="w-6 h-6 text-gray-900" />
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">Mail Volume</h2>
-            <p className="text-sm text-gray-600">Last {chartTimeRange} days</p>
+      {/* Charts Side by Side on Desktop */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Mail Volume Chart */}
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
+              <TrendingUp className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">Mail Volume</h2>
+              <p className="text-xs text-gray-500">Last {chartTimeRange} days</p>
+            </div>
           </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={mailVolumeData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis 
+                dataKey="date" 
+                tick={{ fill: '#6B7280', fontSize: 11 }}
+                tickLine={{ stroke: '#E5E7EB' }}
+                interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fill: '#6B7280', fontSize: 12 }}
+                tickLine={{ stroke: '#E5E7EB' }}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#fff', 
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Bar dataKey="count" fill="#3B82F6" radius={[8, 8, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
-        <ResponsiveContainer width="100%" height={250}>
-          <BarChart data={mailVolumeData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis 
-              dataKey="date" 
-              tick={{ fill: '#6B7280', fontSize: 11 }}
-              tickLine={{ stroke: '#E5E7EB' }}
-              interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
-              angle={-45}
-              textAnchor="end"
-              height={60}
-            />
-            <YAxis 
-              tick={{ fill: '#6B7280', fontSize: 12 }}
-              tickLine={{ stroke: '#E5E7EB' }}
-            />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: '#fff', 
-                border: '1px solid #E5E7EB',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}
-            />
-            <Bar dataKey="count" fill="#10B981" radius={[8, 8, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
 
-      {/* Customer Growth Chart */}
-      <div className="bg-white border-2 border-gray-300 rounded-lg p-6 shadow-sm h-[calc(50%-3rem)]">
-        <div className="flex items-center gap-3 mb-6">
-          <UserPlus className="w-6 h-6 text-green-600" />
-          <div>
-            <h2 className="text-xl font-bold text-gray-900">New Customers</h2>
-            <p className="text-sm text-gray-600">Added per day (last {chartTimeRange} days)</p>
+        {/* Customer Growth Chart */}
+        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
+              <UserPlus className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">New Customers</h2>
+              <p className="text-xs text-gray-500">Added per day (last {chartTimeRange} days)</p>
+            </div>
           </div>
+          <ResponsiveContainer width="100%" height={300}>
+            <LineChart data={customerGrowthData}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis 
+                dataKey="date" 
+                tick={{ fill: '#6B7280', fontSize: 11 }}
+                tickLine={{ stroke: '#E5E7EB' }}
+                interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
+                angle={-45}
+                textAnchor="end"
+                height={60}
+              />
+              <YAxis 
+                tick={{ fill: '#6B7280', fontSize: 12 }}
+                tickLine={{ stroke: '#E5E7EB' }}
+                allowDecimals={false}
+              />
+              <Tooltip 
+                contentStyle={{ 
+                  backgroundColor: '#fff', 
+                  border: '1px solid #E5E7EB',
+                  borderRadius: '8px',
+                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+                }}
+              />
+              <Line 
+                type="monotone" 
+                dataKey="customers" 
+                stroke="#10B981" 
+                strokeWidth={3}
+                dot={{ fill: '#10B981', r: 4 }}
+                activeDot={{ r: 6 }}
+              />
+            </LineChart>
+          </ResponsiveContainer>
         </div>
-        <ResponsiveContainer width="100%" height={250}>
-          <LineChart data={customerGrowthData}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis 
-              dataKey="date" 
-              tick={{ fill: '#6B7280', fontSize: 11 }}
-              tickLine={{ stroke: '#E5E7EB' }}
-              interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
-              angle={-45}
-              textAnchor="end"
-              height={60}
-            />
-            <YAxis 
-              tick={{ fill: '#6B7280', fontSize: 12 }}
-              tickLine={{ stroke: '#E5E7EB' }}
-              allowDecimals={false}
-            />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: '#fff', 
-                border: '1px solid #E5E7EB',
-                borderRadius: '8px',
-                boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-              }}
-            />
-            <Line 
-              type="monotone" 
-              dataKey="customers" 
-              stroke="#10B981" 
-              strokeWidth={3}
-              dot={{ fill: '#10B981', r: 4 }}
-              activeDot={{ r: 6 }}
-            />
-          </LineChart>
-        </ResponsiveContainer>
       </div>
     </div>
   );

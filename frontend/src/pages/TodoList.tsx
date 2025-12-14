@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Check, Circle, Trash2, Calendar, Flag, Folder, Edit2 } from 'lucide-react';
+import { Plus, Check, Circle, Trash2, Calendar, Flag, Folder, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
@@ -36,6 +36,8 @@ export default function TodoList() {
   const [newTodoPriority, setNewTodoPriority] = useState(0);
   const [newTodoStaff, setNewTodoStaff] = useState('Merlin'); // Default to Merlin
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [viewMode, setViewMode] = useState<'week' | 'list'>('week'); // week view or list view
   
   // Quick add state for each date section
   const [quickAddOpen, setQuickAddOpen] = useState<string | null>(null);
@@ -90,10 +92,13 @@ export default function TodoList() {
     }
 
     try {
+      // Use selected date if no date is explicitly set
+      const dateToUse = newTodoDate || formatDateKey(selectedDate);
+      
       await api.todos.create({
         title: newTodoTitle.trim(),
         notes: newTodoNotes.trim() || undefined,
-        date_header: newTodoDate || undefined,
+        date_header: dateToUse,
         category: newTodoCategory || undefined,
         priority: newTodoPriority,
         staff_member: newTodoStaff,
@@ -374,6 +379,52 @@ export default function TodoList() {
     });
   };
 
+  // Get week days starting from selected date
+  const getWeekDays = () => {
+    const days = [];
+    const startDate = new Date(selectedDate);
+    startDate.setDate(startDate.getDate() - startDate.getDay()); // Start from Sunday
+    
+    for (let i = 0; i < 7; i++) {
+      const date = new Date(startDate);
+      date.setDate(startDate.getDate() + i);
+      days.push(date);
+    }
+    return days;
+  };
+
+  const goToPreviousWeek = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() - 7);
+    setSelectedDate(newDate);
+  };
+
+  const goToNextWeek = () => {
+    const newDate = new Date(selectedDate);
+    newDate.setDate(newDate.getDate() + 7);
+    setSelectedDate(newDate);
+  };
+
+  const goToToday = () => {
+    setSelectedDate(new Date());
+  };
+
+  const isToday = (date: Date) => {
+    const today = new Date();
+    return date.toDateString() === today.toDateString();
+  };
+
+  const isSameDay = (date1: Date, date2: Date) => {
+    return date1.toDateString() === date2.toDateString();
+  };
+
+  const formatDateKey = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
   if (loading) {
     return (
       <div className="max-w-5xl mx-auto px-6 py-8">
@@ -386,29 +437,161 @@ export default function TodoList() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
-      {/* Header */}
-      <div className="mb-6 md:mb-8">
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Tasks</h1>
-        <p className="text-sm md:text-base text-gray-600">Manage your daily tasks and priorities</p>
+    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+      {/* Header with Filter Tabs */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900">To-Do</h1>
+          <div className="flex items-center gap-3">
+            <span className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
+              {todos.filter(t => !t.is_completed).length} tasks left
+            </span>
+          </div>
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex gap-2 mb-6">
+          <button
+            onClick={() => setFilter('all')}
+            className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
+              filter === 'all'
+                ? 'bg-blue-500 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            All
+            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+              filter === 'all' ? 'bg-white/30' : 'bg-gray-300'
+            }`}>
+              {todos.length}
+            </span>
+          </button>
+          <button
+            onClick={() => setFilter('active')}
+            className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
+              filter === 'active'
+                ? 'bg-pink-500 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Incompleted
+            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+              filter === 'active' ? 'bg-white/30' : 'bg-gray-300'
+            }`}>
+              {todos.filter(t => !t.is_completed).length}
+            </span>
+          </button>
+          <button
+            onClick={() => setFilter('completed')}
+            className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
+              filter === 'completed'
+                ? 'bg-teal-500 text-white shadow-md'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+          >
+            Completed
+            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
+              filter === 'completed' ? 'bg-white/30' : 'bg-gray-300'
+            }`}>
+              {todos.filter(t => t.is_completed).length}
+            </span>
+          </button>
+        </div>
       </div>
 
-      {/* Add New Todo Form */}
-      <div className="mb-6 md:mb-8">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-6 bg-blue-600 rounded-full"></div>
-          <h2 className="text-base md:text-lg font-semibold text-gray-900">Add New Task</h2>
+      {/* Date Selector */}
+      <div className="mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900">Today</h2>
+          <button
+            onClick={goToToday}
+            className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+          >
+            Today
+          </button>
         </div>
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
+        
+        <div className="flex items-center gap-3 justify-between">
+          <button
+            onClick={goToPreviousWeek}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+            title="Previous week"
+          >
+            <ChevronLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          
+          <div className="flex-1 flex gap-3 justify-center overflow-x-auto pb-2 px-2">
+            {getWeekDays().map((date) => {
+              const isSelected = isSameDay(date, selectedDate);
+              const isTodayDate = isToday(date);
+              const dateKey = formatDateKey(date);
+              const tasksForDate = todos.filter(t => {
+                if (!t.date_header) return false;
+                return t.date_header.startsWith(dateKey);
+              });
+              
+              return (
+                <button
+                  key={dateKey}
+                  onClick={() => setSelectedDate(date)}
+                  className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-xl transition-all min-w-[70px] ${
+                    isSelected
+                      ? 'bg-gradient-to-br from-amber-100 to-orange-100 border-2 border-amber-300 shadow-md'
+                      : isTodayDate
+                      ? 'bg-white border-2 border-gray-300 hover:border-amber-300'
+                      : 'bg-white border-2 border-gray-200 hover:border-gray-300'
+                  }`}
+                >
+                  <span className={`text-xs font-semibold uppercase mb-1 ${
+                    isSelected ? 'text-amber-800' : 'text-gray-500'
+                  }`}>
+                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                  </span>
+                  <span className={`text-2xl font-bold ${
+                    isSelected ? 'text-gray-900' : isTodayDate ? 'text-blue-600' : 'text-gray-700'
+                  }`}>
+                    {date.getDate()}
+                  </span>
+                  {tasksForDate.length > 0 && (
+                    <span className={`text-xs mt-1 px-2 py-0.5 rounded-full ${
+                      isSelected ? 'bg-amber-200 text-amber-800' : 'bg-blue-100 text-blue-700'
+                    }`}>
+                      {tasksForDate.length}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          
+          <button
+            onClick={goToNextWeek}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
+            title="Next week"
+          >
+            <ChevronRight className="w-5 h-5 text-gray-600" />
+          </button>
+        </div>
+      </div>
+
+      {/* Add New Todo Input */}
+      <div className="mb-8">
+        <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6">
         <form onSubmit={handleAddTodo} className="space-y-4">
-          <div>
+          <div className="flex items-center gap-3">
             <input
               type="text"
               value={newTodoTitle}
               onChange={(e) => setNewTodoTitle(e.target.value)}
-              placeholder="Add a new task..."
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-lg"
+              placeholder="Add todo"
+              className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-all"
             />
+            <button
+              type="submit"
+              className="px-8 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition-colors"
+            >
+              Add Todo
+            </button>
           </div>
           
           {/* Notes / Details */}
@@ -482,264 +665,111 @@ export default function TodoList() {
       </div>
       </div>
 
-      {/* Filter Tabs */}
-      <div className="mb-8">
-        <div className="flex items-center gap-2 mb-3">
-          <div className="w-1 h-6 bg-purple-600 rounded-full"></div>
-          <h2 className="text-lg font-semibold text-gray-900">Your Tasks</h2>
-        </div>
-        <div className="flex gap-2">
-        <button
-          onClick={() => setFilter('all')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filter === 'all'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          All
-        </button>
-        <button
-          onClick={() => setFilter('active')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filter === 'active'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Active
-        </button>
-        <button
-          onClick={() => setFilter('completed')}
-          className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-            filter === 'completed'
-              ? 'bg-blue-600 text-white'
-              : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-          }`}
-        >
-          Completed
-        </button>
-      </div>
-      </div>
-
-      {/* Todos List - Grouped by Date */}
-      {todos.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+      {/* Todos List - Clean layout */}
+      {(() => {
+        // Filter todos by selected date
+        const dateKey = formatDateKey(selectedDate);
+        const filteredTodos = todos.filter(t => {
+          if (!t.date_header) return false;
+          return t.date_header.startsWith(dateKey);
+        });
+        
+        return filteredTodos.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-12 text-center">
           <Circle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <p className="text-gray-500 text-lg font-medium mb-2">No tasks yet</p>
-          <p className="text-gray-400 text-sm">Add your first task above to get started</p>
+          <p className="text-gray-500 text-lg font-medium mb-2">No tasks for this day</p>
+          <p className="text-gray-400 text-sm">Add a task above to get started</p>
         </div>
       ) : (
-        <div className="space-y-6">
-          {sortedDateKeys.map((dateKey) => (
-            <div key={dateKey} className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-              {/* Date Header */}
-              <div className="bg-gray-50 px-6 py-4 border-b border-gray-200">
-                <h2 className="text-lg font-semibold text-gray-900">{formatDate(dateKey)}</h2>
-              </div>
-
-              {/* Todos for this date */}
-              <div className="divide-y divide-gray-100">
-                {groupedTodos[dateKey].map((todo) => (
-                  <div
-                    key={todo.todo_id}
-                    className="px-4 md:px-6 py-3 md:py-4 hover:bg-gray-50 transition-colors group"
-                  >
-                    <div className="flex items-start gap-3">
-                      {/* Checkbox */}
-                      <button
-                        onClick={() => handleToggleComplete(todo)}
-                        className="mt-0.5 flex-shrink-0"
-                      >
-                        {todo.is_completed ? (
-                          <div className="w-6 h-6 rounded-full bg-blue-600 flex items-center justify-center">
-                            <Check className="w-4 h-4 text-white" />
-                          </div>
-                        ) : (
-                          <Circle className="w-6 h-6 text-gray-400 hover:text-blue-600 transition-colors" />
-                        )}
-                      </button>
-
-                      {/* Content */}
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-start gap-2">
-                          {getPriorityIcon(todo.priority)}
-                          <p
-                            className={`text-sm md:text-base break-words ${
-                              todo.is_completed
-                                ? 'line-through text-gray-400'
-                                : 'text-gray-900'
-                            }`}
-                          >
-                            {todo.title}
-                          </p>
-                        </div>
-                        
-                        {/* Notes/Description (if exists) */}
-                        {todo.notes && (
-                          <div className="mt-2 text-xs md:text-sm text-gray-600 whitespace-pre-wrap pl-6">
-                            {todo.notes}
-                          </div>
-                        )}
-                        
-                        {/* Metadata: Category + User info on mobile */}
-                        <div className="flex flex-col md:flex-row md:items-center gap-2 mt-2">
-                          {todo.category && (
-                            <span className="inline-block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full w-fit">
-                              {todo.category}
-                            </span>
-                          )}
-                          
-                          {/* Show who last edited on mobile (move from right side) */}
-                          {todo.last_edited_by_name && (
-                            <div className="flex items-center gap-1.5 text-xs text-gray-500 md:hidden">
-                              <div 
-                                className={`w-5 h-5 rounded-full ${getUserColor(todo.last_edited_by_name)} flex items-center justify-center text-white text-[10px] font-semibold`}
-                                title={`Last edited by ${todo.last_edited_by_name}`}
-                              >
-                                {getInitials(todo.last_edited_by_name)}
-                              </div>
-                              <span className="truncate">
-                                {todo.created_by_email === todo.last_edited_by_email 
-                                  ? 'created' 
-                                  : 'edited'} {new Date(todo.updated_at || todo.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              </span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Right side: Creator info (desktop only) + Action Buttons */}
-                      <div className="flex items-start gap-2 md:gap-3 flex-shrink-0">
-                        {/* Show who last edited (desktop only) */}
-                        {todo.last_edited_by_name && (
-                          <div className="hidden md:flex items-center gap-1.5 text-xs text-gray-500">
-                            <div 
-                              className={`w-5 h-5 rounded-full ${getUserColor(todo.last_edited_by_name)} flex items-center justify-center text-white text-[10px] font-semibold`}
-                              title={`Last edited by ${todo.last_edited_by_name}`}
-                            >
-                              {getInitials(todo.last_edited_by_name)}
-                            </div>
-                            <span>
-                              {todo.created_by_email === todo.last_edited_by_email 
-                                ? 'created' 
-                                : 'edited'} {new Date(todo.updated_at || todo.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            </span>
-                          </div>
-                        )}
-                        
-                        {/* Action Buttons - always visible on mobile, hover on desktop */}
-                        <div className="flex items-center gap-2">
-                        {/* Edit Button */}
-                        <button
-                          onClick={() => openEditModal(todo)}
-                          className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-blue-500 hover:text-blue-700"
-                        >
-                          <Edit2 className="w-4 h-4 md:w-5 md:h-5" />
-                        </button>
-                        
-                        {/* Delete Button */}
-                        <button
-                          onClick={() => handleDeleteTodo(todo.todo_id)}
-                          className="flex-shrink-0 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="w-4 h-4 md:w-5 md:h-5" />
-                        </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              
-              {/* Quick Add Task for This Date */}
-              {quickAddOpen === dateKey ? (
-                <div className="px-6 py-4 bg-blue-50 border-t border-blue-200">
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      handleQuickAdd(dateKey);
-                    }}
-                    className="space-y-3"
-                  >
-                    <input
-                      type="text"
-                      value={quickAddTitle}
-                      onChange={(e) => setQuickAddTitle(e.target.value)}
-                      placeholder="Add a new task..."
-                      autoFocus
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    
-                    <div className="flex gap-2 flex-wrap">
-                      {/* Priority */}
-                      <select
-                        value={quickAddPriority}
-                        onChange={(e) => setQuickAddPriority(Number(e.target.value))}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      >
-                        <option value={0}>Normal</option>
-                        <option value={1}>Priority</option>
-                      </select>
-
-                      {/* Category */}
-                      <input
-                        type="text"
-                        value={quickAddCategory}
-                        onChange={(e) => setQuickAddCategory(e.target.value)}
-                        placeholder="Category (optional)"
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      />
-
-                      {/* Staff */}
-                      <select
-                        value={quickAddStaff}
-                        onChange={(e) => setQuickAddStaff(e.target.value)}
-                        className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                      >
-                        <option value="Merlin">Merlin</option>
-                        <option value="Madison">Madison</option>
-                      </select>
-                    </div>
-
-                    <div className="flex gap-2">
-                      <button
-                        type="submit"
-                        className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
-                      >
-                        Add
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setQuickAddOpen(null);
-                          setQuickAddTitle('');
-                          setQuickAddPriority(0);
-                          setQuickAddCategory('');
-                          setQuickAddStaff('Merlin');
-                        }}
-                        className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
-                </div>
-              ) : (
-                <div className="px-6 py-4 bg-gray-50 border-t border-gray-200">
+        <div className="bg-white rounded-2xl shadow-md border border-gray-200 overflow-hidden">
+          {/* Todos list */}
+          <div className="divide-y divide-gray-100">
+            {filteredTodos.map((todo) => (
+              <div
+                key={todo.todo_id}
+                className="px-6 py-4 hover:bg-gray-50 transition-colors group"
+              >
+                <div className="flex items-center gap-4">
+                  {/* Checkbox */}
                   <button
-                    onClick={() => setQuickAddOpen(dateKey)}
-                    className="flex items-center gap-2 text-blue-600 hover:text-blue-700 font-medium transition-colors"
+                    onClick={() => handleToggleComplete(todo)}
+                    className="flex-shrink-0"
                   >
-                    <Plus className="w-4 h-4" />
-                    Add another task for {formatDate(dateKey)}
+                    {todo.is_completed ? (
+                      <div className="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center">
+                        <Check className="w-4 h-4 text-white" />
+                      </div>
+                    ) : (
+                      <div className="w-6 h-6 rounded-md border-2 border-gray-300 hover:border-blue-500 transition-colors" />
+                    )}
                   </button>
+
+                  {/* Content */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {getPriorityIcon(todo.priority)}
+                      <p
+                        className={`text-base break-words ${
+                          todo.is_completed
+                            ? 'line-through text-gray-400'
+                            : 'text-gray-900'
+                        }`}
+                      >
+                        {todo.title}
+                      </p>
+                    </div>
+                    
+                    {/* Notes/Description (if exists) */}
+                    {todo.notes && (
+                      <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">
+                        {todo.notes}
+                      </div>
+                    )}
+                    
+                    {/* Metadata: Category + Date */}
+                    {(todo.category || todo.date_header) && (
+                      <div className="flex items-center gap-2 mt-2">
+                        {todo.category && (
+                          <span className="inline-block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md font-medium">
+                            {todo.category}
+                          </span>
+                        )}
+                        {todo.date_header && (
+                          <span className="text-xs text-gray-500">
+                            {formatDate(todo.date_header.split('T')[0])}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right side: Action Buttons - Always visible on mobile, hover on desktop */}
+                  <div className="flex items-center gap-2 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    {/* Edit Button */}
+                    <button
+                      onClick={() => openEditModal(todo)}
+                      className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
+                      title="Edit"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    
+                    {/* Delete Button */}
+                    <button
+                      onClick={() => handleDeleteTodo(todo.todo_id)}
+                      className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-600 hover:text-red-600"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            ))}
+          </div>
         </div>
-      )}
+      );
+      })()}
       
       {/* Edit Task Modal */}
       <Modal

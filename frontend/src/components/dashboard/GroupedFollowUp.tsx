@@ -92,17 +92,19 @@ export default function GroupedFollowUpSection({
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-orange-600" />
-            <h2 className="text-xl font-bold text-gray-900">Need Follow-up</h2>
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center shadow-md">
+              <AlertCircle className="w-5 h-5 text-white" />
+            </div>
+            <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
           </div>
         </div>
         <div className="p-4 space-y-3">
           {[1, 2, 3].map((i) => (
             <div key={i} className="animate-pulse">
-              <div className="h-32 bg-gray-100 rounded-lg"></div>
+              <div className="h-32 bg-gray-100 rounded-xl"></div>
             </div>
           ))}
         </div>
@@ -112,39 +114,52 @@ export default function GroupedFollowUpSection({
 
   if (!groups || groups.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-        <div className="flex items-center justify-between p-4 border-b border-gray-200">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="w-5 h-5 text-gray-400" />
-            <h2 className="text-xl font-bold text-gray-900">Need Follow-up</h2>
-            <span className="px-2 py-1 bg-gray-100 text-gray-600 text-sm rounded-full">
-              0
-            </span>
+      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+        <div className="flex items-center justify-between p-5 border-b border-gray-200">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
+              <AlertCircle className="w-5 h-5 text-gray-400" />
+            </div>
+            <div className="flex items-center gap-3">
+              <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
+              <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full font-semibold">
+                0
+              </span>
+            </div>
           </div>
         </div>
         <div className="p-8 text-center">
-          <p className="text-gray-500">No customers need follow-up at this time</p>
-          <p className="text-sm text-gray-400 mt-1">Great job staying on top of things!</p>
+          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
+            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>
+          </div>
+          <p className="text-gray-700 font-medium">No customers need follow-up at this time</p>
+          <p className="text-sm text-gray-500 mt-1">Great job staying on top of things!</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200">
-      <div className="flex items-center justify-between p-4 border-b border-gray-200">
-        <div className="flex items-center gap-2">
-          <AlertCircle className="w-5 h-5 text-orange-600" />
-          <h2 className="text-xl font-bold text-gray-900">Need Follow-up</h2>
-          <span className="px-2 py-1 bg-orange-100 text-orange-800 text-sm rounded-full font-medium">
-            {groups.length} {groups.length === 1 ? 'person' : 'people'}
-          </span>
+    <div className="bg-white rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
+      <div className="flex items-center justify-between p-5 border-b border-gray-200">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center shadow-md">
+            <AlertCircle className="w-5 h-5 text-white" />
+          </div>
+          <div className="flex items-center gap-3">
+            <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
+            <span className="px-3 py-1 bg-gradient-to-r from-orange-100 to-red-100 text-orange-800 text-sm rounded-full font-semibold shadow-sm">
+              {groups.length} {groups.length === 1 ? 'person' : 'people'}
+            </span>
+          </div>
         </div>
         <button
           onClick={() => setIsExpanded(!isExpanded)}
           className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
         >
-          {isExpanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
+          {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
         </button>
       </div>
       
@@ -171,17 +186,30 @@ export default function GroupedFollowUpSection({
               <div
                 key={group.contact.contact_id}
                 onClick={() => togglePersonExpand(group.contact.contact_id)}
-                className="p-4 rounded-lg border-2 border-gray-300 transition-all duration-200 bg-white cursor-pointer hover:shadow-lg hover:border-green-400 hover:bg-green-50 hover:scale-[1.02] active:scale-100"
+                className="relative overflow-hidden p-5 rounded-xl border-2 transition-all duration-200 bg-gradient-to-br from-white to-gray-50 cursor-pointer hover:shadow-xl hover:border-blue-400 hover:-translate-y-0.5 active:translate-y-0 ${
+                  isAbandoned ? 'border-red-300 hover:border-red-400' :
+                  hasFees ? 'border-orange-300 hover:border-orange-400' :
+                  'border-gray-200'
+                }"
                 title={isPersonExpanded ? "Click to collapse details" : "Click to expand and see full details"}
               >
+                {/* Gradient accent line */}
+                <div className={`absolute top-0 left-0 right-0 h-1 ${
+                  isAbandoned ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                  hasFees ? 'bg-gradient-to-r from-orange-500 to-red-500' :
+                  'bg-gradient-to-r from-gray-400 to-gray-500'
+                }`} />
+                
                 {/* Header with customer name and fees */}
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3 flex-1">
-                    <div className={`w-3 h-3 rounded-full ${
-                      isAbandoned ? 'bg-red-600' :
-                      hasFees ? 'bg-orange-500' :
-                      'bg-gray-400'
-                    }`} />
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${
+                      isAbandoned ? 'bg-gradient-to-br from-red-500 to-red-600' :
+                      hasFees ? 'bg-gradient-to-br from-orange-500 to-amber-600' :
+                      'bg-gradient-to-br from-gray-400 to-gray-500'
+                    }`}>
+                      <AlertCircle className="w-6 h-6 text-white" />
+                    </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-gray-900 text-lg">{customerName}</p>
@@ -190,7 +218,7 @@ export default function GroupedFollowUpSection({
                             e.stopPropagation(); // Prevent triggering parent div's onClick
                             togglePersonExpand(group.contact.contact_id);
                           }}
-                          className="p-1 hover:bg-gray-200 rounded transition-colors"
+                          className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
                           title={isPersonExpanded ? "Collapse details" : "Expand details"}
                         >
                           {isPersonExpanded ? 
@@ -199,19 +227,28 @@ export default function GroupedFollowUpSection({
                           }
                         </button>
                       </div>
-                      <p className="text-sm text-gray-600">
-                        📮 {group.contact.mailbox_number || 'No mailbox'} • {totalItems} item{totalItems !== 1 ? 's' : ''}
-                        {!isPersonExpanded && ` • ${oldestDays} days old`}
-                      </p>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-md">
+                          📮 {group.contact.mailbox_number || 'No mailbox'}
+                        </span>
+                        <span className="text-sm text-gray-600">
+                          {totalItems} item{totalItems !== 1 ? 's' : ''}
+                        </span>
+                        {!isPersonExpanded && (
+                          <span className={`text-sm font-medium ${oldestDays >= 7 ? 'text-red-600' : 'text-gray-600'}`}>
+                            • {oldestDays} days old
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   
                   {hasFees && (
-                    <div className="text-right">
+                    <div className="text-right bg-gradient-to-br from-orange-50 to-red-50 px-4 py-2 rounded-xl border border-orange-200">
                       <p className="text-2xl font-bold text-orange-600">
                         ${group.totalFees.toFixed(2)}
                       </p>
-                      <p className="text-xs text-gray-600">storage fees</p>
+                      <p className="text-xs text-orange-700 font-medium">storage fees</p>
                     </div>
                   )}
                 </div>

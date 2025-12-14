@@ -5,12 +5,8 @@ import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
-import SendEmailModal from '../components/SendEmailModal.tsx';
-import WaiveFeeModal from '../components/WaiveFeeModal.tsx';
-import CollectFeeModal from '../components/CollectFeeModal.tsx';
 import LoadingSpinner from '../components/LoadingSpinner.tsx';
 import RevenueWidget from '../components/dashboard/RevenueWidget.tsx';
-import GroupedFollowUpSection from '../components/dashboard/GroupedFollowUp.tsx';
 import QuickActionsSection from '../components/dashboard/QuickActionsSection.tsx';
 import ChartsSection from '../components/dashboard/ChartsSection.tsx';
 import toast from 'react-hot-toast';
@@ -121,21 +117,6 @@ export default function DashboardPage() {
     quantity: 1
   });
   const [contacts, setContacts] = useState<Contact[]>([]);
-  
-  // Send Email Modal states
-  const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
-  const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
-  const [emailingBulkItems, setEmailingBulkItems] = useState<MailItem[]>([]); // For bulk notifications
-  const [suggestedTemplateType, setSuggestedTemplateType] = useState<string | undefined>(undefined);
-  const [emailingGroupKey, setEmailingGroupKey] = useState<string | null>(null); // Track group key for email toast navigation
-  
-  // Waive Fee Modal states
-  const [isWaiveFeeModalOpen, setIsWaiveFeeModalOpen] = useState(false);
-  const [waivingGroup, setWaivingGroup] = useState<GroupedFollowUp | null>(null);
-  
-  // Collect Fee Modal states
-  const [isCollectFeeModalOpen, setIsCollectFeeModalOpen] = useState(false);
-  const [collectingGroup, setCollectingGroup] = useState<GroupedFollowUp | null>(null);
   
   // Action Modal states (for picked up, forward, abandoned actions)
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -372,90 +353,6 @@ export default function DashboardPage() {
     }
   };
 
-  const openSendEmailModal = (item: MailItem) => {
-    setEmailingMailItem(item);
-    setIsSendEmailModalOpen(true);
-  };
-
-  const handleEmailSuccess = async () => {
-    // Increase delay for bulk emails to ensure backend commits all changes
-    const isBulk = emailingBulkItems.length > 0;
-    await new Promise(resolve => setTimeout(resolve, isBulk ? 800 : 200));
-    
-    loadDashboardData(); // Refresh data after email sent
-    
-    // Show toast with "View in Mail Log" link
-    if (emailingMailItem) {
-      const customerName = emailingMailItem.contacts?.contact_person || 
-                          emailingMailItem.contacts?.company_name || 
-                          'Customer';
-      
-      if (isBulk) {
-        // For bulk emails, we need to pass all affected group keys
-        const groupKeys = emailingBulkItems.map(item => 
-          `${item.contact_id}|${item.received_date.split('T')[0]}|${item.item_type}`
-        );
-        // Remove duplicates
-        const uniqueGroupKeys = [...new Set(groupKeys)];
-        
-        toast.success(
-          (t) => (
-            <div className="flex items-center justify-between gap-4">
-              <span>📧 Summary email sent to {customerName} ({emailingBulkItems.length} items)</span>
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  navigate('/dashboard/log', { 
-                    state: { 
-                      jumpToGroupKeys: uniqueGroupKeys,
-                      sortByLastNotified: true // Auto-sort by Last Notified
-                    } 
-                  });
-                }}
-                className="text-blue-600 hover:underline text-sm font-medium whitespace-nowrap"
-              >
-                View in Log →
-              </button>
-            </div>
-          ),
-          { duration: 15000 } // Increased from 12000 to 15000ms for better visibility
-        );
-      } else {
-        // Single email - original behavior
-        const groupKey = emailingGroupKey || 
-          `${emailingMailItem.contact_id}|${emailingMailItem.received_date.split('T')[0]}|${emailingMailItem.item_type}`;
-        
-        toast.success(
-          (t) => (
-            <div className="flex items-center justify-between gap-4">
-              <span>✅ Email sent to {customerName}</span>
-              <button
-                onClick={() => {
-                  toast.dismiss(t.id);
-                  navigate('/dashboard/log', { 
-                    state: { 
-                      jumpToGroupKey: groupKey,
-                      sortByLastNotified: true // Auto-sort by Last Notified
-                    } 
-                  });
-                }}
-                className="text-blue-600 hover:underline text-sm"
-              >
-                View in Log →
-              </button>
-            </div>
-          ),
-          { duration: 15000 } // Increased from 10000 to 15000ms for better visibility
-        );
-      }
-    }
-    
-    setIsSendEmailModalOpen(false);
-    setEmailingMailItem(null);
-    setEmailingBulkItems([]); // Clear bulk items
-    setEmailingGroupKey(null); // Clear the stored group key
-  };
-
   const handleActionSuccess = () => {
     loadDashboardData();
     setIsActionModalOpen(false);
@@ -466,130 +363,6 @@ export default function DashboardPage() {
     loadDashboardData();
     setIsQuickNotifyModalOpen(false);
     setNotifyingMailItem(null);
-  };
-
-  const openWaiveFeeModal = (group: GroupedFollowUp) => {
-    setWaivingGroup(group);
-    setIsWaiveFeeModalOpen(true);
-  };
-
-  const handleWaiveFeeSuccess = () => {
-    loadDashboardData(); // Refresh data after waiving fees
-    setIsWaiveFeeModalOpen(false);
-    setWaivingGroup(null);
-    
-    // Simple toast without navigation
-    if (waivingGroup) {
-      const customerName = waivingGroup.contact.contact_person || 
-                          waivingGroup.contact.company_name || 
-                          'Customer';
-      toast.success(`✅ Fee waived for ${customerName}`);
-    }
-  };
-
-  const openCollectFeeModal = (group: GroupedFollowUp) => {
-    setCollectingGroup(group);
-    setIsCollectFeeModalOpen(true);
-  };
-
-  const handleCollectFeeSuccess = async (action: 'collected' | 'waived' | 'skipped') => {
-    // Small delay to ensure backend has committed action history to database
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    loadDashboardData(); // Refresh data after fee action
-    setIsCollectFeeModalOpen(false);
-    
-    // Simple toast without navigation
-    if (collectingGroup) {
-      const customerName = collectingGroup.contact.contact_person || 
-                          collectingGroup.contact.company_name || 
-                          'Customer';
-      
-      if (action === 'collected') {
-        toast.success(`💰 Fee collected from ${customerName}`);
-      } else if (action === 'waived') {
-        toast.success(`✅ Fee waived for ${customerName}`);
-      }
-    }
-    
-    setCollectingGroup(null);
-  };
-
-  const openSendEmailForGroup = (group: GroupedFollowUp) => {
-    // For grouped follow-up, we send a summary email for ALL items
-    const allItems = [...group.packages, ...group.letters];
-    const firstItem = allItems[0];
-    
-    if (firstItem && allItems.length > 0) {
-      // Calculate suggested template based on urgency and item count
-      const oldestDays = Math.max(...allItems.map(item => getDaysSince(item.received_date)));
-      
-      let suggested: string | undefined;
-      // If multiple items, suggest summary template
-      if (allItems.length > 1) {
-        suggested = 'Summary Notification (All Items)';
-      } else if (oldestDays >= 28) {
-        suggested = 'Final Notice Before Abandonment';
-      } else if (group.totalFees > 0) {
-        suggested = 'Package Fee Reminder';
-      } else {
-        suggested = 'General Reminder';
-      }
-      
-      setSuggestedTemplateType(suggested);
-      
-      // Store ALL items for bulk notification
-      setEmailingBulkItems(allItems);
-      
-      // Use first item's groupKey for navigation (we'll update ALL items' history)
-      const groupKey = `${firstItem.contact_id}|${firstItem.received_date.split('T')[0]}|${firstItem.item_type}`;
-      setEmailingGroupKey(groupKey);
-      
-      openSendEmailModal(firstItem);
-    }
-  };
-
-  // Mark all items 30+ days old in a group as abandoned
-  const handleMarkAbandoned = async (group: GroupedFollowUp) => {
-    const allItems = [...group.packages, ...group.letters];
-    
-    // Filter to only items 30+ days old
-    const abandonedItems = allItems.filter(item => getDaysSince(item.received_date) >= 30);
-    
-    if (abandonedItems.length === 0) {
-      toast.error('No items are 30+ days old in this group');
-      return;
-    }
-    
-    const customerName = group.contact.contact_person || group.contact.company_name || 'Unknown';
-    const confirmMessage = abandonedItems.length === 1
-      ? `Mark 1 item (30+ days old) for ${customerName} as abandoned?`
-      : `Mark ${abandonedItems.length} items (30+ days old) for ${customerName} as abandoned?`;
-    
-    if (!window.confirm(confirmMessage)) {
-      return;
-    }
-    
-    try {
-      // Update each item's status to 'Abandoned Package'
-      // Backend will automatically log to action_history
-      for (const item of abandonedItems) {
-        await api.mailItems.updateStatus(item.mail_item_id, 'Abandoned Package');
-      }
-      
-      // Small delay to ensure backend has committed action history to database
-      await new Promise(resolve => setTimeout(resolve, 200));
-      
-      loadDashboardData(); // Refresh the dashboard
-      
-      // Simple toast without navigation
-      toast.success(
-        `📦 Marked ${abandonedItems.length} item${abandonedItems.length > 1 ? 's' : ''} as abandoned for ${customerName}`
-      );
-    } catch (err) {
-      console.error('Error marking items as abandoned:', err);
-      toast.error('Failed to mark items as abandoned');
-    }
   };
 
   if (loading) {
@@ -622,104 +395,92 @@ export default function DashboardPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Dashboard</h1>
-        <p className="text-gray-600">Today's mail activity, metrics, and customer insights</p>
-      </div>
-
       {/* Quick Action Buttons */}
       <QuickActionsSection
         onScanMail={() => navigate('/dashboard/scan')}
         onAddCustomer={() => setIsAddCustomerModalOpen(true)}
         onLogMail={openLogMailModal}
+        followUpCount={stats?.needsFollowUp?.length || 0}
+        onNavigateToFollowUps={() => navigate('/dashboard/follow-ups')}
       />
 
-      {/* Stats Cards - Responsive grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
+      {/* Stats Cards - Responsive grid with modern design */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6 mb-8">
         {/* Today's Mail */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Today's Mail</p>
-              <p className="text-4xl font-bold text-gray-900">{stats?.todaysMail || 0}</p>
-              <p className="text-gray-500 text-sm mt-1">items received</p>
+        <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-6 shadow-md border border-blue-100 hover:shadow-lg transition-shadow">
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex-1">
+              <p className="text-blue-700 text-xs font-semibold uppercase tracking-wide mb-2">Today's Mail</p>
+              <p className="text-4xl font-bold text-gray-900 mb-1">{stats?.todaysMail || 0}</p>
+              <p className="text-gray-600 text-sm">items received</p>
             </div>
-            <Mail className="w-8 h-8 text-gray-900" />
+            <div className="w-12 h-12 bg-blue-500 rounded-full flex items-center justify-center shadow-md">
+              <Mail className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
 
         {/* Pending Pickups */}
-        <div className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Pending Pickups</p>
-              <p className="text-4xl font-bold text-gray-900">{stats?.pendingPickups || 0}</p>
-              <p className="text-gray-500 text-sm mt-1">awaiting collection</p>
+        <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-6 shadow-md border border-purple-100 hover:shadow-lg transition-shadow">
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex-1">
+              <p className="text-purple-700 text-xs font-semibold uppercase tracking-wide mb-2">Pending Pickups</p>
+              <p className="text-4xl font-bold text-gray-900 mb-1">{stats?.pendingPickups || 0}</p>
+              <p className="text-gray-600 text-sm">awaiting collection</p>
             </div>
-            <Package className="w-8 h-8 text-gray-900" />
+            <div className="w-12 h-12 bg-purple-500 rounded-full flex items-center justify-center shadow-md">
+              <Package className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
 
         {/* Overdue! */}
-        <div className="bg-white border-2 border-red-200 rounded-lg p-6 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-gray-900 text-sm mb-1 font-semibold">Overdue!</p>
-              <p className="text-4xl font-bold text-red-600">{stats?.overdueMail || 0}</p>
-              <p className="text-gray-900 text-sm mt-1">&gt;7 days old</p>
+        <div className="bg-gradient-to-br from-red-50 to-white rounded-xl p-6 shadow-md border border-red-200 hover:shadow-lg transition-shadow">
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex-1">
+              <p className="text-red-700 text-xs font-semibold uppercase tracking-wide mb-2">Overdue!</p>
+              <p className="text-4xl font-bold text-red-600 mb-1">{stats?.overdueMail || 0}</p>
+              <p className="text-gray-700 text-sm font-medium">&gt;7 days old</p>
             </div>
-            <AlertCircle className="w-8 h-8 text-red-600" />
+            <div className="w-12 h-12 bg-red-500 rounded-full flex items-center justify-center shadow-md animate-pulse">
+              <AlertCircle className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
 
         {/* Completed Today */}
-        <div className="bg-white border border-green-200 rounded-lg p-6 shadow-sm">
-          <div className="flex justify-between items-start mb-4">
-            <div>
-              <p className="text-gray-600 text-sm mb-1">Completed Today</p>
-              <p className="text-4xl font-bold text-green-600">{stats?.completedToday || 0}</p>
-              <p className="text-gray-500 text-sm mt-1">picked up</p>
+        <div className="bg-gradient-to-br from-green-50 to-white rounded-xl p-6 shadow-md border border-green-100 hover:shadow-lg transition-shadow">
+          <div className="flex justify-between items-start mb-3">
+            <div className="flex-1">
+              <p className="text-green-700 text-xs font-semibold uppercase tracking-wide mb-2">Completed Today</p>
+              <p className="text-4xl font-bold text-green-600 mb-1">{stats?.completedToday || 0}</p>
+              <p className="text-gray-600 text-sm">picked up</p>
             </div>
-            <CheckCircle2 className="w-8 h-8 text-green-600" />
+            <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center shadow-md">
+              <CheckCircle2 className="w-6 h-6 text-white" />
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Responsive Layout: Stack on mobile, side-by-side on desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8 items-start">
-        {/* Revenue Widget - NEW */}
-        <div className="lg:col-span-5">
-          <RevenueWidget
-            monthlyRevenue={stats?.monthlyRevenue || 0}
-            outstandingFees={stats?.outstandingFees || 0}
-            totalRevenue={stats?.totalRevenue || 0}
-            loading={loading}
-          />
-              </div>
-          
-        {/* Needs Follow-Up - Full width on mobile, 60% on desktop */}
-        <div className="lg:col-span-3 h-full">
-          <GroupedFollowUpSection
-            groups={stats?.needsFollowUp || []}
-            onWaiveFee={openWaiveFeeModal}
-            onSendEmail={openSendEmailForGroup}
-            onMarkAbandoned={handleMarkAbandoned}
-            onCollectFee={openCollectFeeModal}
-            getDaysSince={getDaysSince}
-            loading={loading}
-          />
-          </div>
-
-        {/* Charts - Full width on mobile, 40% on desktop */}
-        <ChartsSection
-          mailVolumeData={stats?.mailVolumeData || []}
-          customerGrowthData={stats?.customerGrowthData || []}
-          chartTimeRange={chartTimeRange}
-          onTimeRangeChange={setChartTimeRange}
-          loading={chartsLoading}
+      {/* Revenue Widget */}
+      <div className="mb-8">
+        <RevenueWidget
+          monthlyRevenue={stats?.monthlyRevenue || 0}
+          outstandingFees={stats?.outstandingFees || 0}
+          totalRevenue={stats?.totalRevenue || 0}
+          loading={loading}
         />
       </div>
+
+      {/* Charts - Full width */}
+      <ChartsSection
+        mailVolumeData={stats?.mailVolumeData || []}
+        customerGrowthData={stats?.customerGrowthData || []}
+        chartTimeRange={chartTimeRange}
+        onTimeRangeChange={setChartTimeRange}
+        loading={chartsLoading}
+      />
 
       {/* Add Customer Modal */}
       <Modal 
@@ -1046,49 +807,6 @@ export default function DashboardPage() {
           }}
           actionType={actionModalType}
           onSuccess={handleActionSuccess}
-        />
-      )}
-      
-      {/* Waive Fee Modal */}
-      {waivingGroup && (
-        <WaiveFeeModal
-          isOpen={isWaiveFeeModalOpen}
-          onClose={() => {
-            setIsWaiveFeeModalOpen(false);
-            setWaivingGroup(null);
-          }}
-          group={waivingGroup}
-          onSuccess={handleWaiveFeeSuccess}
-        />
-      )}
-      
-      {/* Collect Fee Modal */}
-      {collectingGroup && (
-        <CollectFeeModal
-          isOpen={isCollectFeeModalOpen}
-          onClose={() => {
-            setIsCollectFeeModalOpen(false);
-            setCollectingGroup(null);
-          }}
-          group={collectingGroup}
-          onSuccess={handleCollectFeeSuccess}
-        />
-      )}
-      
-      {/* Send Email Modal */}
-      {emailingMailItem && (
-        <SendEmailModal
-          isOpen={isSendEmailModalOpen}
-          onClose={() => {
-            setIsSendEmailModalOpen(false);
-            setEmailingMailItem(null);
-            setEmailingBulkItems([]);
-            setSuggestedTemplateType(undefined);
-          }}
-          mailItem={emailingMailItem}
-          bulkMailItems={emailingBulkItems}
-          onSuccess={handleEmailSuccess}
-          suggestedTemplateType={suggestedTemplateType}
         />
       )}
     </div>

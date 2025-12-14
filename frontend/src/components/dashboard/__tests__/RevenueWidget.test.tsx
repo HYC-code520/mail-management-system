@@ -2,11 +2,20 @@ import React from 'react';
 import '@testing-library/jest-dom';
 import { describe, it, expect } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import { MemoryRouter } from 'react-router-dom';
 import RevenueWidget from '../RevenueWidget';
+
+const renderWithRouter = (component: React.ReactElement) => {
+  return render(
+    <MemoryRouter>
+      {component}
+    </MemoryRouter>
+  );
+};
 
 describe('RevenueWidget', () => {
   it('should display all revenue metrics', () => {
-    render(
+    renderWithRouter(
       <RevenueWidget
         monthlyRevenue={125.50}
         outstandingFees={75.00}
@@ -22,7 +31,7 @@ describe('RevenueWidget', () => {
   });
 
   it('should display $0.00 when values are zero', () => {
-    render(
+    renderWithRouter(
       <RevenueWidget
         monthlyRevenue={0}
         outstandingFees={0}
@@ -36,7 +45,7 @@ describe('RevenueWidget', () => {
   });
 
   it('should show loading skeleton when loading', () => {
-    const { container } = render(
+    const { container } = renderWithRouter(
       <RevenueWidget
         monthlyRevenue={100}
         outstandingFees={50}
@@ -47,13 +56,13 @@ describe('RevenueWidget', () => {
 
     const skeletons = container.querySelectorAll('.animate-pulse');
     expect(skeletons.length).toBeGreaterThan(0);
-    
+
     // Should not display actual values while loading
     expect(screen.queryByText('$100.00')).not.toBeInTheDocument();
   });
 
   it('should format large numbers correctly', () => {
-    render(
+    renderWithRouter(
       <RevenueWidget
         monthlyRevenue={1234.56}
         outstandingFees={987.65}
@@ -68,7 +77,7 @@ describe('RevenueWidget', () => {
   });
 
   it('should display section labels correctly', () => {
-    render(
+    renderWithRouter(
       <RevenueWidget
         monthlyRevenue={100}
         outstandingFees={50}
@@ -83,7 +92,7 @@ describe('RevenueWidget', () => {
   });
 
   it('should handle undefined values gracefully', () => {
-    render(
+    renderWithRouter(
       <RevenueWidget
         monthlyRevenue={undefined as any}
         outstandingFees={undefined as any}
@@ -97,7 +106,7 @@ describe('RevenueWidget', () => {
   });
 
   it('should round to 2 decimal places', () => {
-    render(
+    renderWithRouter(
       <RevenueWidget
         monthlyRevenue={99.999}
         outstandingFees={50.001}
@@ -110,6 +119,32 @@ describe('RevenueWidget', () => {
     expect(screen.getByText('$50.00')).toBeInTheDocument();
     expect(screen.getByText('$250.50')).toBeInTheDocument();
   });
+
+  it('should have clickable Outstanding section with correct title', () => {
+    renderWithRouter(
+      <RevenueWidget
+        monthlyRevenue={100}
+        outstandingFees={70}
+        totalRevenue={300}
+        loading={false}
+      />
+    );
+
+    const outstandingSection = screen.getByTitle('View customers who need follow-up');
+    expect(outstandingSection).toBeInTheDocument();
+    expect(outstandingSection).toHaveClass('cursor-pointer');
+  });
+
+  it('should display click hint text on Outstanding section', () => {
+    renderWithRouter(
+      <RevenueWidget
+        monthlyRevenue={100}
+        outstandingFees={70}
+        totalRevenue={300}
+        loading={false}
+      />
+    );
+
+    expect(screen.getByText('Owed - Click to view')).toBeInTheDocument();
+  });
 });
-
-
