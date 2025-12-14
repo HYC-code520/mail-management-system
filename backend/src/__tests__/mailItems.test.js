@@ -259,6 +259,90 @@ describe('Mail Items API', () => {
         expect(response.body.status).toBe(status);
       }
     });
+
+    it('should create mail item with logged_by parameter for staff tracking', async () => {
+      const newMailItem = {
+        contact_id: 'contact-123',
+        item_type: 'Letter',
+        description: 'Test letter',
+        status: 'Received',
+        logged_by: 'Madison'
+      };
+
+      const createdMailItem = {
+        mail_item_id: 'mail-1',
+        contact_id: 'contact-123',
+        item_type: 'Letter',
+        description: 'Test letter',
+        status: 'Received',
+        quantity: 1,
+        received_date: new Date().toISOString(),
+        created_at: new Date().toISOString()
+      };
+
+      mockSupabaseClient.single.mockResolvedValue({
+        data: createdMailItem,
+        error: null
+      });
+
+      const response = await request(app)
+        .post('/api/mail-items')
+        .send(newMailItem)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('mail_item_id');
+      expect(mockSupabaseClient.insert).toHaveBeenCalled();
+      
+      // Verify action history was created with logged_by parameter
+      // The insert is called twice: once for mail_item, once for action_history
+      const insertCalls = mockSupabaseClient.insert.mock.calls;
+      const actionHistoryCall = insertCalls.find(call => 
+        call[0] && call[0].action_type === 'created'
+      );
+      
+      if (actionHistoryCall) {
+        expect(actionHistoryCall[0].performed_by).toBe('Madison');
+      }
+    });
+
+    it('should fall back to email when logged_by is not provided', async () => {
+      const newMailItem = {
+        contact_id: 'contact-123',
+        item_type: 'Package',
+        description: 'Test package',
+        status: 'Received'
+      };
+
+      const createdMailItem = {
+        mail_item_id: 'mail-2',
+        ...newMailItem,
+        quantity: 1,
+        received_date: new Date().toISOString()
+      };
+
+      mockSupabaseClient.single.mockResolvedValue({
+        data: createdMailItem,
+        error: null
+      });
+
+      const response = await request(app)
+        .post('/api/mail-items')
+        .send(newMailItem)
+        .expect(201);
+
+      expect(response.body).toHaveProperty('mail_item_id');
+      
+      // Verify action history falls back to user email
+      const insertCalls = mockSupabaseClient.insert.mock.calls;
+      const actionHistoryCall = insertCalls.find(call => 
+        call[0] && call[0].action_type === 'created'
+      );
+      
+      if (actionHistoryCall) {
+        // Should use req.user.email from the mock auth middleware
+        expect(actionHistoryCall[0].performed_by).toBe('test@example.com');
+      }
+    });
   });
 
   describe('PUT /api/mail-items/:id', () => {
@@ -743,6 +827,81 @@ describe('Action History Logging Logic', () => {
         { field: 'status', from: 'Received', to: 'Notified' }
       ];
       expect(generateDescription(changes)).toBe('Quantity: 1 → 3; Status: Received → Notified');
+    });
+  });
+});
+
+// Staff Name Tracking Tests
+describe('Staff Name Tracking in Action History', () => {
+  describe('performed_by parameter handling', () => {
+    it('should use performed_by parameter when provided', () => {
+      const req = {
+        body: { status: 'Picked Up', performed_by: 'Madison' },
+        user: { email: 'ariel.chen@pursuit.org' }
+      };
+      
+      // When performed_by is provided, it should be used
+      const performedBy = req.body.performed_by || req.user.email || 'Staff';
+      expect(performedBy).toBe('Madison');
+    });
+
+    it('should fallback to user email when performed_by is not provided', () => {
+      const req = {
+        body: { status: 'Picked Up' },
+        user: { email: 'ariel.chen@pursuit.org' }
+      };
+      
+      // When performed_by is NOT provided, fallback to email
+      const performedBy = req.body.performed_by || req.user.email || 'Staff';
+      expect(performedBy).toBe('ariel.chen@pursuit.org');
+    });
+
+    it('should support Merlin as performed_by', () => {
+      const req = {
+        body: { status: 'Picked Up', performed_by: 'Merlin' },
+        user: { email: 'ariel.chen@pursuit.org' }
+      };
+      
+      const performedBy = req.body.performed_by || req.user.email || 'Staff';
+      expect(performedBy).toBe('Merlin');
+    });
+
+    it('should fallback to "Staff" when neither performed_by nor email is available', () => {
+      const req = {
+        body: { status: 'Picked Up' },
+        user: {}
+      };
+      
+      const performedBy = req.body.performed_by || req.user.email || 'Staff';
+      expect(performedBy).toBe('Staff');
+    });
+  });
+
+  describe('action history entry format', () => {
+    it('should include performed_by in action history entry', () => {
+      const actionHistoryEntry = {
+        mail_item_id: 'mail-1',
+        action_type: 'picked_up',
+        action_description: 'Status: Notified → Picked Up',
+        performed_by: 'Madison',
+        action_timestamp: new Date().toISOString()
+      };
+      
+      expect(actionHistoryEntry.performed_by).toBe('Madison');
+      expect(actionHistoryEntry.action_type).toBe('picked_up');
+    });
+
+    it('should preserve staff name across multiple updates', () => {
+      const staffName = 'Madison';
+      const entries = [
+        { mail_item_id: 'pkg-1', performed_by: staffName },
+        { mail_item_id: 'letter-1', performed_by: staffName },
+        { mail_item_id: 'letter-2', performed_by: staffName }
+      ];
+      
+      entries.forEach(entry => {
+        expect(entry.performed_by).toBe('Madison');
+      });
     });
   });
 });

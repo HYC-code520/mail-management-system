@@ -204,6 +204,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const [searchResults, setSearchResults] = useState<Contact[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
   const [addingMail, setAddingMail] = useState(false);
+  const [loggedBy, setLoggedBy] = useState<string | null>(null); // NEW: Staff selection for logging mail
   
   // Duplicate detection state
   const [existingTodayMail, setExistingTodayMail] = useState<MailItem | null>(null);
@@ -384,7 +385,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           mail_item_id: existingTodayMail.mail_item_id,
           action_type: 'updated',
           action_description: `Added ${currentQuantity} more ${itemType}${currentQuantity > 1 ? 's' : ''} (total now: ${newQuantity})`,
-          performed_by: 'Staff',
+          performed_by: loggedBy || 'Staff', // Use selected staff name
           notes: note || null
         });
 
@@ -407,7 +408,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           description: note,
           status: 'Received',
           quantity: typeof quantity === 'string' && quantity === '' ? 1 : Number(quantity),
-          received_date: receivedDateNY
+          received_date: receivedDateNY,
+          logged_by: loggedBy || undefined // Pass staff name to backend
         });
 
         console.log('Successfully created new mail!');
@@ -423,6 +425,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       setSelectedContact(null);
       setDate(getTodayNY()); // Use NY timezone
       setExistingTodayMail(null);
+      setLoggedBy(null); // Reset staff selection
       
       // Small delay before reloading to ensure database has committed the timestamp
       await new Promise(resolve => setTimeout(resolve, 100));
@@ -1252,6 +1255,40 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
             />
           </div>
 
+          {/* Staff Selection */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Who is logging this mail? *
+            </label>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={() => setLoggedBy('Madison')}
+                className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                  loggedBy === 'Madison'
+                    ? 'border-purple-500 bg-purple-50 text-purple-700'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                }`}
+              >
+                Madison
+              </button>
+              <button
+                type="button"
+                onClick={() => setLoggedBy('Merlin')}
+                className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                  loggedBy === 'Merlin'
+                    ? 'border-blue-500 bg-blue-50 text-blue-700'
+                    : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                }`}
+              >
+                Merlin
+              </button>
+            </div>
+            {!loggedBy && (
+              <p className="mt-1 text-xs text-red-600">Please select who is logging this mail</p>
+            )}
+          </div>
+
           {/* Link to Customer */}
           <div className="mb-6 relative">
             <label className="block text-sm font-medium text-gray-700 mb-2">Link to Customer</label>
@@ -1371,7 +1408,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           {/* Submit Button */}
           <button
             type="submit"
-            disabled={addingMail || !selectedContact}
+            disabled={addingMail || !selectedContact || !loggedBy}
             className="w-full px-6 py-3 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {addingMail ? 'Saving...' : 'Add Mail Item'}

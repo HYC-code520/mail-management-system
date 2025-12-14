@@ -5,11 +5,11 @@
  * Used during pickup flow and standalone fee collection.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Modal from './Modal.tsx';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
-import { CreditCard, Banknote, Smartphone, CheckCircle, XCircle, ArrowRight, PackageCheck } from 'lucide-react';
+import { CreditCard, Banknote, Smartphone, CheckCircle, XCircle, ArrowRight, PackageCheck, Mail, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext.tsx';
 
 interface PackageFee {
@@ -78,9 +78,39 @@ export default function CollectFeeModal({
   const [showWaiveInput, setShowWaiveInput] = useState(false);
   const [saving, setSaving] = useState(false);
   const [markAsPickedUp, setMarkAsPickedUp] = useState(false);
+  const [markLettersAsPickedUp, setMarkLettersAsPickedUp] = useState(true); // Default to true for convenience
   const [isEditingAmount, setIsEditingAmount] = useState(false);
   const [editedAmount, setEditedAmount] = useState('');
   const [collectedBy, setCollectedBy] = useState<'Madison' | 'Merlin' | ''>(''); // Staff selection
+  const [fullUnpaidAmount, setFullUnpaidAmount] = useState<number | null>(null); // Total unpaid fees across ALL items
+  const [loadingFullAmount, setLoadingFullAmount] = useState(false);
+
+  // Fetch the customer's FULL unpaid fees (not just from Needs Follow-Up)
+  useEffect(() => {
+    if (!group || !isOpen) {
+      setFullUnpaidAmount(null);
+      return;
+    }
+
+    const fetchFullUnpaidFees = async () => {
+      setLoadingFullAmount(true);
+      try {
+        const response = await api.fees.getUnpaidByContact(group.contact.contact_id);
+        // API returns array directly, not wrapped in { fees: [...] }
+        const feesArray = Array.isArray(response) ? response : (response.fees || []);
+        const total = feesArray.reduce((sum: number, fee: any) => sum + (fee.fee_amount || 0), 0);
+        setFullUnpaidAmount(total);
+      } catch (error) {
+        console.error('Error fetching full unpaid fees:', error);
+        // Don't show error to user, just fail silently
+        setFullUnpaidAmount(null);
+      } finally {
+        setLoadingFullAmount(false);
+      }
+    };
+
+    fetchFullUnpaidFees();
+  }, [group, isOpen]);
 
   if (!group) return null;
 
@@ -88,6 +118,14 @@ export default function CollectFeeModal({
   const pendingPackages = group.packages.filter(
     pkg => pkg.packageFee && pkg.packageFee.fee_status === 'pending' && pkg.packageFee.fee_amount > 0
   );
+
+  // Helper to get staff name for performed_by field
+  const getPerformedBy = (): string => {
+    // For collect flow, use the selected staff name
+    if (collectedBy) return collectedBy;
+    // For waive/skip flow or fallback, use email
+    return user?.email || 'Staff';
+  };
 
   // Calculate total fee - use edited amount if in edit mode, otherwise use original
   const displayAmount = isEditingAmount && editedAmount ? parseFloat(editedAmount) : group.totalFees;
@@ -115,16 +153,28 @@ export default function CollectFeeModal({
         }
       }
 
-      // If checkbox is checked or pickup flow, mark all packages as picked up
+      // If checkbox is checked or pickup flow, mark items as picked up
       const shouldMarkPickedUp = markAsPickedUp || (isPickupFlow && onMarkPickedUp);
       
       if (shouldMarkPickedUp) {
         // Mark all packages in this group as picked up
         for (const pkg of group.packages) {
-          await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up');
+          await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up', collectedBy);
         }
+        
+        // Mark letters as picked up if checkbox is checked
+        if (markLettersAsPickedUp && group.letters.length > 0) {
+          for (const letter of group.letters) {
+            await api.mailItems.updateStatus(letter.mail_item_id, 'Picked Up', collectedBy);
+          }
+        }
+        
+        // Show appropriate toast message
+        const itemsMarked = markLettersAsPickedUp && group.letters.length > 0 
+          ? 'all items' 
+          : 'packages';
         toast.success(
-          `💵 Collected $${totalCollected.toFixed(2)} via ${paymentMethod} & marked as Picked Up`,
+          `💵 Collected $${totalCollected.toFixed(2)} via ${paymentMethod} & marked ${itemsMarked} as Picked Up`,
           { duration: 5000 }
         );
       } else {
@@ -168,15 +218,29 @@ export default function CollectFeeModal({
         }
       }
 
-      // If checkbox is checked or pickup flow, mark all packages as picked up
+      // If checkbox is checked or pickup flow, mark items as picked up
       const shouldMarkPickedUp = markAsPickedUp || (isPickupFlow && onMarkPickedUp);
       
       if (shouldMarkPickedUp) {
+        const performedBy = getPerformedBy();
+        // Mark all packages in this group as picked up
         for (const pkg of group.packages) {
-          await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up');
+          await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up', performedBy);
         }
+        
+        // Mark letters as picked up if checkbox is checked
+        if (markLettersAsPickedUp && group.letters.length > 0) {
+          for (const letter of group.letters) {
+            await api.mailItems.updateStatus(letter.mail_item_id, 'Picked Up', performedBy);
+          }
+        }
+        
+        // Show appropriate toast message
+        const itemsMarked = markLettersAsPickedUp && group.letters.length > 0 
+          ? 'all items' 
+          : 'packages';
         toast.success(
-          `✅ Waived $${totalWaived.toFixed(2)} & marked as Picked Up`,
+          `✅ Waived $${totalWaived.toFixed(2)} & marked ${itemsMarked} as Picked Up`,
           { duration: 5000 }
         );
       } else {
@@ -207,15 +271,29 @@ export default function CollectFeeModal({
     // Skip fee collection - mark as unpaid debt
     setSaving(true);
     try {
-      // If checkbox is checked or pickup flow, mark all packages as picked up
+      // If checkbox is checked or pickup flow, mark items as picked up
       const shouldMarkPickedUp = markAsPickedUp || (isPickupFlow && onMarkPickedUp);
       
       if (shouldMarkPickedUp) {
+        const performedBy = getPerformedBy();
+        // Mark all packages in this group as picked up
         for (const pkg of group.packages) {
-          await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up');
+          await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up', performedBy);
         }
+        
+        // Mark letters as picked up if checkbox is checked
+        if (markLettersAsPickedUp && group.letters.length > 0) {
+          for (const letter of group.letters) {
+            await api.mailItems.updateStatus(letter.mail_item_id, 'Picked Up', performedBy);
+          }
+        }
+        
+        // Show appropriate toast message
+        const itemsMarked = markLettersAsPickedUp && group.letters.length > 0 
+          ? 'all items' 
+          : 'packages';
         toast.success(
-          `⏭️ Skipped fee - marked as Picked Up. $${group.totalFees.toFixed(2)} tracked as unpaid debt.`,
+          `⏭️ Skipped fee - marked ${itemsMarked} as Picked Up. $${group.totalFees.toFixed(2)} tracked as unpaid debt.`,
           { duration: 5000 }
         );
       } else {
@@ -246,9 +324,11 @@ export default function CollectFeeModal({
     setWaiveReason('');
     setShowWaiveInput(false);
     setMarkAsPickedUp(false);
+    setMarkLettersAsPickedUp(true); // Reset to default true
     setIsEditingAmount(false);
     setEditedAmount('');
     setCollectedBy('');
+    // Note: fullUnpaidAmount is managed by useEffect, not reset here
   };
 
   const handleClose = () => {
@@ -267,6 +347,32 @@ export default function CollectFeeModal({
           <p className="text-lg font-bold text-gray-900">{customerName}</p>
           <p className="text-sm text-gray-600">📮 Mailbox: {group.contact.mailbox_number || 'N/A'}</p>
         </div>
+
+        {/* Warning: Additional unpaid fees exist */}
+        {!loadingFullAmount && fullUnpaidAmount !== null && fullUnpaidAmount > group.totalFees && (
+          <div className="bg-amber-50 border-2 border-amber-400 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-bold text-amber-900 mb-1">⚠️ Additional Fees Not Shown</p>
+                <p className="text-sm text-amber-800 mb-2">
+                  This customer owes <strong>${fullUnpaidAmount.toFixed(2)} total</strong>, but only <strong>${group.totalFees.toFixed(2)}</strong> is shown here (from items needing follow-up).
+                </p>
+                <p className="text-sm text-amber-800">
+                  <strong>Additional ${(fullUnpaidAmount - group.totalFees).toFixed(2)}</strong> is from items that were:
+                </p>
+                <ul className="text-xs text-amber-700 ml-4 mt-1 space-y-0.5">
+                  <li>• Already picked up (fee not collected)</li>
+                  <li>• Recently notified (within 3 days)</li>
+                  <li>• Abandoned (still owe storage fees)</li>
+                </ul>
+                <p className="text-sm font-bold text-amber-900 mt-2 bg-amber-100 p-2 rounded border border-amber-300">
+                  💡 Consider collecting the full ${fullUnpaidAmount.toFixed(2)} if customer is present!
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Fee Summary */}
         <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -400,21 +506,42 @@ export default function CollectFeeModal({
 
         {/* Mark as Picked Up Checkbox */}
         {!isPickupFlow && !showWaiveInput && (
-          <label className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
-            <input
-              type="checkbox"
-              checked={markAsPickedUp}
-              onChange={(e) => setMarkAsPickedUp(e.target.checked)}
-              disabled={saving}
-              className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-            />
-            <div className="flex items-center gap-2">
-              <PackageCheck className="w-5 h-5 text-blue-600" />
-              <span className="text-sm font-medium text-gray-700">
-                Also mark as Picked Up
-              </span>
-            </div>
-          </label>
+          <div className="space-y-2">
+            <label className="flex items-center gap-3 p-3 bg-blue-50 border border-blue-200 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors">
+              <input
+                type="checkbox"
+                checked={markAsPickedUp}
+                onChange={(e) => setMarkAsPickedUp(e.target.checked)}
+                disabled={saving}
+                className="w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <div className="flex items-center gap-2">
+                <PackageCheck className="w-5 h-5 text-blue-600" />
+                <span className="text-sm font-medium text-gray-700">
+                  Also mark as Picked Up
+                </span>
+              </div>
+            </label>
+            
+            {/* Letter Pickup Sub-checkbox - Only show if customer has letters AND main checkbox is checked */}
+            {markAsPickedUp && group.letters.length > 0 && (
+              <label className="flex items-center gap-3 p-3 ml-6 bg-green-50 border border-green-200 rounded-lg cursor-pointer hover:bg-green-100 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={markLettersAsPickedUp}
+                  onChange={(e) => setMarkLettersAsPickedUp(e.target.checked)}
+                  disabled={saving}
+                  className="w-5 h-5 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                />
+                <div className="flex items-center gap-2">
+                  <Mail className="w-5 h-5 text-green-600" />
+                  <span className="text-sm font-medium text-gray-700">
+                    Also mark {group.letters.length} letter{group.letters.length !== 1 ? 's' : ''} as picked up
+                  </span>
+                </div>
+              </label>
+            )}
+          </div>
         )}
 
         {/* Waive Reason Input (conditional) */}

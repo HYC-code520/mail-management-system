@@ -127,13 +127,17 @@ describe('WaiveFeeModal', () => {
     const reasonInput = screen.getByRole('textbox');
     fireEvent.change(reasonInput, { target: { value: 'Customer complaint resolution' } });
 
+    // Select staff (Madison)
+    const madisonButton = screen.getByRole('button', { name: 'Madison' });
+    fireEvent.click(madisonButton);
+
     const confirmButton = screen.getByText(/Waive \$28\.00/i);
     fireEvent.click(confirmButton);
 
     await waitFor(() => {
       expect(api.fees.waive).toHaveBeenCalledTimes(2);
-      expect(api.fees.waive).toHaveBeenCalledWith('fee-1', 'Customer complaint resolution');
-      expect(api.fees.waive).toHaveBeenCalledWith('fee-2', 'Customer complaint resolution');
+      expect(api.fees.waive).toHaveBeenCalledWith('fee-1', 'Customer complaint resolution', 'Madison');
+      expect(api.fees.waive).toHaveBeenCalledWith('fee-2', 'Customer complaint resolution', 'Madison');
     });
 
     await waitFor(() => {
@@ -161,6 +165,10 @@ describe('WaiveFeeModal', () => {
 
     const reasonInput = screen.getByRole('textbox');
     fireEvent.change(reasonInput, { target: { value: 'Good customer' } });
+
+    // Select staff (Merlin)
+    const merlinButton = screen.getByRole('button', { name: 'Merlin' });
+    fireEvent.click(merlinButton);
 
     const confirmButton = screen.getByText(/Waive \$28\.00/i);
     fireEvent.click(confirmButton);

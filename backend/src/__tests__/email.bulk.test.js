@@ -331,5 +331,60 @@ describe('Bulk Email Notifications API', () => {
       expect(response.status).toBeGreaterThanOrEqual(400);
       expect(response.body.error).toBeDefined();
     });
+
+    it('should correctly count quantities when mail items have quantity > 1', async () => {
+      // Mock mail items with quantities
+      const mockMailItemsWithQuantities = [
+        {
+          mail_item_id: 'mail-1',
+          item_type: 'Package',
+          received_date: '2024-11-25',
+          quantity: 2,
+          package_fees: [{ fee_amount: 10.00, fee_status: 'pending' }]
+        },
+        {
+          mail_item_id: 'mail-2',
+          item_type: 'Letter',
+          received_date: '2024-11-26',
+          quantity: 5
+        },
+        {
+          mail_item_id: 'mail-3',
+          item_type: 'Package',
+          received_date: '2024-11-27',
+          quantity: 1,
+          package_fees: [{ fee_amount: 15.00, fee_status: 'pending' }]
+        }
+      ];
+
+      const mockClient = createMockSupabaseClient({
+        mailItemsData: mockMailItemsWithQuantities
+      });
+      supabase.from = mockClient.from;
+      getSupabaseClient.mockReturnValue(mockClient);
+
+      sendTemplateEmail.mockResolvedValue({ messageId: 'msg-123' });
+
+      const response = await request(app)
+        .post('/api/emails/send-bulk')
+        .set('Authorization', `Bearer ${mockToken}`)
+        .send({
+          contact_id: 'contact-123',
+          template_id: 'template-summary',
+          mail_item_ids: ['mail-1', 'mail-2', 'mail-3'],
+          sent_by: 'Madison'
+        });
+
+      expect(response.status).toBe(200);
+      expect(sendTemplateEmail).toHaveBeenCalledWith(
+        expect.objectContaining({
+          variables: expect.objectContaining({
+            TotalItems: 8,        // 2 + 5 + 1 = 8 total items
+            TotalPackages: 3,     // 2 + 1 = 3 packages
+            TotalLetters: 5       // 5 letters
+          })
+        })
+      );
+    });
   });
 });

@@ -88,7 +88,7 @@ exports.getMailItems = async (req, res, next) => {
 exports.createMailItem = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
-    const { contact_id, item_type, description, status, quantity, received_date } = req.body;
+    const { contact_id, item_type, description, status, quantity, received_date, logged_by } = req.body;
 
     // Validate required fields
     if (!contact_id) {
@@ -162,7 +162,7 @@ exports.createMailItem = async (req, res, next) => {
           mail_item_id: mailItem.mail_item_id,
           action_type: 'created',
           action_description: `${mailItem.item_type} logged (qty: ${mailItem.quantity || 1})${mailItem.description ? ` - ${mailItem.description}` : ''}`,
-          performed_by: req.user.email || 'Staff',
+          performed_by: logged_by || req.user.email || 'Staff',
           action_timestamp: new Date().toISOString()
         });
       

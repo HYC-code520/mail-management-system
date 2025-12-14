@@ -89,7 +89,7 @@ exports.getRevenueStats = async (req, res, next) => {
 exports.waiveFee = async (req, res, next) => {
   try {
     const { feeId } = req.params;
-    const { reason } = req.body;
+    const { reason, waived_by } = req.body;
     const userId = req.user.id;
     
     // Validate input
@@ -125,6 +125,7 @@ exports.waiveFee = async (req, res, next) => {
     
     // Log action to action_history (without contact_id - table doesn't have it)
     try {
+      const staffName = waived_by || req.user.email || 'Unknown';
       await require('../services/supabase.service').supabaseAdmin
         .from('action_history')
         .insert({
@@ -132,7 +133,7 @@ exports.waiveFee = async (req, res, next) => {
           action_type: 'Fee Waived',
           action_description: `Waived $${fee.fee_amount.toFixed(2)} storage fee`,
           notes: `Reason: ${reason}`,
-          performed_by: req.user.email || 'Unknown',
+          performed_by: staffName,
           action_timestamp: new Date().toISOString()
         });
       
