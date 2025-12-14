@@ -1093,7 +1093,7 @@ export default function ScanSessionPage() {
         <BulkScanEmailModal
           isOpen={showEmailModal}
           onClose={() => setShowEmailModal(false)}
-          groups={groupItems()}
+          groups={groupItemsByContact()}
           onConfirm={handleConfirmAndSend}
           sending={isSubmitting}
         />
