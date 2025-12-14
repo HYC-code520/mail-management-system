@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, Bell, CheckCircle, FileText, Send, AlertTriangle, Eye, MoreVertical, Loader2 } from 'lucide-react';
+import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, CheckCircle, FileText, Send, AlertTriangle, Eye, MoreVertical, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
@@ -8,7 +8,7 @@ import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
 import ActionHistorySection from '../components/ActionHistorySection.tsx';
-import { getTodayNY, getNYTimestamp } from '../utils/timezone.ts';
+import { getTodayNY } from '../utils/timezone.ts';
 
 interface MailItem {
   mail_item_id: string;
@@ -666,56 +666,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const quickStatusUpdate = async (mailItemId: string, newStatus: string, currentStatus?: string) => {
-    // Store the previous status for undo
-    const previousStatus = currentStatus || 'Received';
-    
-    try {
-      // Update to new status
-      await api.mailItems.update(mailItemId, { status: newStatus });
-      
-      // Show success toast with undo button
-      toast.success(
-        (t) => (
-          <div className="flex items-center justify-between gap-4">
-            <span>Status updated to {newStatus}</span>
-            <button
-              onClick={async () => {
-                try {
-                  await api.mailItems.update(mailItemId, { status: previousStatus });
-                  toast.dismiss(t.id);
-                  toast.success(`Undone! Status reverted to ${previousStatus}`);
-                  loadMailItems();
-                } catch (err) {
-                  console.error('Failed to undo:', err);
-                  toast.error('Failed to undo');
-                }
-              }}
-              className="px-3 py-1 bg-white hover:bg-gray-100 text-gray-900 text-sm font-medium rounded border border-gray-300 transition-colors"
-            >
-              Undo
-            </button>
-          </div>
-        ),
-        {
-          duration: 8000, // Show for 8 seconds to give time to undo
-        }
-      );
-      
-      loadMailItems();
-    } catch (err) {
-      console.error('Failed to update status:', err);
-      toast.error('Failed to update status');
-    }
-  };
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const openQuickNotifyModal = (item: MailItem) => {
-    setNotifyingMailItem(item);
-    setIsQuickNotifyModalOpen(true);
-  };
-
   const openSendEmailModal = (item: MailItem) => {
     setEmailingMailItem(item);
     setIsSendEmailModalOpen(true);
@@ -795,20 +745,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     return allHistory.sort((a, b) => 
       new Date(b.action_timestamp).getTime() - new Date(a.action_timestamp).getTime()
     );
-  };
-
-  const toggleRow = (id: string) => {
-    const newExpanded = new Set(expandedRows);
-    if (newExpanded.has(id)) {
-      newExpanded.delete(id);
-    } else {
-      newExpanded.add(id);
-      // Load action history when row is expanded
-      if (!actionHistory[id]) {
-        loadActionHistory(id);
-      }
-    }
-    setExpandedRows(newExpanded);
   };
 
   // Toggle for grouped rows
@@ -944,7 +880,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           setLoading(false);
         });
     }
-  }, [location.state, navigate]);
+  }, [location.state, location.pathname, navigate]);
 
   // Jump to row after data is loaded and grouped (single row)
   useEffect(() => {
@@ -1099,37 +1035,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           // Both have values, compare normally
           comparison = lastNotifiedA - lastNotifiedB;
         }
-        break;
-      }
-    }
-    
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
-
-  // Keep legacy sortedItems for backwards compatibility with modals
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    let comparison = 0;
-    
-    switch (sortColumn) {
-      case 'date':
-        comparison = new Date(a.received_date).getTime() - new Date(b.received_date).getTime();
-        break;
-      case 'status':
-        comparison = a.status.localeCompare(b.status);
-        break;
-      case 'customer': {
-        const nameA = a.contacts?.contact_person || a.contacts?.company_name || '';
-        const nameB = b.contacts?.contact_person || b.contacts?.company_name || '';
-        comparison = nameA.localeCompare(nameB);
-        break;
-      }
-      case 'type':
-        comparison = a.item_type.localeCompare(b.item_type);
-        break;
-      case 'quantity': {
-        const qtyA = a.quantity || 1;
-        const qtyB = b.quantity || 1;
-        comparison = qtyA - qtyB;
         break;
       }
     }

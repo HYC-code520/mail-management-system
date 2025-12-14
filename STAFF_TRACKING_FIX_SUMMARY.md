@@ -158,3 +158,4 @@ All staff selection buttons use consistent styling:
 
 All staff tracking is now consistent throughout the application. Every action will show Madison or Merlin instead of the email address.
 
+

@@ -202,7 +202,7 @@ describe('WaiveFeeModal - Staff Selection', () => {
   });
 
   it('should reset staff selection on modal close', async () => {
-    const { rerender, unmount } = render(
+    const { unmount } = render(
       <BrowserRouter>
         <WaiveFeeModal
           isOpen={true}
