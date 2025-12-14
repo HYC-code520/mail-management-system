@@ -222,6 +222,123 @@ describe('Fee Controller', () => {
       expect(response.status).toBe(400);
       expect(response.body.error).toContain('at least 5 characters');
     });
+
+    it('should waive fee with waived_by parameter for staff tracking', async () => {
+      const mockWaivedFee = {
+        fee_id: 'fee-1',
+        fee_status: 'waived',
+        waive_reason: 'Customer loyalty discount',
+        fee_amount: 10.00,
+      };
+
+      // Mock the fee fetch query
+      const mockSelectBuilder = {
+        eq: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({
+          data: { 
+            fee_id: 'fee-1', 
+            user_id: 'test-user-id', 
+            fee_status: 'pending', 
+            mail_item_id: 'mail-1', 
+            fee_amount: 10.00 
+          },
+          error: null
+        }),
+      };
+
+      // Mock the action_history insert
+      let actionHistoryData = null;
+      const mockInsertBuilder = {
+        insert: jest.fn().mockImplementation((data) => {
+          actionHistoryData = data;
+          return Promise.resolve({ data: null, error: null });
+        }),
+      };
+
+      let callCount = 0;
+      supabaseService.supabaseAdmin.from = jest.fn().mockImplementation((table) => {
+        callCount++;
+        if (callCount === 1 && table === 'package_fees') {
+          return { select: jest.fn().mockReturnValue(mockSelectBuilder) };
+        } else if (callCount === 2 && table === 'action_history') {
+          return mockInsertBuilder;
+        }
+        return { select: jest.fn().mockReturnThis(), insert: jest.fn().mockResolvedValue({}) };
+      });
+
+      feeService.waiveFee = jest.fn().mockResolvedValue(mockWaivedFee);
+
+      const response = await request(app)
+        .post('/api/fees/fee-1/waive')
+        .send({ 
+          reason: 'Customer loyalty discount',
+          waived_by: 'Madison'
+        });
+
+      expect(response.status).toBe(200);
+      expect(response.body.fee).toEqual(mockWaivedFee);
+      
+      // Verify action history was created with waived_by parameter
+      expect(actionHistoryData).toBeTruthy();
+      expect(actionHistoryData.performed_by).toBe('Madison');
+      expect(actionHistoryData.action_type).toBe('Fee Waived');
+    });
+
+    it('should fall back to email when waived_by is not provided', async () => {
+      const mockWaivedFee = {
+        fee_id: 'fee-1',
+        fee_status: 'waived',
+        waive_reason: 'System error',
+        fee_amount: 10.00,
+      };
+
+      // Mock the fee fetch query
+      const mockSelectBuilder = {
+        eq: jest.fn().mockReturnThis(),
+        single: jest.fn().mockResolvedValue({
+          data: { 
+            fee_id: 'fee-1', 
+            user_id: 'test-user-id', 
+            fee_status: 'pending', 
+            mail_item_id: 'mail-1', 
+            fee_amount: 10.00 
+          },
+          error: null
+        }),
+      };
+
+      // Mock the action_history insert
+      let actionHistoryData = null;
+      const mockInsertBuilder = {
+        insert: jest.fn().mockImplementation((data) => {
+          actionHistoryData = data;
+          return Promise.resolve({ data: null, error: null });
+        }),
+      };
+
+      let callCount = 0;
+      supabaseService.supabaseAdmin.from = jest.fn().mockImplementation((table) => {
+        callCount++;
+        if (callCount === 1 && table === 'package_fees') {
+          return { select: jest.fn().mockReturnValue(mockSelectBuilder) };
+        } else if (callCount === 2 && table === 'action_history') {
+          return mockInsertBuilder;
+        }
+        return { select: jest.fn().mockReturnThis(), insert: jest.fn().mockResolvedValue({}) };
+      });
+
+      feeService.waiveFee = jest.fn().mockResolvedValue(mockWaivedFee);
+
+      const response = await request(app)
+        .post('/api/fees/fee-1/waive')
+        .send({ reason: 'System error' }); // No waived_by provided
+
+      expect(response.status).toBe(200);
+      
+      // Verify action history falls back to user email
+      expect(actionHistoryData).toBeTruthy();
+      expect(actionHistoryData.performed_by).toBe('test@example.com');
+    });
   });
 
   describe('POST /api/fees/:feeId/pay', () => {

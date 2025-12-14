@@ -155,7 +155,9 @@ export default function GroupedFollowUpSection({
                                group.contact.company_name || 
                                'Unknown Customer';
             const hasFees = group.totalFees > 0;
-            const totalItems = group.packages.length + group.letters.length;
+            const totalItems =
+              group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0) +
+              group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
             
             // Calculate oldest item age
             const allItems = [...group.packages, ...group.letters];
@@ -223,7 +225,14 @@ export default function GroupedFollowUpSection({
                         <div className="flex items-center gap-2 text-sm mb-2">
                           <Package className="w-4 h-4 text-gray-600" />
                           <span className="font-semibold text-gray-900">
-                            {group.packages.length} {group.packages.length === 1 ? 'package' : 'packages'} waiting
+                            {(() => {
+                              const totalQty = group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0);
+                              const recordCount = group.packages.length;
+                              if (totalQty > recordCount) {
+                                return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'} (${totalQty} total) waiting`;
+                              }
+                              return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'} waiting`;
+                            })()}
                           </span>
                         </div>
                         <div className="ml-5 space-y-2">
@@ -243,7 +252,12 @@ export default function GroupedFollowUpSection({
                               return (
                               <div key={pkg.mail_item_id} className="text-sm">
                                 <div className="flex items-start gap-2">
-                                  <span className="text-gray-900 font-medium">• Received {receivedDateStr}</span>
+                                  <span className="text-gray-900 font-medium">
+                                    • Received {receivedDateStr}
+                                    {pkg.quantity && pkg.quantity > 1 && (
+                                      <span className="text-blue-600 font-semibold"> (×{pkg.quantity})</span>
+                                    )}
+                                  </span>
                                   <span className="text-gray-500">({days} day{days !== 1 ? 's' : ''} ago)</span>
                                 </div>
                                 <div className="ml-5 text-gray-600">
@@ -287,11 +301,30 @@ export default function GroupedFollowUpSection({
                         <div className="flex items-center gap-2 text-sm mb-2">
                           <Mail className="w-4 h-4 text-gray-600" />
                           <span className="font-semibold text-gray-900">
-                            {group.letters.length} {group.letters.length === 1 ? 'letter' : 'letters'} waiting
+                            {(() => {
+                              const totalQty = group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
+                              const recordCount = group.letters.length;
+                              if (totalQty > recordCount) {
+                                return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'} (${totalQty} total) waiting`;
+                              }
+                              return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'} waiting`;
+                            })()}
                           </span>
                         </div>
-                        <div className="ml-5 text-sm text-gray-600">
-                          • Oldest: {Math.max(...group.letters.map(l => getDaysSince(l.received_date)))} days ago
+                        <div className="ml-5 space-y-1">
+                          {group.letters.map(letter => {
+                            const days = getDaysSince(letter.received_date);
+                            const receivedDateStr = format(new Date(letter.received_date), 'MMM d');
+                            return (
+                              <div key={letter.mail_item_id} className="text-sm text-gray-600">
+                                • Received {receivedDateStr}
+                                {letter.quantity && letter.quantity > 1 && (
+                                  <span className="text-blue-600 font-semibold"> (×{letter.quantity})</span>
+                                )}
+                                <span className="text-gray-500"> ({days} day{days !== 1 ? 's' : ''} ago)</span>
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}

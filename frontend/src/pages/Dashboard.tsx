@@ -14,7 +14,7 @@ import GroupedFollowUpSection from '../components/dashboard/GroupedFollowUp.tsx'
 import QuickActionsSection from '../components/dashboard/QuickActionsSection.tsx';
 import ChartsSection from '../components/dashboard/ChartsSection.tsx';
 import toast from 'react-hot-toast';
-import { getTodayNY, toNYDateString, getNYTimestamp } from '../utils/timezone.ts';
+import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 
 interface PackageFee {
   fee_id: string;
@@ -93,26 +93,15 @@ export default function DashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [chartsLoading, setChartsLoading] = useState(false); // Separate loading state for charts
-  const [statusFilter] = useState('All Status');
-  const [searchTerm] = useState('');
-  const [isFollowUpExpanded, setIsFollowUpExpanded] = useState(true);
-  const [followUpDisplayCount, setFollowUpDisplayCount] = useState(10); // Show 10 initially
   
   // Chart time range state
   const [chartTimeRange, setChartTimeRange] = useState<7 | 14 | 30>(7); // Default to 7 days
-  
-  // Sorting states (for future feature)
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [sortColumn, setSortColumn] = useState<'date' | 'type' | 'customer' | 'status'>('date');
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
 
   // Add Customer Modal states
   const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
   const [isQuickNotifyModalOpen, setIsQuickNotifyModalOpen] = useState(false);
   const [notifyingMailItem, setNotifyingMailItem] = useState<MailItem | null>(null);
   const [saving, setSaving] = useState(false);
-  const [openFollowUpDropdownId, setOpenFollowUpDropdownId] = useState<string | null>(null);
   
   // Log New Mail Modal states
   const [isLogMailModalOpen, setIsLogMailModalOpen] = useState(false);
@@ -150,7 +139,7 @@ export default function DashboardPage() {
   
   // Action Modal states (for picked up, forward, abandoned actions)
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
-  const [actionModalType, setActionModalType] = useState<'picked_up' | 'forward' | 'scanned' | 'abandoned'>('picked_up');
+  const [actionModalType] = useState<'picked_up' | 'forward' | 'scanned' | 'abandoned'>('picked_up');
   const [actionMailItem, setActionMailItem] = useState<MailItem | null>(null);
   
   const [formData, setFormData] = useState({
@@ -209,31 +198,6 @@ export default function DashboardPage() {
     }
   }, [chartTimeRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Helper function to get notification context based on notification history
-  const getNotificationContext = (mailItem: MailItem) => {
-    const count = mailItem.notification_count || 0;
-    
-    let buttonText: string;
-    let suggestedTemplateType: string;
-    let buttonColor: string;
-    
-    if (count === 0) {
-      buttonText = "Send Notification";
-      suggestedTemplateType = "Initial";
-      buttonColor = "bg-blue-600/40 hover:bg-blue-600/60 text-blue-900 border border-blue-600/40";
-    } else if (count === 1) {
-      buttonText = "Send Reminder";
-      suggestedTemplateType = "Reminder";
-      buttonColor = "bg-gray-600/40 hover:bg-gray-600/60 text-gray-900 border border-gray-300";
-    } else {
-      buttonText = "Send Final Notice";
-      suggestedTemplateType = "Final Notice";
-      buttonColor = "bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300";
-    }
-    
-    return { buttonText, suggestedTemplateType, buttonColor, count };
-  };
-
   // Helper function to calculate days since a date (NY timezone aware)
   const getDaysSince = (dateStr: string) => {
     const todayNY = getTodayNY();
@@ -243,71 +207,6 @@ export default function DashboardPage() {
     const diffTime = todayDate.getTime() - itemDate.getTime();
     const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
     return Math.max(0, diffDays);
-  };
-
-  // Helper function to format date for tooltip display (NY timezone)
-  const formatDateForTooltip = (dateStr: string) => {
-    const nyDateStr = toNYDateString(dateStr);
-    const date = new Date(nyDateStr + 'T12:00:00'); // Use noon to avoid timezone edge cases
-    return date.toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric', 
-      year: 'numeric' 
-    });
-  };
-
-  // Helper function to generate date range for charts
-  const getChartDateRange = (days: number) => {
-    const result = [];
-    const today = new Date();
-    
-    for (let i = days - 1; i >= 0; i--) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      
-      // Format as YYYY-MM-DD for data matching
-      const dateStr = toNYDateString(date.toISOString());
-      
-      // Format for display (e.g., "Nov 20")
-      const displayDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-      
-      result.push({ dateStr, displayDate, date: displayDate }); // 'date' is what the chart uses
-    }
-    
-    return result;
-  };
-
-  // Helper function to generate tooltip content for notification button
-  const getNotificationTooltip = (mailItem: MailItem) => {
-    const count = mailItem.notification_count || 0;
-    const daysSinceReceived = getDaysSince(mailItem.received_date);
-    const receivedDateFormatted = formatDateForTooltip(mailItem.received_date);
-    
-    let tooltip = `📦 Received: ${receivedDateFormatted} (${daysSinceReceived} ${daysSinceReceived === 1 ? 'day' : 'days'} ago)\n`;
-    
-    if (count === 0) {
-      tooltip += `✉️ Status: Not notified yet\n`;
-      tooltip += `→ Action: Send initial notification`;
-    } else if (count === 1) {
-      if (mailItem.last_notified) {
-        const daysSinceNotified = getDaysSince(mailItem.last_notified);
-        const lastNotifiedFormatted = formatDateForTooltip(mailItem.last_notified);
-        tooltip += `✉️ Last notified: ${lastNotifiedFormatted} (${daysSinceNotified} ${daysSinceNotified === 1 ? 'day' : 'days'} ago)\n`;
-      } else {
-        tooltip += `✉️ Notified: 1 time\n`;
-      }
-      tooltip += `→ Action: Send reminder`;
-    } else {
-      if (mailItem.last_notified) {
-        const daysSinceNotified = getDaysSince(mailItem.last_notified);
-        const lastNotifiedFormatted = formatDateForTooltip(mailItem.last_notified);
-        tooltip += `✉️ Last notified: ${lastNotifiedFormatted} (${daysSinceNotified} ${daysSinceNotified === 1 ? 'day' : 'days'} ago)\n`;
-      }
-      tooltip += `🔔 Notified: ${count} times\n`;
-      tooltip += `⚠ Action: Send final notice`;
-    }
-    
-    return tooltip;
   };
 
   // Format phone number as user types: 917-822-5751
@@ -472,11 +371,6 @@ export default function DashboardPage() {
       setSaving(false);
     }
   };
-
-  // const openQuickNotifyModal = (item: MailItem) => {
-  //   setNotifyingMailItem(item);
-  //   setIsQuickNotifyModalOpen(true);
-  // };
 
   const openSendEmailModal = (item: MailItem) => {
     setEmailingMailItem(item);
@@ -725,48 +619,6 @@ export default function DashboardPage() {
       </div>
     );
   }
-
-  // const handleSort = (column: 'date' | 'type' | 'customer' | 'status') => {
-  //   if (sortColumn === column) {
-  //     setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
-  //   } else {
-  //     setSortColumn(column);
-  //     setSortDirection(column === 'date' ? 'desc' : 'asc');
-  //   }
-  // };
-
-  const filteredItems = stats?.recentMailItems.filter((item: any) => {
-    const matchesStatus = statusFilter === 'All Status' || item.status === statusFilter;
-    const matchesSearch = searchTerm === '' || 
-      item.contacts?.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.contacts?.company_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesStatus && matchesSearch;
-  }) || [];
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const sortedItems = [...filteredItems].sort((a, b) => {
-    let comparison = 0;
-    
-    switch (sortColumn) {
-      case 'date':
-        comparison = new Date(a.received_date).getTime() - new Date(b.received_date).getTime();
-        break;
-      case 'type':
-        comparison = a.item_type.localeCompare(b.item_type);
-        break;
-      case 'customer': {
-        const nameA = a.contacts?.contact_person || a.contacts?.company_name || '';
-        const nameB = b.contacts?.contact_person || b.contacts?.company_name || '';
-        comparison = nameA.localeCompare(nameB);
-        break;
-      }
-      case 'status':
-        comparison = a.status.localeCompare(b.status);
-        break;
-    }
-    
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
 
   return (
     <div className="max-w-7xl mx-auto px-6 py-8">

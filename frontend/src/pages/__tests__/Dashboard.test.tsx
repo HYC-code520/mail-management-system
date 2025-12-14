@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '../../test/test-utils';
+import { render, screen, waitFor } from '../../test/test-utils';
 import Dashboard from '../Dashboard';
 import { mockContacts, mockMailItems } from '../../test/mockData';
 

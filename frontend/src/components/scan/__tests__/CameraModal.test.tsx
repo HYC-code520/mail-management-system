@@ -22,15 +22,6 @@ class MockMediaStream {
   }
 }
 
-// Mock video element behavior
-const _mockVideoElement = {
-  srcObject: null as MediaStream | null,
-  play: vi.fn().mockResolvedValue(undefined),
-  pause: vi.fn(),
-  addEventListener: vi.fn(),
-  removeEventListener: vi.fn(),
-};
-
 describe('CameraModal', () => {
   const mockOnClose = vi.fn();
   const mockOnCapture = vi.fn();

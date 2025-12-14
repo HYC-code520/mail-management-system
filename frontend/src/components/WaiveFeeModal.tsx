@@ -50,6 +50,7 @@ interface WaiveFeeModalProps {
 export default function WaiveFeeModal({ isOpen, onClose, group, onSuccess }: WaiveFeeModalProps) {
   const [reason, setReason] = useState('');
   const [saving, setSaving] = useState(false);
+  const [waivedBy, setWaivedBy] = useState<string | null>(null); // NEW: Staff selection
 
   if (!group) return null;
 
@@ -63,6 +64,11 @@ export default function WaiveFeeModal({ isOpen, onClose, group, onSuccess }: Wai
       toast.error('Please provide a reason (at least 5 characters)');
       return;
     }
+    
+    if (!waivedBy) {
+      toast.error('Please select who is waiving this fee');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -72,19 +78,20 @@ export default function WaiveFeeModal({ isOpen, onClose, group, onSuccess }: Wai
       // Waive fees for all pending packages in this group
       for (const pkg of pendingPackages) {
         if (pkg.packageFee && pkg.packageFee.fee_status === 'pending') {
-          await api.fees.waive(pkg.packageFee.fee_id, reason.trim());
+          await api.fees.waive(pkg.packageFee.fee_id, reason.trim(), waivedBy);
           waivedCount++;
           totalWaived += pkg.packageFee.fee_amount;
         }
       }
 
       toast.success(
-        `✅ Waived $${totalWaived.toFixed(2)} in fees for ${customerName} (${waivedCount} package${waivedCount !== 1 ? 's' : ''})`,
+        `✅ Waived $${totalWaived.toFixed(2)} in fees for ${customerName} by ${waivedBy} (${waivedCount} package${waivedCount !== 1 ? 's' : ''})`,
         { duration: 5000 }
       );
 
       // Reset form
       setReason('');
+      setWaivedBy(null);
       onSuccess();
       onClose();
     } catch (error) {
@@ -98,6 +105,7 @@ export default function WaiveFeeModal({ isOpen, onClose, group, onSuccess }: Wai
 
   const handleClose = () => {
     setReason('');
+    setWaivedBy(null);
     onClose();
   };
 
@@ -149,6 +157,42 @@ export default function WaiveFeeModal({ isOpen, onClose, group, onSuccess }: Wai
           <p className="text-xs text-gray-500 mt-1">
             {reason.length}/500 characters (minimum 5)
           </p>
+        </div>
+
+        {/* Staff Selection */}
+        <div>
+          <label className="block text-sm font-medium text-gray-900 mb-2">
+            Who is waiving this fee? <span className="text-red-500">*</span>
+          </label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={() => setWaivedBy('Madison')}
+              disabled={saving}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                waivedBy === 'Madison'
+                  ? 'border-purple-500 bg-purple-50 text-purple-700'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              } disabled:opacity-50`}
+            >
+              Madison
+            </button>
+            <button
+              type="button"
+              onClick={() => setWaivedBy('Merlin')}
+              disabled={saving}
+              className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                waivedBy === 'Merlin'
+                  ? 'border-blue-500 bg-blue-50 text-blue-700'
+                  : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+              } disabled:opacity-50`}
+            >
+              Merlin
+            </button>
+          </div>
+          {!waivedBy && (
+            <p className="mt-1 text-xs text-red-600">Please select who is waiving the fee</p>
+          )}
         </div>
 
         {/* Warning */}

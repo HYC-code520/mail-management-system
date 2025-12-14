@@ -7,12 +7,13 @@ import { api } from '../lib/api-client';
 import { initOCRWorker, terminateOCRWorker } from '../utils/ocr';
 import { smartMatchWithGemini } from '../utils/smartMatch';
 import CameraModal from '../components/scan/CameraModal';
-import type { 
-  ScannedItem, 
-  ScanSession, 
-  Contact, 
+import BulkScanEmailModal from '../components/scan/BulkScanEmailModal';
+import type {
+  ScannedItem,
+  ScanSession,
+  Contact,
   GroupedScanResult,
-  BulkSubmitItem 
+  BulkSubmitItem
 } from '../types/scan';
 
 const SESSION_TIMEOUT_HOURS = 4;
@@ -25,6 +26,7 @@ export default function ScanSessionPage() {
   // Session state
   const [session, setSession] = useState<ScanSession | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
+  const [scannedBy, setScannedBy] = useState<string | null>(null); // NEW: Staff selection for scan session
   
   // UI state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -43,6 +45,9 @@ export default function ScanSessionPage() {
   
   // Camera modal state
   const [showCameraModal, setShowCameraModal] = useState(false);
+
+  // Email preview modal state
+  const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Load contacts and check for existing session on mount
   useEffect(() => {
@@ -496,7 +501,78 @@ export default function ScanSessionPage() {
     return Array.from(grouped.values());
   };
 
+  // Quick send - original behavior (no preview modal)
   const handleBulkSubmit = async () => {
+    if (!session) return;
+
+    if (!scannedBy) {
+      toast.error('Please select who is scanning');
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // Prepare bulk submission data
+      const items: BulkSubmitItem[] = session.items
+        .filter(item => item.matchedContact)
+        .map(item => ({
+          contact_id: item.matchedContact!.contact_id,
+          item_type: item.itemType,
+          scanned_at: item.scannedAt,
+        }));
+
+      // Submit to backend with staff name (no template customization)
+      const response = await api.scan.bulkSubmit(items, scannedBy);
+
+      // Success!
+      toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
+
+      // Confetti animation
+      confetti({
+        particleCount: 100,
+        spread: 70,
+        origin: { y: 0.6 }
+      });
+
+      // Clean up
+      session.items.forEach(item => {
+        if (item.photoPreviewUrl) {
+          URL.revokeObjectURL(item.photoPreviewUrl);
+        }
+      });
+      localStorage.removeItem('scanSession');
+      sessionStorage.removeItem('scanSessionResumedToast');
+
+      // Navigate back after delay
+      setTimeout(() => {
+        navigate('/dashboard');
+      }, 2000);
+    } catch (error) {
+      console.error('Bulk submit failed:', error);
+      toast.error('Failed to submit items. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Optional: Preview/Edit email before sending
+  const handlePreviewEmail = () => {
+    if (!session) return;
+
+    if (!scannedBy) {
+      toast.error('Please select who is scanning');
+      return;
+    }
+
+    setShowEmailModal(true);
+  };
+
+  const handleConfirmAndSend = async (
+    templateId: string,
+    customSubject?: string,
+    customBody?: string
+  ) => {
     if (!session) return;
 
     setIsSubmitting(true);
@@ -511,8 +587,14 @@ export default function ScanSessionPage() {
           scanned_at: item.scannedAt,
         }));
 
-      // Submit to backend
-      const response = await api.scan.bulkSubmit(items);
+      // Submit to backend with staff name, template, and optional custom content
+      const response = await api.scan.bulkSubmit(
+        items,
+        scannedBy!,
+        templateId,
+        customSubject,
+        customBody
+      );
 
       // Success!
       toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
@@ -532,6 +614,9 @@ export default function ScanSessionPage() {
       });
       localStorage.removeItem('scanSession');
       sessionStorage.removeItem('scanSessionResumedToast'); // Clear the toast flag
+
+      // Close email modal
+      setShowEmailModal(false);
 
       // Navigate back after delay
       setTimeout(() => {
@@ -651,10 +736,45 @@ export default function ScanSessionPage() {
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-200 bg-gray-50">
+            <div className="p-6 border-t border-gray-200 bg-gray-50 space-y-4">
+              {/* Staff Selection */}
+              <div>
+                <label className="block text-sm font-medium text-gray-900 mb-2">
+                  Who is scanning this mail? *
+                </label>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setScannedBy('Madison')}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                      scannedBy === 'Madison'
+                        ? 'border-purple-500 bg-purple-50 text-purple-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    Madison
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScannedBy('Merlin')}
+                    className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                      scannedBy === 'Merlin'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                    }`}
+                  >
+                    Merlin
+                  </button>
+                </div>
+                {!scannedBy && (
+                  <p className="mt-1 text-xs text-red-600">Please select who is scanning</p>
+                )}
+              </div>
+              
+              {/* Main Action: Quick Send */}
               <button
                 onClick={handleBulkSubmit}
-                disabled={isSubmitting || grouped.length === 0}
+                disabled={isSubmitting || grouped.length === 0 || !scannedBy}
                 className="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-lg font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
               >
                 {isSubmitting ? (
@@ -669,9 +789,30 @@ export default function ScanSessionPage() {
                   </>
                 )}
               </button>
+
+              {/* Optional: Preview/Edit Email */}
+              <button
+                onClick={handlePreviewEmail}
+                disabled={isSubmitting || grouped.length === 0 || !scannedBy}
+                className="w-full py-2 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition-colors flex items-center justify-center gap-2"
+              >
+                <Edit className="w-4 h-4" />
+                Preview/Edit Email First (Optional)
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Email Preview Modal - must be inside Review Screen return */}
+        {showEmailModal && (
+          <BulkScanEmailModal
+            isOpen={showEmailModal}
+            onClose={() => setShowEmailModal(false)}
+            groups={grouped}
+            onConfirm={handleConfirmAndSend}
+            sending={isSubmitting}
+          />
+        )}
       </div>
     );
   }
@@ -947,6 +1088,16 @@ export default function ScanSessionPage() {
         onClose={() => setShowCameraModal(false)}
         onCapture={handleCameraCapture}
       />
+
+      {showEmailModal && (
+        <BulkScanEmailModal
+          isOpen={showEmailModal}
+          onClose={() => setShowEmailModal(false)}
+          groups={groupItemsByContact()}
+          onConfirm={handleConfirmAndSend}
+          sending={isSubmitting}
+        />
+      )}
     </div>
   );
 }

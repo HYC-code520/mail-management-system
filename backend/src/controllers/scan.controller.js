@@ -162,8 +162,8 @@ Now analyze the image and provide your response:`;
  */
 async function bulkSubmitScanSession(req, res, next) {
   try {
-    const { items } = req.body;
-    
+    const { items, template_id, custom_subject, custom_body } = req.body;
+
     // Get the logged-in user for sending emails
     const userId = req.user?.id;
     
@@ -264,7 +264,7 @@ async function bulkSubmitScanSession(req, res, next) {
                   mail_item_id: mailItem.mail_item_id,
                   action_type: 'scanned',
                   action_description: `Bulk scanned ${typeGroup.count} ${mailItem.item_type}${typeGroup.count > 1 ? 's' : ''} via Scan Session`,
-                  performed_by: req.user.email || 'Staff',
+                  performed_by: req.body.scanned_by || req.user.email || 'Staff',
                   action_timestamp: new Date().toISOString()
                 });
             } catch (historyError) {
@@ -288,25 +288,40 @@ async function bulkSubmitScanSession(req, res, next) {
             }
           }
 
-          // Select appropriate email template based on item types
-          let templateName;
-          const hasLetters = group.letterCount > 0;
-          const hasPackages = group.packageCount > 0;
+          // Get email template - use custom template if provided, otherwise auto-select
+          let template, templateError;
 
-          if (hasLetters && hasPackages) {
-            templateName = 'Scan: Mixed Items';
-          } else if (hasPackages) {
-            templateName = 'Scan: Packages Only';
+          if (template_id) {
+            // Use template provided from frontend
+            const result = await supabaseAdmin
+              .from('message_templates')
+              .select('*')
+              .eq('template_id', template_id)
+              .single();
+            template = result.data;
+            templateError = result.error;
           } else {
-            templateName = 'Scan: Letters Only';
-          }
+            // Auto-select template based on item types (legacy behavior)
+            let templateName;
+            const hasLetters = group.letterCount > 0;
+            const hasPackages = group.packageCount > 0;
 
-          // Get template
-          const { data: template, error: templateError } = await supabaseAdmin
-            .from('message_templates')
-            .select('*')
-            .eq('template_name', templateName)
-            .single();
+            if (hasLetters && hasPackages) {
+              templateName = 'Scan: Mixed Items';
+            } else if (hasPackages) {
+              templateName = 'Scan: Packages Only';
+            } else {
+              templateName = 'Scan: Letters Only';
+            }
+
+            const result = await supabaseAdmin
+              .from('message_templates')
+              .select('*')
+              .eq('template_name', templateName)
+              .single();
+            template = result.data;
+            templateError = result.error;
+          }
 
           // Send notifications with error handling
           let emailSent = false;
@@ -374,10 +389,14 @@ async function bulkSubmitScanSession(req, res, next) {
           } else {
             // Send notification using scan-specific template (with error handling)
             try {
+              // Use custom subject/body if provided, otherwise use template defaults
+              const emailSubject = custom_subject || template.subject_line;
+              const emailBody = custom_body || template.message_body;
+
               await sendTemplateEmail({
                 to: contact.email,
-                templateSubject: template.subject_line,
-                templateBody: template.message_body,
+                templateSubject: emailSubject,
+                templateBody: emailBody,
                 variables: {
                   Name: contact.contact_person || contact.company_name || 'Valued Customer',
                   BoxNumber: contact.mailbox_number || 'N/A',

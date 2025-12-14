@@ -179,7 +179,7 @@ async function sendNotificationEmail(req, res, next) {
         .insert({
           mail_item_id: mail_item_id,
           contact_id: contact_id,
-          notified_by: req.user.email || 'System',
+          notified_by: req.body.sent_by || req.user.email || 'System',
           notification_method: 'Email',
           notified_at: new Date().toISOString()
         });
@@ -196,7 +196,7 @@ async function sendNotificationEmail(req, res, next) {
           mail_item_id: mail_item_id,
           action_type: 'notified',
           action_description: `Email notification sent via ${template.template_name || template.template_type}`,
-          performed_by: req.user.email || 'System',
+          performed_by: req.body.sent_by || req.user.email || 'System',
           notes: `Template: ${template.template_name || template.template_type}`
         });
 
@@ -332,7 +332,7 @@ async function sendCustomEmail(req, res, next) {
         .insert({
           mail_item_id: mail_item_id,
           contact_id: contact_id,
-          notified_by: req.user.email || 'System',
+          notified_by: req.body.sent_by || req.user.email || 'System',
           notification_method: 'Email',
           notified_at: new Date().toISOString()
         });
@@ -349,7 +349,7 @@ async function sendCustomEmail(req, res, next) {
           mail_item_id: mail_item_id,
           action_type: 'notified',
           action_description: `Custom email sent: ${subject}`,
-          performed_by: req.user.email || 'System',
+          performed_by: req.body.sent_by || req.user.email || 'System',
           notes: `Subject: ${subject}`
         });
 
@@ -515,9 +515,10 @@ async function sendBulkNotification(req, res, next) {
     const packages = mailItems.filter(item => item.item_type === 'Package' || item.item_type === 'Large Package');
     const letters = mailItems.filter(item => item.item_type === 'Letter' || item.item_type === 'Certified Mail');
     
-    const totalItems = mailItems.length;
-    const totalPackages = packages.length;
-    const totalLetters = letters.length;
+    // Count total items including quantities
+    const totalPackages = packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0);
+    const totalLetters = letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
+    const totalItems = totalPackages + totalLetters;
     
     // Calculate oldest item
     const now = new Date();
