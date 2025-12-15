@@ -34,6 +34,9 @@ export default function TodoList() {
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   
+  // Add modal state
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingTodo, setEditingTodo] = useState<Todo | null>(null);
@@ -98,6 +101,7 @@ export default function TodoList() {
       setNewTodoCategory('');
       setNewTodoPriority(0);
       setNewTodoStaff('Merlin');
+      setIsAddModalOpen(false); // Close modal after adding
       
       await loadTodos();
       toast.success('Task added!');
@@ -105,6 +109,17 @@ export default function TodoList() {
       console.error('Failed to add todo:', error);
       toast.error('Failed to add task');
     }
+  };
+
+  const openAddModal = () => {
+    // Reset form and set default date to selected date
+    setNewTodoTitle('');
+    setNewTodoNotes('');
+    setNewTodoDate(formatDateKey(selectedDate));
+    setNewTodoCategory('');
+    setNewTodoPriority(0);
+    setNewTodoStaff('Merlin');
+    setIsAddModalOpen(true);
   };
 
   const handleToggleComplete = async (todo: Todo) => {
@@ -262,6 +277,23 @@ export default function TodoList() {
     return null;
   };
 
+  // Get staff avatar component
+  const getStaffAvatar = (staffName: string, size: 'sm' | 'md' = 'sm') => {
+    const sizeClasses = size === 'sm' ? 'w-6 h-6 text-xs' : 'w-8 h-8 text-sm';
+    const initials = staffName === 'Merlin' ? 'MP' : staffName === 'Madison' ? 'MR' : staffName.substring(0, 2).toUpperCase();
+    const colorClasses = staffName === 'Merlin' 
+      ? 'bg-blue-100 text-blue-700 border-blue-200'
+      : staffName === 'Madison'
+      ? 'bg-purple-100 text-purple-700 border-purple-200'
+      : 'bg-gray-100 text-gray-700 border-gray-200';
+    
+    return (
+      <div className={`${sizeClasses} rounded-full ${colorClasses} border-2 flex items-center justify-center font-bold`}>
+        {initials}
+      </div>
+    );
+  };
+
   const formatDate = (dateStr: string) => {
     if (dateStr === 'No Date') return dateStr;
     
@@ -416,7 +448,7 @@ export default function TodoList() {
           </button>
         </div>
         
-        <div className="flex items-center gap-3 justify-between">
+        <div className="flex items-center gap-4">
           <button
             onClick={goToPreviousWeek}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
@@ -425,7 +457,7 @@ export default function TodoList() {
             <ChevronLeft className="w-5 h-5 text-gray-600" />
           </button>
           
-          <div className="flex-1 flex gap-3 justify-center overflow-x-auto pb-2 px-2">
+          <div className="flex-1 grid grid-cols-7 gap-2 md:gap-3">
             {getWeekDays().map((date) => {
               const isSelected = isSameDay(date, selectedDate);
               const isTodayDate = isToday(date);
@@ -439,7 +471,7 @@ export default function TodoList() {
                 <button
                   key={dateKey}
                   onClick={() => setSelectedDate(date)}
-                  className={`flex-shrink-0 flex flex-col items-center px-4 py-3 rounded-xl transition-all min-w-[70px] ${
+                  className={`flex flex-col items-center px-2 md:px-4 py-3 rounded-xl transition-all ${
                     isSelected
                       ? 'bg-gradient-to-br from-amber-100 to-orange-100 border-2 border-amber-300 shadow-md'
                       : isTodayDate
@@ -452,7 +484,7 @@ export default function TodoList() {
                   }`}>
                     {date.toLocaleDateString('en-US', { weekday: 'short' })}
                   </span>
-                  <span className={`text-2xl font-bold ${
+                  <span className={`text-xl md:text-2xl font-bold ${
                     isSelected ? 'text-gray-900' : isTodayDate ? 'text-blue-600' : 'text-gray-700'
                   }`}>
                     {date.getDate()}
@@ -479,95 +511,15 @@ export default function TodoList() {
         </div>
       </div>
 
-      {/* Add New Todo Input */}
+      {/* Add Task Button */}
       <div className="mb-8">
-        <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-6">
-        <form onSubmit={handleAddTodo} className="space-y-4">
-          <div className="flex items-center gap-3">
-            <input
-              type="text"
-              value={newTodoTitle}
-              onChange={(e) => setNewTodoTitle(e.target.value)}
-              placeholder="Add todo"
-              className="flex-1 px-4 py-3 border-2 border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base transition-all"
-            />
-            <button
-              type="submit"
-              className="px-8 py-3 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-xl font-semibold transition-colors"
-            >
-              Add Todo
-            </button>
-          </div>
-          
-          {/* Notes / Details */}
-          <div>
-            <textarea
-              value={newTodoNotes}
-              onChange={(e) => setNewTodoNotes(e.target.value)}
-              placeholder="Add notes or details (optional)...
-• Bullet point 1
-• Bullet point 2"
-              rows={3}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none text-sm"
-            />
-          </div>
-          
-          <div className="flex flex-col md:flex-row gap-3 md:gap-4 flex-wrap">
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Calendar className="w-4 h-4 text-gray-500 flex-shrink-0" />
-              <input
-                type="date"
-                value={newTodoDate}
-                onChange={(e) => setNewTodoDate(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Folder className="w-4 h-4 text-gray-500 flex-shrink-0" />
-              <input
-                type="text"
-                value={newTodoCategory}
-                onChange={(e) => setNewTodoCategory(e.target.value)}
-                placeholder="Category (optional)"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <Flag className="w-4 h-4 text-gray-500 flex-shrink-0" />
-              <select
-                value={newTodoPriority}
-                onChange={(e) => setNewTodoPriority(Number(e.target.value))}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value={0}>Normal</option>
-                <option value={1}>Priority</option>
-              </select>
-            </div>
-
-            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
-              <span className="text-sm font-medium text-gray-700 flex-shrink-0">Staff:</span>
-              <select
-                value={newTodoStaff}
-                onChange={(e) => setNewTodoStaff(e.target.value)}
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="Merlin">Merlin</option>
-                <option value="Madison">Madison</option>
-              </select>
-            </div>
-
-            <button
-              type="submit"
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2 ml-auto"
-            >
-              <Plus className="w-5 h-5" />
-              Add Task
-            </button>
-          </div>
-        </form>
-      </div>
+        <button
+          onClick={openAddModal}
+          className="w-full px-6 py-4 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white rounded-2xl font-semibold transition-all shadow-md hover:shadow-lg flex items-center justify-center gap-3"
+        >
+          <Plus className="w-6 h-6" />
+          Add New Task
+        </button>
       </div>
 
       {/* Todos List - Clean layout */}
@@ -592,29 +544,30 @@ export default function TodoList() {
             {filteredTodos.map((todo) => (
                   <div
                     key={todo.todo_id}
-                className="px-6 py-4 hover:bg-gray-50 transition-colors group"
+                    className="px-6 py-4 hover:bg-gray-50 transition-colors group"
                   >
-                <div className="flex items-center gap-4">
+                    <div className="flex items-start gap-4">
                       {/* Checkbox */}
                       <button
                         onClick={() => handleToggleComplete(todo)}
-                    className="flex-shrink-0"
+                        className="flex-shrink-0 mt-0.5"
                       >
                         {todo.is_completed ? (
-                      <div className="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center">
+                          <div className="w-6 h-6 rounded-md bg-blue-500 flex items-center justify-center">
                             <Check className="w-4 h-4 text-white" />
                           </div>
                         ) : (
-                      <div className="w-6 h-6 rounded-md border-2 border-gray-300 hover:border-blue-500 transition-colors" />
+                          <div className="w-6 h-6 rounded-md border-2 border-gray-300 hover:border-blue-500 transition-colors" />
                         )}
                       </button>
 
                       {/* Content */}
                       <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
+                        {/* Title with Priority */}
+                        <div className="flex items-start gap-2 mb-2">
                           {getPriorityIcon(todo.priority)}
                           <p
-                        className={`text-base break-words ${
+                            className={`text-base font-medium break-words flex-1 ${
                               todo.is_completed
                                 ? 'line-through text-gray-400'
                                 : 'text-gray-900'
@@ -626,46 +579,67 @@ export default function TodoList() {
                         
                         {/* Notes/Description (if exists) */}
                         {todo.notes && (
-                      <div className="mt-2 text-sm text-gray-600 whitespace-pre-wrap">
+                          <div className="text-sm text-gray-600 whitespace-pre-wrap mb-3 pl-6">
                             {todo.notes}
                           </div>
                         )}
                         
-                    {/* Metadata: Category + Date */}
-                    {(todo.category || todo.date_header) && (
-                      <div className="flex items-center gap-2 mt-2">
+                        {/* Clean Metadata Row */}
+                        <div className="flex items-center gap-3 text-xs">
+                          {/* Category Badge */}
                           {todo.category && (
-                          <span className="inline-block text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-md font-medium">
+                            <span className="inline-flex items-center px-2.5 py-1 bg-blue-50 text-blue-700 rounded-full font-medium border border-blue-100">
                               {todo.category}
                             </span>
                           )}
-                        {todo.date_header && (
-                          <span className="text-xs text-gray-500">
-                            {formatDate(todo.date_header.split('T')[0])}
-                              </span>
-                        )}
+                          
+                          {/* Date */}
+                          {todo.date_header && (
+                            <span className="text-gray-500 flex items-center gap-1">
+                              <Calendar className="w-3.5 h-3.5" />
+                              {formatDate(todo.date_header.split('T')[0])}
+                            </span>
+                          )}
+                          
+                          {/* Completion Status with Avatar - Only show if completed */}
+                          {todo.is_completed && todo.last_edited_by_name && (
+                            <div className="flex items-center gap-1.5 ml-auto">
+                              <div className="relative">
+                                {getStaffAvatar(todo.last_edited_by_name, 'sm')}
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-white flex items-center justify-center">
+                                  <Check className="w-2 h-2 text-white" />
+                                </div>
+                              </div>
                             </div>
                           )}
+                          
+                          {/* Assigned To - Only show if NOT completed */}
+                          {!todo.is_completed && todo.created_by_name && (
+                            <div className="flex items-center gap-1.5 ml-auto text-gray-400">
+                              {getStaffAvatar(todo.created_by_name, 'sm')}
+                            </div>
+                          )}
+                        </div>
                       </div>
 
-                  {/* Right side: Action Buttons - Always visible on mobile, hover on desktop */}
-                  <div className="flex items-center gap-2 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                      {/* Right side: Action Buttons - Always visible on mobile, hover on desktop */}
+                      <div className="flex items-center gap-1 flex-shrink-0 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                         {/* Edit Button */}
                         <button
                           onClick={() => openEditModal(todo)}
-                      className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-600 hover:text-blue-600"
-                      title="Edit"
+                          className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-400 hover:text-blue-600"
+                          title="Edit"
                         >
-                      <Edit2 className="w-4 h-4" />
+                          <Edit2 className="w-4 h-4" />
                         </button>
                         
                         {/* Delete Button */}
                         <button
                           onClick={() => handleDeleteTodo(todo.todo_id)}
-                      className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-600 hover:text-red-600"
-                      title="Delete"
+                          className="p-2 hover:bg-gray-200 rounded-lg transition-colors text-gray-400 hover:text-red-600"
+                          title="Delete"
                         >
-                      <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
                     </div>
@@ -676,6 +650,131 @@ export default function TodoList() {
       );
       })()}
       
+      {/* Add Task Modal */}
+      <Modal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        title="Add New Task"
+      >
+        <form onSubmit={handleAddTodo} className="space-y-4">
+          {/* Title */}
+          <div>
+            <label htmlFor="add-title" className="block text-sm font-medium text-gray-700 mb-1">
+              Task Title *
+            </label>
+            <input
+              type="text"
+              id="add-title"
+              value={newTodoTitle}
+              onChange={(e) => setNewTodoTitle(e.target.value)}
+              placeholder="Enter task title"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              required
+              autoFocus
+            />
+          </div>
+
+          {/* Notes / Details */}
+          <div>
+            <label htmlFor="add-notes" className="block text-sm font-medium text-gray-700 mb-1">
+              Notes / Details
+            </label>
+            <textarea
+              id="add-notes"
+              value={newTodoNotes}
+              onChange={(e) => setNewTodoNotes(e.target.value)}
+              rows={4}
+              placeholder="Add details, bullet points, or notes...
+• Item 1
+• Item 2"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
+            />
+          </div>
+
+          {/* Date */}
+          <div>
+            <label htmlFor="add-date" className="block text-sm font-medium text-gray-700 mb-1">
+              Date
+            </label>
+            <input
+              type="date"
+              id="add-date"
+              value={newTodoDate}
+              onChange={(e) => setNewTodoDate(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Category */}
+          <div>
+            <label htmlFor="add-category" className="block text-sm font-medium text-gray-700 mb-1">
+              Category
+            </label>
+            <input
+              type="text"
+              id="add-category"
+              value={newTodoCategory}
+              onChange={(e) => setNewTodoCategory(e.target.value)}
+              placeholder="e.g., Mail, Social Media"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+
+          {/* Priority */}
+          <div>
+            <label htmlFor="add-priority" className="block text-sm font-medium text-gray-700 mb-1">
+              Priority
+            </label>
+            <select
+              id="add-priority"
+              value={newTodoPriority}
+              onChange={(e) => setNewTodoPriority(Number(e.target.value))}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value={0}>Normal</option>
+              <option value={1}>Priority</option>
+            </select>
+          </div>
+
+          {/* Assigned To */}
+          <div>
+            <label htmlFor="add-staff" className="block text-sm font-medium text-gray-700 mb-1">
+              Assigned To
+            </label>
+            <select
+              id="add-staff"
+              value={newTodoStaff}
+              onChange={(e) => setNewTodoStaff(e.target.value)}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            >
+              <option value="Merlin">Merlin</option>
+              <option value="Madison">Madison</option>
+            </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Who should complete this task?
+            </p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={() => setIsAddModalOpen(false)}
+              className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors flex items-center gap-2"
+            >
+              <Plus className="w-5 h-5" />
+              Add Task
+            </button>
+          </div>
+        </form>
+      </Modal>
+
       {/* Edit Task Modal */}
       <Modal
         isOpen={isEditModalOpen}
@@ -768,10 +867,10 @@ export default function TodoList() {
             </select>
           </div>
 
-          {/* Staff Member */}
+          {/* Assigned To */}
           <div>
             <label htmlFor="edit-staff" className="block text-sm font-medium text-gray-700 mb-1">
-              Staff Member
+              Assigned To
             </label>
             <select
               id="edit-staff"
@@ -783,6 +882,9 @@ export default function TodoList() {
               <option value="Merlin">Merlin</option>
               <option value="Madison">Madison</option>
             </select>
+            <p className="mt-1 text-xs text-gray-500">
+              Who should complete this task?
+            </p>
           </div>
 
           {/* Buttons */}
