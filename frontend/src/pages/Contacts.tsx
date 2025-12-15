@@ -7,6 +7,32 @@ import Modal from '../components/Modal.tsx';
 import LoadingSpinner from '../components/LoadingSpinner.tsx';
 import BulkEmailModal from '../components/BulkEmailModal.tsx';
 import { validateContactForm } from '../utils/validation.ts';
+import { getCustomerAvatarUrl } from '../utils/customerAvatars.ts';
+
+// Helper function to generate avatar color based on name
+const getAvatarColor = (name: string): string => {
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-indigo-500',
+    'bg-red-500',
+    'bg-yellow-500',
+    'bg-teal-500',
+  ];
+  const index = name.charCodeAt(0) % colors.length;
+  return colors[index];
+};
+
+// Helper function to get initials from name
+const getInitials = (name: string): string => {
+  const words = name.trim().split(' ');
+  if (words.length >= 2) {
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
 
 interface Contact {
   contact_id: string;
@@ -395,7 +421,7 @@ export default function ContactsPage() {
                     onClick={() => handleSort('name')}
                   >
                     <div className="flex items-center gap-2">
-                      Contact
+                      Contact / Company
                       {sortColumn === 'name' ? (
                         sortDirection === 'asc' ? <ArrowUp className="w-4 h-4" /> : <ArrowDown className="w-4 h-4" />
                       ) : (
@@ -403,7 +429,6 @@ export default function ContactsPage() {
                       )}
                     </div>
                   </th>
-                  <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Company</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Email</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Phone</th>
                   <th className="text-left py-3 px-6 text-sm font-semibold text-gray-700">Service Tier</th>
@@ -451,12 +476,44 @@ export default function ContactsPage() {
                     className="border-b border-gray-100 hover:bg-gray-50 transition-colors cursor-pointer"
                   >
                     <td className="py-4 px-6">
-                      <div className="font-medium text-gray-900">
-                        {contact.contact_person || 'Unnamed'}
+                      <div className="flex items-center gap-3">
+                        {/* Avatar */}
+                        {(() => {
+                          const customAvatar = getCustomerAvatarUrl(
+                            contact.contact_id,
+                            contact.mailbox_number,
+                            contact.contact_person,
+                            contact.company_name
+                          );
+                          
+                          if (customAvatar) {
+                            return (
+                              <img
+                                src={customAvatar}
+                                alt={contact.contact_person || contact.company_name || 'Contact'}
+                                className="w-10 h-10 rounded-full object-cover flex-shrink-0"
+                              />
+                            );
+                          }
+                          
+                          return (
+                            <div className={`w-10 h-10 rounded-full ${getAvatarColor(contact.contact_person || contact.company_name || 'U')} flex items-center justify-center text-white text-sm font-bold flex-shrink-0`}>
+                              {getInitials(contact.contact_person || contact.company_name || 'UN')}
+                            </div>
+                          );
+                        })()}
+                        {/* Name and Company */}
+                        <div>
+                          <div className="font-medium text-gray-900">
+                            {contact.contact_person || contact.company_name || 'Unnamed'}
+                          </div>
+                          {contact.contact_person && contact.company_name && (
+                            <div className="text-sm text-gray-500 mt-1">
+                              {contact.company_name}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </td>
-                    <td className="py-4 px-6 text-gray-700">
-                      {contact.company_name || '—'}
                     </td>
                     <td className="py-4 px-6 text-gray-700">
                       {contact.email || '—'}

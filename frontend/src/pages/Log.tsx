@@ -153,6 +153,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [isFilterExpanded, setIsFilterExpanded] = useState(true); // New state for filter panel
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  
   // Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingMailItem, setEditingMailItem] = useState<MailItem | null>(null);
@@ -265,6 +269,11 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       setShowDropdown(false);
     }
   }, [searchQuery, showAddForm, searchContacts]);
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, typeFilter, searchTerm, dateRangeFilter, mailboxFilter, sortColumn, sortDirection]);
 
   const handleSelectContact = (contact: Contact) => {
     // Warn if selecting a Pending customer
@@ -1488,16 +1497,34 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         )}
       </div>
 
-      {/* Results Counter */}
+      {/* Results Counter and Rows Per Page */}
       <div className="flex items-center justify-between mb-4">
         <p className="text-sm text-gray-600">
           Showing <span className="font-semibold text-gray-900">{sortedGroups.length}</span> groups{' '}
           (<span className="font-semibold text-gray-900">{filteredItems.length}</span> items) of{' '}
           <span className="font-semibold text-gray-900">{mailItems.length}</span> total
         </p>
-        <p className="text-sm text-gray-500 italic">
-          💡 Items grouped by customer, date, and type. Click to expand.
-        </p>
+        <div className="flex items-center gap-4">
+          <p className="text-sm text-gray-500 italic">
+            💡 Items grouped by customer, date, and type. Click to expand.
+          </p>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-gray-600">Rows per page:</label>
+            <select
+              value={rowsPerPage}
+              onChange={(e) => {
+                setRowsPerPage(Number(e.target.value));
+                setCurrentPage(1); // Reset to first page when changing rows per page
+              }}
+              className="px-3 py-1.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value={10}>10</option>
+              <option value={25}>25</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+          </div>
+        </div>
       </div>
 
       {/* Log Table */}
@@ -1627,7 +1654,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
               </tr>
             </thead>
             <tbody>
-              {sortedGroups.map((group) => (
+              {sortedGroups
+                .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+                .map((group) => (
                   <React.Fragment key={group.groupKey}>
                     {/* Main Row - Clickable to expand */}
                     <tr 
@@ -1937,9 +1966,90 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         </div>
       </div>
 
+      {/* Pagination Controls */}
       {sortedGroups.length > 0 && (
-        <div className="mt-4 text-sm text-gray-600 text-center">
-          Showing {sortedGroups.length} groups ({filteredItems.length} items) of {mailItems.length} total
+        <div className="mt-4 flex items-center justify-between">
+          <div className="text-sm text-gray-600">
+            Showing {Math.min((currentPage - 1) * rowsPerPage + 1, sortedGroups.length)} to {Math.min(currentPage * rowsPerPage, sortedGroups.length)} of {sortedGroups.length} groups
+          </div>
+          <div className="flex items-center gap-2">
+            {/* First Page Button */}
+            <button
+              onClick={() => setCurrentPage(1)}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="First page"
+            >
+              ⟪
+            </button>
+            
+            {/* Previous Page Button */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Previous
+            </button>
+            
+            {/* Page Numbers */}
+            {(() => {
+              const totalPages = Math.ceil(sortedGroups.length / rowsPerPage);
+              const pageButtons = [];
+              const maxButtons = 5;
+              
+              let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+              const endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+              if (endPage - startPage < maxButtons - 1) {
+                startPage = Math.max(1, endPage - maxButtons + 1);
+              }
+              
+              for (let i = startPage; i <= endPage; i++) {
+                pageButtons.push(
+                  <button
+                    key={i}
+                    onClick={() => setCurrentPage(i)}
+                    className={`px-3 py-1.5 border rounded-lg text-sm transition-colors ${
+                      currentPage === i
+                        ? 'bg-purple-600 text-white border-purple-600'
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {i}
+                  </button>
+                );
+              }
+              
+              return pageButtons;
+            })()}
+            
+            {/* Show total pages indicator */}
+            {Math.ceil(sortedGroups.length / rowsPerPage) > 5 && (
+              <span className="text-sm text-gray-500">
+                of {Math.ceil(sortedGroups.length / rowsPerPage)}
+              </span>
+            )}
+            
+            {/* Next Page Button */}
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(Math.ceil(sortedGroups.length / rowsPerPage), prev + 1))}
+              disabled={currentPage >= Math.ceil(sortedGroups.length / rowsPerPage)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              Next
+            </button>
+            
+            {/* Last Page Button */}
+            <button
+              onClick={() => setCurrentPage(Math.ceil(sortedGroups.length / rowsPerPage))}
+              disabled={currentPage >= Math.ceil(sortedGroups.length / rowsPerPage)}
+              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Last page"
+            >
+              ⟫
+            </button>
+          </div>
         </div>
       )}
 

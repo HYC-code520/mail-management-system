@@ -319,24 +319,21 @@ export default function TemplatesPage() {
                           <div key={template.template_id} className="relative group">
                             <button
                               onClick={() => setSelectedTemplate(template)}
-                              className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
+                              className={`w-full text-left p-3 pr-10 rounded-lg transition-colors text-sm ${
                                 selectedTemplate?.template_id === template.template_id
                                   ? 'bg-blue-50 text-blue-900 font-medium border border-blue-200'
                                   : 'text-gray-700 hover:bg-gray-50'
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <span>{template.template_name.replace('Scan: ', '')}</span>
-                                <span className="text-xs text-gray-400">auto</span>
-                              </div>
+                              <span className="block truncate">{template.template_name.replace('Scan: ', '')}</span>
                             </button>
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => openEditModal(template)}
-                                className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                                title="Edit"
+                                className="p-1.5 text-blue-600 hover:bg-blue-100 rounded bg-white shadow-sm border border-blue-200"
+                                title="Edit template"
                               >
-                                <Edit className="w-3 h-3" />
+                                <Edit className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -356,24 +353,21 @@ export default function TemplatesPage() {
                           <div key={template.template_id} className="relative group">
                             <button
                               onClick={() => setSelectedTemplate(template)}
-                              className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
+                              className={`w-full text-left p-3 pr-10 rounded-lg transition-colors text-sm ${
                                 selectedTemplate?.template_id === template.template_id
                                   ? 'bg-gray-100 text-gray-900 font-medium'
                                   : 'text-gray-700 hover:bg-gray-50'
                               }`}
                             >
-                              <div className="flex items-center justify-between">
-                                <span>{template.template_name}</span>
-                                <span className="text-xs text-gray-400">default</span>
-                              </div>
+                              <span className="block truncate">{template.template_name}</span>
                             </button>
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
+                            <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                               <button
                                 onClick={() => openEditModal(template)}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
-                                title="Edit"
+                                className="p-1.5 text-blue-600 hover:bg-blue-100 rounded bg-white shadow-sm border border-blue-200"
+                                title="Edit template"
                               >
-                                <Edit className="w-3 h-3" />
+                                <Edit className="w-3.5 h-3.5" />
                               </button>
                             </div>
                           </div>
@@ -393,32 +387,32 @@ export default function TemplatesPage() {
                           <div key={template.template_id} className="relative group">
                             <button
                               onClick={() => setSelectedTemplate(template)}
-                              className={`w-full text-left p-3 rounded-lg transition-colors text-sm ${
+                              className={`w-full text-left p-3 pr-16 rounded-lg transition-colors text-sm ${
                                 selectedTemplate?.template_id === template.template_id
                                   ? 'bg-gray-100 text-gray-900 font-medium'
                                   : 'text-gray-700 hover:bg-gray-50'
                               }`}
                             >
-                              {template.template_name}
+                              <span className="truncate block">{template.template_name}</span>
                             </button>
                             <div className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity flex gap-1">
                               <button
                                 onClick={() => openEditModal(template)}
-                                className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                className="p-1.5 text-blue-600 hover:bg-blue-100 rounded bg-white shadow-sm border border-blue-200"
                                 title="Edit"
                               >
-                                <Edit className="w-3 h-3" />
+                                <Edit className="w-3.5 h-3.5" />
                               </button>
                               <button
                                 onClick={() => handleDelete(template)}
                                 disabled={deletingTemplateId === template.template_id}
-                                className="p-1 text-red-600 hover:bg-red-50 rounded disabled:opacity-50 disabled:cursor-not-allowed"
+                                className="p-1.5 text-red-600 hover:bg-red-50 rounded bg-white shadow-sm border border-red-200 disabled:opacity-50 disabled:cursor-not-allowed"
                                 title="Delete"
                               >
                                 {deletingTemplateId === template.template_id ? (
-                                  <Loader2 className="w-3 h-3 animate-spin" />
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
                                 ) : (
-                                  <Trash2 className="w-3 h-3" />
+                                  <Trash2 className="w-3.5 h-3.5" />
                                 )}
                               </button>
                             </div>

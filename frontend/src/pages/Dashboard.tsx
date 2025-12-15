@@ -424,7 +424,7 @@ export default function DashboardPage() {
               <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-shadow relative" style={{ minHeight: '160px', overflow: 'visible' }}>
                 {/* Avatar positioned on the RIGHT side - smaller and further right */}
                 <div className="absolute bottom-0 right-0 pointer-events-none" style={{ 
-                  height: '17git add .0px',
+                  height: '170px',
                   width: 'auto',
                   right: '-60px',
                   bottom: '0',

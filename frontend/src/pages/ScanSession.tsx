@@ -896,8 +896,8 @@ export default function ScanSessionPage() {
         </div>
       </div>
 
-      {/* Camera Button - Fixed at bottom */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-6 z-20">
+      {/* Camera Button - Fixed at bottom, aligned with main content */}
+      <div className="fixed bottom-0 left-0 lg:left-72 right-0 bg-white border-t border-gray-200 p-6 z-20">
         <div className="max-w-4xl mx-auto">
           {/* Floating Counter Badge (visible in Quick Scan Mode) */}
           {quickScanMode && (session.items.length > 0 || processingQueue > 0) && (

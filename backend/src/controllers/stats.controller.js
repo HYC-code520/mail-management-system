@@ -454,12 +454,16 @@ exports.getDashboardStats = async (req, res, next) => {
     
     // NEW ANALYTICS: Staff Performance (from todos)
     // Get todos completed in the last 7 days (this week)
-    const sevenDaysAgo = getDaysAgoNY(7);
+    // Use completed_at instead of updated_at to only count when task was actually completed
+    const { getStartOfDayNY } = require('../utils/timezone');
+    const sevenDaysAgoTimestamp = getStartOfDayNY(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+    
     const { data: todos } = await supabase
       .from('todos')
-      .select('is_completed, last_edited_by_name, updated_at')
+      .select('is_completed, last_edited_by_name, completed_at')
       .eq('is_completed', true)
-      .gte('updated_at', sevenDaysAgo);
+      .not('completed_at', 'is', null)
+      .gte('completed_at', sevenDaysAgoTimestamp);
     
     const staffPerformance = {
       Merlin: (todos || []).filter(t => t.last_edited_by_name === 'Merlin').length,

@@ -8,6 +8,32 @@ import ActionHistorySection from '../components/ActionHistorySection.tsx';
 import Modal from '../components/Modal.tsx';
 import { validateContactForm } from '../utils/validation.ts';
 import toast from 'react-hot-toast';
+import { getCustomerAvatarUrl } from '../utils/customerAvatars.ts';
+
+// Helper function to generate avatar color based on name
+const getAvatarColor = (name: string): string => {
+  const colors = [
+    'bg-blue-500',
+    'bg-green-500',
+    'bg-purple-500',
+    'bg-pink-500',
+    'bg-indigo-500',
+    'bg-red-500',
+    'bg-yellow-500',
+    'bg-teal-500',
+  ];
+  const index = name.charCodeAt(0) % colors.length;
+  return colors[index];
+};
+
+// Helper function to get initials from name
+const getInitials = (name: string): string => {
+  const words = name.trim().split(' ');
+  if (words.length >= 2) {
+    return (words[0][0] + words[words.length - 1][0]).toUpperCase();
+  }
+  return name.substring(0, 2).toUpperCase();
+};
 
 interface Contact {
   contact_id: string;
@@ -431,11 +457,38 @@ export default function ContactDetailPage() {
 
       {/* Header */}
       <div className="mb-6 sm:mb-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
-          {contact.contact_person || contact.company_name || 'Unnamed Contact'}
-        </h1>
-          <p className="text-sm sm:text-base text-gray-600">Customer Profile</p>
+        <div className="flex items-center gap-4">
+          {/* Avatar */}
+          {(() => {
+            const customAvatar = getCustomerAvatarUrl(
+              contact.contact_id,
+              contact.mailbox_number,
+              contact.contact_person,
+              contact.company_name
+            );
+            
+            if (customAvatar) {
+              return (
+                <img
+                  src={customAvatar}
+                  alt={contact.contact_person || contact.company_name || 'Contact'}
+                  className="w-16 h-16 sm:w-20 sm:h-20 rounded-full object-cover shadow-lg"
+                />
+              );
+            }
+            
+            return (
+              <div className={`w-16 h-16 sm:w-20 sm:h-20 rounded-full ${getAvatarColor(contact.contact_person || contact.company_name || 'U')} flex items-center justify-center text-white text-2xl sm:text-3xl font-bold shadow-lg`}>
+                {getInitials(contact.contact_person || contact.company_name || 'UN')}
+              </div>
+            );
+          })()}
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-1">
+              {contact.contact_person || contact.company_name || 'Unnamed Contact'}
+            </h1>
+            <p className="text-sm sm:text-base text-gray-600">Customer Profile</p>
+          </div>
         </div>
         <button
           onClick={openEditModal}
