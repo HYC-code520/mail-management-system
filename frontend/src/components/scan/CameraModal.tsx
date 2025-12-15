@@ -11,9 +11,18 @@ export default function CameraModal({ isOpen, onClose, onCapture }: CameraModalP
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const isMountedRef = useRef(true);
   const [isCameraReady, setIsCameraReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('environment');
+
+  // Track mounted state to prevent state updates after unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Initialize camera when modal opens
   useEffect(() => {
@@ -31,8 +40,9 @@ export default function CameraModal({ isOpen, onClose, onCapture }: CameraModalP
 
   const startCamera = async () => {
     console.log('📷 Starting camera...');
-    
+
     try {
+      if (!isMountedRef.current) return;
       setError(null);
       setIsCameraReady(false);
 
@@ -71,6 +81,9 @@ export default function CameraModal({ isOpen, onClose, onCapture }: CameraModalP
       // Wait a moment for the video element to be in DOM
       await new Promise(resolve => setTimeout(resolve, 100));
 
+      // Check if still mounted after timeout
+      if (!isMountedRef.current) return;
+
       if (!videoRef.current) {
         console.error('📷 Video element not found!');
         throw new Error('Video element not ready');
@@ -94,7 +107,7 @@ export default function CameraModal({ isOpen, onClose, onCapture }: CameraModalP
           video.play()
             .then(() => {
               console.log('📷 Video playing successfully!');
-              setIsCameraReady(true);
+              if (isMountedRef.current) setIsCameraReady(true);
               resolve();
             })
             .catch((playError) => {
@@ -123,6 +136,9 @@ export default function CameraModal({ isOpen, onClose, onCapture }: CameraModalP
       
     } catch (err) {
       console.error('📷 Camera access error:', err);
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+
       if (err instanceof Error) {
         if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
           setError('Camera access denied. Please allow camera permissions in your browser settings.');
