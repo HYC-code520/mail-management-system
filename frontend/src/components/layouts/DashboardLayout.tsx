@@ -16,6 +16,7 @@ export default function DashboardLayout() {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [hasNewTodos, setHasNewTodos] = useState(false);
 
   // Gmail status check function - defined before useEffect
   const checkGmailStatus = useCallback(async () => {
@@ -29,11 +30,31 @@ export default function DashboardLayout() {
     }
   }, []);
 
+  // Check for new todos (incomplete tasks created in last 24 hours)
+  const checkNewTodos = useCallback(async () => {
+    try {
+      const todos = await api.todos.getAll({ completed: false });
+      const oneDayAgo = new Date();
+      oneDayAgo.setHours(oneDayAgo.getHours() - 24);
+      
+      const hasRecent = todos.some((todo: any) => {
+        const createdAt = new Date(todo.created_at);
+        return createdAt > oneDayAgo;
+      });
+      
+      setHasNewTodos(hasRecent);
+    } catch (error) {
+      console.error('Error checking todos:', error);
+      setHasNewTodos(false);
+    }
+  }, []);
+
   // Check Gmail connection status on mount and when location changes
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     void checkGmailStatus(); // Explicitly ignore the promise
-  }, [location.pathname, checkGmailStatus]); // Re-check when navigating between pages
+    void checkNewTodos(); // Check for new todos
+  }, [location.pathname, checkGmailStatus, checkNewTodos]); // Re-check when navigating between pages
 
   const handleSignOut = async () => {
     try {
@@ -330,7 +351,16 @@ export default function DashboardLayout() {
                   title={sidebarCollapsed ? 'To-Do' : ''}
                 >
                   <CheckSquare className="w-5 h-5 shrink-0" />
-                  {!sidebarCollapsed && <span className="whitespace-nowrap">To-Do</span>}
+                  {!sidebarCollapsed && (
+                    <span className="flex items-center gap-3 whitespace-nowrap flex-1">
+                      <span>To-Do</span>
+                      {hasNewTodos && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-semibold rounded-full">
+                          New
+                        </span>
+                      )}
+                    </span>
+                  )}
                 </Link>
               </li>
 
@@ -468,13 +498,18 @@ export default function DashboardLayout() {
                 <Link
                   to="/dashboard/todos"
                   onClick={() => setMobileMenuOpen(false)}
-                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                  className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
                     location.pathname === '/dashboard/todos'
                       ? 'bg-blue-50 text-blue-700'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  To-Do
+                  <span>To-Do</span>
+                  {hasNewTodos && (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-800 text-xs font-semibold rounded-full">
+                      New
+                    </span>
+                  )}
                 </Link>
                 <Link
                   to="/dashboard/scan"

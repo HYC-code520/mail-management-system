@@ -443,7 +443,7 @@ export default function DashboardPage() {
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 bg-blue-600 rounded-full flex items-center justify-center shadow-md">
-                      <span className="text-white font-bold text-xs">MR</span>
+                      <span className="text-white font-bold text-xs">MP</span>
                     </div>
                     <div className="flex-1">
                       <h3 className="text-xs font-bold text-gray-900">Merlin</h3>
@@ -482,7 +482,7 @@ export default function DashboardPage() {
                 <div className="relative z-10">
                   <div className="flex items-center gap-2 mb-2">
                     <div className="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center shadow-md">
-                      <span className="text-white font-bold text-xs">MP</span>
+                      <span className="text-white font-bold text-xs">MR</span>
                     </div>
                     <div className="flex-1">
                       <h3 className="text-xs font-bold text-gray-900">Madison</h3>

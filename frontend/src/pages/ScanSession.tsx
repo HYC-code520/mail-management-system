@@ -684,82 +684,91 @@ export default function ScanSessionPage() {
     const unmatchedItems = session.items.filter(item => !item.matchedContact);
 
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-4xl mx-auto">
-          <div className="bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-2xl font-bold text-gray-900">
-                  Review Session
-                </h2>
+      <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+        <div className="max-w-5xl mx-auto">
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+            {/* Modern Header */}
+            <div className="p-6 md:p-8 bg-gradient-to-br from-gray-50 to-white border-b border-gray-200">
+              <div className="flex items-center gap-4 mb-3">
                 <button
                   onClick={() => setShowReview(false)}
-                  className="text-gray-600 hover:text-gray-900"
+                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  title="Back to scanning"
                 >
-                  <ArrowLeft className="w-6 h-6" />
+                  <ArrowLeft className="w-5 h-5 text-gray-600" />
                 </button>
+                <div className="flex-1">
+                  <h2 className="text-2xl md:text-3xl font-bold text-gray-900">
+                    Review Session
+                  </h2>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {session.items.length} items scanned • {grouped.length} {grouped.length === 1 ? 'customer' : 'customers'}
+                  </p>
+                </div>
               </div>
-              <p className="text-gray-600">
-                {session.items.length} items scanned • {grouped.length} customers
-              </p>
             </div>
 
-            <div className="p-6 space-y-4">
+            {/* Scanned Items List */}
+            <div className="p-6 md:p-8 space-y-3 max-h-96 overflow-y-auto">
               {grouped.map(group => (
-                <div key={group.contact.contact_id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="flex items-start justify-between mb-3">
-                    <div>
-                      <h3 className="font-semibold text-gray-900">
+                <div key={group.contact.contact_id} className="bg-white border border-gray-200 rounded-xl p-5 hover:border-gray-300 transition-colors">
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold text-gray-900 text-lg mb-1">
                         {group.contact.contact_person || group.contact.company_name}
                       </h3>
-                      <p className="text-sm text-gray-600">
-                        Mailbox: {group.contact.mailbox_number}
+                      <p className="text-sm text-gray-500">
+                        Mailbox: <span className="font-medium text-gray-700">{group.contact.mailbox_number}</span>
                       </p>
+                      {!skipNotification && (
+                        <div className="flex items-center gap-1.5 text-xs text-green-600 mt-2">
+                          <CheckCircle className="w-3.5 h-3.5" />
+                          <span>Will notify customer</span>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-right">
-                      <div className="text-2xl font-bold text-gray-900">
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-3xl font-bold text-gray-900">
                         {group.totalCount}
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div className="text-xs text-gray-500 mt-1">
                         {group.letterCount > 0 && `${group.letterCount} Letter${group.letterCount > 1 ? 's' : ''}`}
                         {group.letterCount > 0 && group.packageCount > 0 && ', '}
                         {group.packageCount > 0 && `${group.packageCount} Package${group.packageCount > 1 ? 's' : ''}`}
                       </div>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded">
-                    <CheckCircle className="w-4 h-4" />
-                    Will send notification email
-                  </div>
                 </div>
               ))}
 
               {unmatchedItems.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-yellow-900 mb-2">
-                    ⚠️ Manual Review Needed ({unmatchedItems.length})
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-5">
+                  <h3 className="font-semibold text-amber-900 mb-1.5 flex items-center gap-2">
+                    <span className="text-lg">⚠️</span>
+                    Manual Review Needed ({unmatchedItems.length})
                   </h3>
-                  <p className="text-sm text-yellow-800">
+                  <p className="text-sm text-amber-700">
                     These items couldn't be matched automatically. Please log them manually.
                   </p>
                 </div>
               )}
             </div>
 
-            <div className="p-6 border-t border-gray-200 bg-gray-50 space-y-4">
+            {/* Footer Actions */}
+            <div className="p-6 md:p-8 border-t border-gray-200 bg-gray-50 space-y-5">
               {/* Staff Selection */}
               <div>
-                <label className="block text-sm font-medium text-gray-900 mb-2">
+                <label className="block text-sm font-semibold text-gray-900 mb-3">
                   Who is scanning this mail? *
                 </label>
-                <div className="flex gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
                     onClick={() => setScannedBy('Madison')}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                    className={`px-5 py-4 rounded-xl border-2 font-semibold transition-all ${
                       scannedBy === 'Madison'
-                        ? 'border-purple-500 bg-purple-50 text-purple-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                        ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
                     Madison
@@ -767,43 +776,41 @@ export default function ScanSessionPage() {
                   <button
                     type="button"
                     onClick={() => setScannedBy('Merlin')}
-                    className={`flex-1 px-4 py-3 rounded-lg border-2 font-medium transition-all ${
+                    className={`px-5 py-4 rounded-xl border-2 font-semibold transition-all ${
                       scannedBy === 'Merlin'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
+                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                     }`}
                   >
                     Merlin
                   </button>
                 </div>
                 {!scannedBy && (
-                  <p className="mt-1 text-xs text-red-600">Please select who is scanning</p>
+                  <p className="mt-2 text-sm text-red-600 font-medium">Please select who is scanning</p>
                 )}
               </div>
 
               {/* Skip Notification Option */}
-              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={skipNotification}
-                    onChange={(e) => setSkipNotification(e.target.checked)}
-                    className="mt-1 w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500 focus:ring-2"
-                  />
-                  <div className="flex-1">
-                    <span className="font-medium text-gray-900">Skip customer notifications</span>
-                    <p className="text-xs text-gray-600 mt-1">
-                      Check this if customers don't use email or don't need to be notified. Items will still be logged.
-                    </p>
-                  </div>
-                </label>
-              </div>
+              <label className="flex items-start gap-3 p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 transition-colors">
+                <input
+                  type="checkbox"
+                  checked={skipNotification}
+                  onChange={(e) => setSkipNotification(e.target.checked)}
+                  className="mt-0.5 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                />
+                <div className="flex-1">
+                  <span className="font-semibold text-gray-900 block">Skip customer notifications</span>
+                  <p className="text-sm text-gray-600 mt-1">
+                    Check this if customers don't use email or don't need to be notified. Items will still be logged.
+                  </p>
+                </div>
+              </label>
               
               {/* Main Action: Quick Send */}
               <button
                 onClick={handleBulkSubmit}
                 disabled={isSubmitting || grouped.length === 0 || !scannedBy}
-                className="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 text-white text-lg font-semibold rounded-xl transition-colors flex items-center justify-center gap-2"
+                className="w-full py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-lg font-semibold rounded-xl transition-all flex items-center justify-center gap-2.5 shadow-sm"
               >
                 {isSubmitting ? (
                   <>
@@ -899,45 +906,42 @@ export default function ScanSessionPage() {
       {/* Camera Button - Fixed at bottom, aligned with main content */}
       <div className="fixed bottom-0 left-0 lg:left-72 right-0 bg-white border-t border-gray-200 p-6 z-20">
         <div className="max-w-4xl mx-auto">
-          {/* Floating Counter Badge (visible in Quick Scan Mode) */}
+          {/* Counter and Status - Cleaner Design */}
           {quickScanMode && (session.items.length > 0 || processingQueue > 0) && (
-            <div className="mb-3 flex items-center justify-center gap-3">
-              <div className="bg-green-600 text-white px-6 py-2 rounded-full shadow-lg">
-                <span className="text-2xl font-bold">{session.items.length}</span>
-                <span className="text-sm ml-2">scanned</span>
-              </div>
+            <div className="mb-4 flex items-center justify-center gap-3 text-sm">
+              {session.items.length > 0 && (
+                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <span className="text-2xl font-bold text-gray-900">{session.items.length}</span>
+                  <span className="text-gray-600">scanned</span>
+                </div>
+              )}
               {processingQueue > 0 && (
-                <div className="bg-blue-600 text-white px-4 py-2 rounded-full shadow-lg animate-pulse">
-                  <Loader className="w-4 h-4 inline mr-2" />
-                  <span className="text-sm">{processingQueue} processing...</span>
+                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
+                  <Loader className="w-4 h-4 text-blue-600 animate-spin" />
+                  <span className="text-blue-700">{processingQueue} processing</span>
                 </div>
               )}
             </div>
           )}
           
-          {/* Camera Options */}
+          {/* Camera Options - Simplified Design */}
           <div className="grid grid-cols-2 gap-3">
-            {/* Webcam Button (Desktop/Laptop) */}
+            {/* Webcam Button */}
             <button
               onClick={handleWebcamClick}
               disabled={isProcessing && !quickScanMode}
-              className={`py-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 ${
-                processingQueue > 0 ? 'ring-2 ring-purple-300 ring-offset-2' : ''
-              }`}
+              className="py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-base font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
               title="Use computer webcam"
             >
-              <Video className={`w-5 h-5 ${processingQueue > 0 ? 'animate-pulse' : ''}`} />
+              <Video className="w-5 h-5" />
               <span className="hidden sm:inline">Webcam</span>
-              <span className="sm:hidden">📹</span>
             </button>
             
-            {/* File/Mobile Camera Button */}
+            {/* Upload/Camera Button */}
             <button
               onClick={handleCameraClick}
               disabled={isProcessing && !quickScanMode}
-              className={`py-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white text-base font-semibold rounded-xl transition-colors flex items-center justify-center gap-2 ${
-                processingQueue > 0 ? 'ring-2 ring-blue-300 ring-offset-2' : ''
-              }`}
+              className="py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-base font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
               title="Upload image or use phone camera"
             >
               {isProcessing && !quickScanMode ? (
@@ -947,17 +951,14 @@ export default function ScanSessionPage() {
                 </>
               ) : (
                 <>
-                  <Camera className={`w-5 h-5 ${processingQueue > 0 ? 'animate-pulse' : ''}`} />
-                  <span className="hidden sm:inline">
-                    {quickScanMode ? 'Upload/Camera' : 'Upload'}
-                  </span>
-                  <span className="sm:hidden">📸</span>
+                  <Camera className="w-5 h-5" />
+                  <span className="hidden sm:inline">Upload/Camera</span>
                 </>
               )}
             </button>
           </div>
           
-          {/* End Session Button */}
+          {/* End Session Button - Prominent Design */}
           {session.items.length > 0 && (
             <button
               onClick={() => {
@@ -971,15 +972,15 @@ export default function ScanSessionPage() {
                   }
                 }
               }}
-              className="w-full mt-3 py-3 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
+              className="w-full mt-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
-              <XCircle className="w-4 h-4" />
+              <XCircle className="w-5 h-5" />
               End Session & Review
             </button>
           )}
           
           {quickScanMode && processingQueue === 0 && session.items.length > 0 && (
-            <p className="text-center text-sm text-gray-600 mt-2">
+            <p className="text-center text-sm text-gray-500 mt-2">
               ✅ All photos processed! Keep scanning or end session.
             </p>
           )}

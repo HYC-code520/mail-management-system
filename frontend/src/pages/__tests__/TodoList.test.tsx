@@ -143,7 +143,7 @@ describe('TodoList Component', () => {
   });
 
   describe('Add New Task Feature', () => {
-    it('should add a new task with all fields', async () => {
+    it('should add a new task with all fields via modal', async () => {
       (api.todos.create as any).mockResolvedValue({
         todo_id: '4',
         title: 'New Task',
@@ -161,12 +161,21 @@ describe('TodoList Component', () => {
         expect(screen.getByText('Test Task 1')).toBeInTheDocument();
       });
 
-      // Fill in task title
-      const titleInput = screen.getByPlaceholderText('Add todo');
+      // Click "Add New Task" button to open modal
+      const addNewTaskButton = screen.getByRole('button', { name: /Add New Task/i });
+      fireEvent.click(addNewTaskButton);
+
+      // Wait for modal to open (look for the heading specifically)
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Add New Task/i })).toBeInTheDocument();
+      });
+
+      // Fill in task title in the modal
+      const titleInput = screen.getByPlaceholderText('Enter task title');
       fireEvent.change(titleInput, { target: { value: 'New Task' } });
 
       // Submit form
-      const addButton = screen.getByRole('button', { name: /Add Task/i });
+      const addButton = screen.getByRole('button', { name: /^Add Task$/i });
       fireEvent.click(addButton);
 
       await waitFor(() => {
@@ -179,46 +188,63 @@ describe('TodoList Component', () => {
       });
     });
 
-    it('should show error when trying to add task without title', async () => {
+    it('should not call API when title is empty (HTML5 required validation)', async () => {
       renderTodoList();
 
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /Add Task/i })).toBeInTheDocument();
+        expect(screen.getByText('Test Task 1')).toBeInTheDocument();
       });
 
-      const addButton = screen.getByRole('button', { name: /Add Task/i });
+      // Click "Add New Task" button to open modal
+      const addNewTaskButton = screen.getByRole('button', { name: /Add New Task/i });
+      fireEvent.click(addNewTaskButton);
+
+      // Wait for modal to open (look for the heading specifically)
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Add New Task/i })).toBeInTheDocument();
+      });
+
+      // Try to submit with empty title - HTML5 required attribute prevents submission
+      const addButton = screen.getByRole('button', { name: /^Add Task$/i });
       fireEvent.click(addButton);
 
-      // Should not call API when title is empty
+      // Should not call API when title is empty (required field)
       expect(api.todos.create).not.toHaveBeenCalled();
     });
   });
 
-  describe('Quick Add Task Feature', () => {
-    // Note: Quick add "Add another task" feature was removed from the calendar UI
-    // These tests now verify the main add form functionality instead
-    it('should have main add form visible', async () => {
+  describe('Add Task Modal', () => {
+    it('should have Add New Task button visible', async () => {
       renderTodoList();
 
       await waitFor(() => {
         expect(screen.getByText('Test Task 1')).toBeInTheDocument();
       });
 
-      // Main add form should be visible
-      const addInput = screen.getByPlaceholderText('Add todo');
-      expect(addInput).toBeInTheDocument();
+      // Main add button should be visible
+      const addButton = screen.getByRole('button', { name: /Add New Task/i });
+      expect(addButton).toBeInTheDocument();
     });
 
-    it('should have staff selector in add form', async () => {
+    it('should have staff selector in add modal', async () => {
       renderTodoList();
 
       await waitFor(() => {
         expect(screen.getByText('Test Task 1')).toBeInTheDocument();
       });
 
-      // Verify the form has staff selector and other fields
+      // Open the modal
+      const addNewTaskButton = screen.getByRole('button', { name: /Add New Task/i });
+      fireEvent.click(addNewTaskButton);
+
+      // Wait for modal to open (look for the heading specifically)
+      await waitFor(() => {
+        expect(screen.getByRole('heading', { name: /Add New Task/i })).toBeInTheDocument();
+      });
+
+      // Verify the modal has staff selector and priority selector
       const selects = screen.getAllByRole('combobox');
-      expect(selects.length).toBeGreaterThan(0); // Should have selects for priority and staff
+      expect(selects.length).toBeGreaterThanOrEqual(2); // Priority and Staff selectors
     });
   });
 
