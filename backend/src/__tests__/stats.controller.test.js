@@ -43,13 +43,13 @@ const { getDaysSinceNY, toNYDateString, getTodayNY, getDaysAgoNY } = require('..
  * 4. notification_history - .select()
  * 5. package_fees (all fees) - .select().in()
  */
-function setupSupabaseMocks(mockSupabase, { contacts = [], mailItems = [], notifications = [], packageFees = [] }) {
+function setupSupabaseMocks(mockSupabase, { contacts = [], mailItems = [], notifications = [], packageFees = [], todos = [] }) {
   let packageFeesCallCount = 0;
-  
+
   mockSupabase.from.mockImplementation((table) => {
     if (table === 'package_fees') {
       packageFeesCallCount++;
-      
+
       if (packageFeesCallCount === 1) {
         // First call: all package fees query (.select().in())
         return {
@@ -100,11 +100,25 @@ function setupSupabaseMocks(mockSupabase, { contacts = [], mailItems = [], notif
           error: null,
         }),
       };
+    } else if (table === 'todos') {
+      // Staff performance query: .select().eq()
+      return {
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockResolvedValue({
+            data: todos,
+            error: null,
+          }),
+        }),
+      };
     }
     // Default fallback
     return {
       select: jest.fn().mockReturnValue({
         in: jest.fn().mockResolvedValue({
+          data: [],
+          error: null,
+        }),
+        eq: jest.fn().mockResolvedValue({
           data: [],
           error: null,
         }),
