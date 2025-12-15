@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Languages, Mail, AlertCircle, Menu, X, User, Settings, LayoutDashboard, Inbox, Users, FileText, CheckSquare, Camera, ChevronLeft, ChevronRight, Bell, DollarSign } from 'lucide-react';
+import { LogOut, Languages, Mail, AlertCircle, Menu, X, User, Settings, LayoutDashboard, Inbox, Users, FileText, CheckSquare, Camera, ChevronLeft, ChevronRight, Bell, DollarSign, Search, UserPlus, Zap } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { useState, useEffect, useCallback } from 'react';
@@ -17,6 +17,7 @@ export default function DashboardLayout() {
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasNewTodos, setHasNewTodos] = useState(false);
+  const [quickActionsOpen, setQuickActionsOpen] = useState(false);
 
   // Gmail status check function - defined before useEffect
   const checkGmailStatus = useCallback(async () => {
@@ -64,6 +65,22 @@ export default function DashboardLayout() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  // Keyboard shortcut for quick actions (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setQuickActionsOpen(prev => !prev);
+      }
+      if (e.key === 'Escape') {
+        setQuickActionsOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
   const handleSignOut = async () => {
     try {
       await signOut();
@@ -89,9 +106,19 @@ export default function DashboardLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Desktop: Top Bar with User & Language Dropdowns - Only on right side */}
+      {/* Desktop: Top Bar with Search & User Dropdowns */}
       <div className={`hidden lg:block bg-gray-50 sticky top-0 z-50 transition-all duration-300 ${sidebarCollapsed ? 'lg:ml-20' : 'lg:ml-72'}`}>
-        <div className="px-6 py-3 flex justify-end items-center gap-3">
+        <div className="py-3 flex justify-between items-center gap-3">
+          {/* Quick Actions Search Bar */}
+          <button
+            onClick={() => setQuickActionsOpen(true)}
+            className="flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors flex-1 ml-16 group"
+          >
+            <Zap className="w-5 h-5 text-gray-400 group-hover:text-gray-600 transition-colors" />
+            <span className="text-gray-500 text-base group-hover:text-gray-700 transition-colors">Quick action [CTRL + K]</span>
+          </button>
+
+          <div className="flex items-center gap-3 pr-16">
           {/* Language Dropdown */}
           <div className="relative">
             <button
@@ -219,6 +246,7 @@ export default function DashboardLayout() {
               </>
             )}
           </div>
+        </div>
         </div>
       </div>
 
@@ -474,6 +502,18 @@ export default function DashboardLayout() {
                 )}
               </div>
 
+              {/* Quick Actions Button for Mobile */}
+              <button
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  setQuickActionsOpen(true);
+                }}
+                className="w-full flex items-center gap-3 px-4 py-3 bg-blue-50 text-blue-700 rounded-lg font-medium transition-colors hover:bg-blue-100 mb-4"
+              >
+                <Search className="w-5 h-5" />
+                <span>Quick Actions</span>
+              </button>
+
               {/* Navigation Links */}
               <nav className="space-y-2">
                 <Link
@@ -591,6 +631,78 @@ export default function DashboardLayout() {
       <main className={`transition-all duration-300 ${sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72'}`}>
         <Outlet />
       </main>
+
+      {/* Quick Actions Modal */}
+      {quickActionsOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[100] flex items-start justify-center pt-20">
+          <div 
+            className="absolute inset-0" 
+            onClick={() => setQuickActionsOpen(false)}
+          />
+          <div className="relative bg-white rounded-xl shadow-2xl w-full max-w-2xl mx-4 overflow-hidden">
+            {/* Quick Actions Grid */}
+            <div className="p-6">
+              <div className="mb-3 px-2">
+                <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                  Quick Actions
+                </h3>
+              </div>
+              <div className="space-y-1">
+                {/* Scan Mail */}
+                <button
+                  onClick={() => {
+                    setQuickActionsOpen(false);
+                    navigate('/dashboard/scan');
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-blue-100 text-blue-600 flex items-center justify-center group-hover:bg-blue-200 transition-colors">
+                    <Camera className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-gray-900">Scan Mail</p>
+                    <p className="text-sm text-gray-500">Start a new scan session</p>
+                  </div>
+                </button>
+
+                {/* Log Mail */}
+                <button
+                  onClick={() => {
+                    setQuickActionsOpen(false);
+                    navigate('/dashboard/log');
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-purple-100 text-purple-600 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+                    <Inbox className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-gray-900">Log Mail</p>
+                    <p className="text-sm text-gray-500">Manually add mail items</p>
+                  </div>
+                </button>
+
+                {/* Add Customer */}
+                <button
+                  onClick={() => {
+                    setQuickActionsOpen(false);
+                    navigate('/dashboard/contacts');
+                  }}
+                  className="w-full flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group"
+                >
+                  <div className="w-10 h-10 rounded-lg bg-green-100 text-green-600 flex items-center justify-center group-hover:bg-green-200 transition-colors">
+                    <UserPlus className="w-5 h-5" />
+                  </div>
+                  <div className="flex-1 text-left">
+                    <p className="font-medium text-gray-900">Add Customer</p>
+                    <p className="text-sm text-gray-500">Create a new customer profile</p>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
