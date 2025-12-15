@@ -1999,8 +1999,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
               const maxButtons = 5;
               
               let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
-              let endPage = Math.min(totalPages, startPage + maxButtons - 1);
-              
+              const endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
               if (endPage - startPage < maxButtons - 1) {
                 startPage = Math.max(1, endPage - maxButtons + 1);
               }

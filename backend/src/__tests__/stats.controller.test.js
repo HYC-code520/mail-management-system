@@ -26,13 +26,14 @@ jest.mock('../utils/timezone', () => ({
   getDaysAgoNY: jest.fn(),
   toNYDateString: jest.fn(),
   getTodayNY: jest.fn(),
+  getStartOfDayNY: jest.fn(),
 }));
 
 const { getDashboardStats } = require('../controllers/stats.controller');
 const { getSupabaseClient } = require('../services/supabase.service');
 const feeService = require('../services/fee.service');
 
-const { getDaysSinceNY, toNYDateString, getTodayNY, getDaysAgoNY } = require('../utils/timezone');
+const { getDaysSinceNY, toNYDateString, getTodayNY, getDaysAgoNY, getStartOfDayNY } = require('../utils/timezone');
 
 /**
  * Helper to setup all required Supabase mocks for getDashboardStats
@@ -101,13 +102,15 @@ function setupSupabaseMocks(mockSupabase, { contacts = [], mailItems = [], notif
         }),
       };
     } else if (table === 'todos') {
-      // Staff performance query: .select().eq().gte()
+      // Staff performance query: .select().eq().not().gte()
       return {
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
-            gte: jest.fn().mockResolvedValue({
-              data: todos,
-              error: null,
+            not: jest.fn().mockReturnValue({
+              gte: jest.fn().mockResolvedValue({
+                data: todos,
+                error: null,
+              }),
             }),
           }),
         }),
@@ -164,6 +167,7 @@ describe('Stats Controller - Dashboard Metrics', () => {
     getTodayNY.mockReturnValue('2025-12-11');
     getDaysSinceNY.mockReturnValue(0);
     getDaysAgoNY.mockReturnValue('2025-12-08');
+    getStartOfDayNY.mockReturnValue('2025-12-04T05:00:00.000Z'); // 7 days ago at midnight NY time
     toNYDateString.mockImplementation((date) => {
       if (typeof date === 'string') {
         return date.split('T')[0];
