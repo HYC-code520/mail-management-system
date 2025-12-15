@@ -51,7 +51,7 @@ export default function ChartsSection({
   return (
     <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 h-full flex flex-col">
       {/* Time Range Toggle */}
-      <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-gray-50 to-gray-100 p-1 rounded-lg shadow-sm border border-gray-200 mb-3">
+      <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-50 to-purple-50 p-1 rounded-lg shadow-sm border border-blue-100 mb-3">
         {[7, 14, 30].map((range) => (
           <button
             key={range}
@@ -64,8 +64,8 @@ export default function ChartsSection({
             }}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
               chartTimeRange === range
-                ? 'bg-white text-blue-700 shadow-sm'
-                : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
+                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
+                : 'text-blue-700 hover:text-blue-900 hover:bg-white/60'
             } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {range} Days

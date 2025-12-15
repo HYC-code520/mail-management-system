@@ -422,21 +422,20 @@ export default function DashboardPage() {
             {/* Merlin Performance - 1/4 width */}
             <div className="lg:col-span-1" style={{ overflow: 'visible' }}>
               <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-shadow relative" style={{ minHeight: '160px', overflow: 'visible' }}>
-                {/* Avatar positioned on the RIGHT side, extending beyond card bounds */}
+                {/* Avatar positioned on the RIGHT side, extending 10% above card */}
                 <div className="absolute bottom-0 right-0 pointer-events-none" style={{ 
-                  height: 'auto', 
-                  width: '120px',
-                  right: '-15px',
+                  height: '110%',
+                  width: '140px',
+                  right: '-20px',
                   bottom: '0',
                   zIndex: 20
                 }}>
                   <img 
                     src="/assets/images/Merlin.png" 
                     alt="Merlin" 
-                    className="w-full h-auto object-contain object-bottom"
+                    className="w-full h-full object-contain object-bottom"
                     style={{ 
-                      filter: 'drop-shadow(2px 2px 6px rgba(0,0,0,0.15))',
-                      maxHeight: 'calc(100% + 50px)'
+                      filter: 'drop-shadow(3px 3px 8px rgba(0,0,0,0.2))'
                     }}
                   />
                 </div>
@@ -448,12 +447,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-1">
                       <h3 className="text-xs font-bold text-gray-900">Merlin</h3>
-                      <p className="text-xs text-gray-500">Tasks</p>
+                      <p className="text-xs text-gray-500">This Week</p>
                     </div>
                   </div>
                   <div>
                     <p className="text-3xl font-bold text-blue-600">{stats.analytics.staffPerformance.Merlin}</p>
-                    <p className="text-xs text-gray-600">completed</p>
+                    <p className="text-xs text-gray-600">tasks completed</p>
                   </div>
                 </div>
               </div>
@@ -462,21 +461,20 @@ export default function DashboardPage() {
             {/* Madison Performance - 1/4 width */}
             <div className="lg:col-span-1" style={{ overflow: 'visible' }}>
               <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-shadow relative" style={{ minHeight: '160px', overflow: 'visible' }}>
-                {/* Avatar positioned on the RIGHT side, extending beyond card bounds */}
+                {/* Avatar positioned on the RIGHT side, extending 10% above card */}
                 <div className="absolute bottom-0 right-0 pointer-events-none" style={{ 
-                  height: 'auto', 
-                  width: '120px',
-                  right: '-15px',
+                  height: '110%',
+                  width: '140px',
+                  right: '-20px',
                   bottom: '0',
                   zIndex: 20
                 }}>
                   <img 
                     src="/assets/images/Madison.png" 
                     alt="Madison" 
-                    className="w-full h-auto object-contain object-bottom"
+                    className="w-full h-full object-contain object-bottom"
                     style={{ 
-                      filter: 'drop-shadow(2px 2px 6px rgba(0,0,0,0.15))',
-                      maxHeight: 'calc(100% + 50px)'
+                      filter: 'drop-shadow(3px 3px 8px rgba(0,0,0,0.2))'
                     }}
                   />
                 </div>
@@ -488,12 +486,12 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex-1">
                       <h3 className="text-xs font-bold text-gray-900">Madison</h3>
-                      <p className="text-xs text-gray-500">Tasks</p>
+                      <p className="text-xs text-gray-500">This Week</p>
                     </div>
                   </div>
                   <div>
                     <p className="text-3xl font-bold text-purple-600">{stats.analytics.staffPerformance.Madison}</p>
-                    <p className="text-xs text-gray-600">completed</p>
+                    <p className="text-xs text-gray-600">tasks completed</p>
                   </div>
                 </div>
               </div>

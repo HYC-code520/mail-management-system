@@ -453,10 +453,13 @@ exports.getDashboardStats = async (req, res, next) => {
     });
     
     // NEW ANALYTICS: Staff Performance (from todos)
+    // Get todos completed in the last 7 days (this week)
+    const sevenDaysAgo = getDaysAgoNY(7);
     const { data: todos } = await supabase
       .from('todos')
-      .select('is_completed, last_edited_by_name')
-      .eq('is_completed', true);
+      .select('is_completed, last_edited_by_name, updated_at')
+      .eq('is_completed', true)
+      .gte('updated_at', sevenDaysAgo);
     
     const staffPerformance = {
       Merlin: (todos || []).filter(t => t.last_edited_by_name === 'Merlin').length,
