@@ -164,20 +164,21 @@ exports.getDashboardStats = async (req, res, next) => {
     const supabase = getSupabaseClient(req.user.token);
     const { days = 7 } = req.query; // Default to 7 days for charts
 
-    // Auto-recalculate pending fees before loading dashboard
-    // This ensures fees are always up-to-date when users view the dashboard
-    try {
-      await feeService.updateFeesForAllPackages(req.user.id);
-    } catch (feeError) {
-      console.error('Error auto-recalculating fees:', feeError);
-      // Continue even if fee calculation fails
-    }
+    // NOTE: Fee recalculation is now handled by the daily cron job
+    // Removing auto-recalculation here to improve dashboard load performance
+    // Fees are calculated when packages are received and updated daily by cron
 
-    // Fetch all data in parallel
+    // Calculate the 7-day timestamp for staff performance query
+    const { getStartOfDayNY } = require('../utils/timezone');
+    const sevenDaysAgoTimestamp = getStartOfDayNY(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
+
+    // Fetch all data in parallel for maximum performance
     const [
       { data: contacts, error: contactsError },
       { data: mailItems, error: mailItemsError },
-      { data: notifications, error: notificationsError }
+      { data: notifications, error: notificationsError },
+      { data: packageFees, error: feesError },
+      { data: todos }
     ] = await Promise.all([
       supabase
         .from('contacts')
@@ -198,7 +199,17 @@ exports.getDashboardStats = async (req, res, next) => {
         .order('received_date', { ascending: false }),
       supabase
         .from('notification_history')
-        .select('mail_item_id, sent_at')
+        .select('mail_item_id, sent_at'),
+      supabase
+        .from('package_fees')
+        .select('*')
+        .in('fee_status', ['pending', 'paid', 'waived']),
+      supabase
+        .from('todos')
+        .select('is_completed, last_edited_by_name, completed_at')
+        .eq('is_completed', true)
+        .not('completed_at', 'is', null)
+        .gte('completed_at', sevenDaysAgoTimestamp)
     ]);
 
     if (contactsError) {
@@ -264,12 +275,6 @@ exports.getDashboardStats = async (req, res, next) => {
       item.pickup_date && 
       toNYDateString(item.pickup_date) === todayString
     ).length;
-    
-    // Fetch package fees FIRST so we can identify customers with pending fees
-    const { data: packageFees, error: feesError } = await supabase
-      .from('package_fees')
-      .select('*')
-      .in('fee_status', ['pending', 'paid', 'waived']);
     
     if (feesError) {
       console.error('Error fetching package fees:', feesError);
@@ -452,19 +457,7 @@ exports.getDashboardStats = async (req, res, next) => {
       else ageDistribution['30+']++;
     });
     
-    // NEW ANALYTICS: Staff Performance (from todos)
-    // Get todos completed in the last 7 days (this week)
-    // Use completed_at instead of updated_at to only count when task was actually completed
-    const { getStartOfDayNY } = require('../utils/timezone');
-    const sevenDaysAgoTimestamp = getStartOfDayNY(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000));
-    
-    const { data: todos } = await supabase
-      .from('todos')
-      .select('is_completed, last_edited_by_name, completed_at')
-      .eq('is_completed', true)
-      .not('completed_at', 'is', null)
-      .gte('completed_at', sevenDaysAgoTimestamp);
-    
+    // Staff Performance (from todos - already fetched in parallel above)
     const staffPerformance = {
       Merlin: (todos || []).filter(t => t.last_edited_by_name === 'Merlin').length,
       Madison: (todos || []).filter(t => t.last_edited_by_name === 'Madison').length

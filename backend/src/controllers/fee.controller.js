@@ -169,7 +169,7 @@ exports.markFeePaid = async (req, res, next) => {
     const userId = req.user.id;
     
     // Validate payment method
-    const validMethods = ['cash', 'card', 'venmo', 'zelle', 'check', 'other'];
+    const validMethods = ['cash', 'card', 'venmo', 'zelle', 'paypal', 'check', 'other'];
     if (paymentMethod && !validMethods.includes(paymentMethod)) {
       return res.status(400).json({ 
         error: `Invalid payment method. Valid options: ${validMethods.join(', ')}` 

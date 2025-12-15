@@ -292,6 +292,7 @@ async function getOutstandingFees(userId) {
       `)
       .eq('user_id', userId)
       .eq('fee_status', 'pending')
+      .gt('fee_amount', 0) // Only show fees > $0 (exclude grace period packages)
       .order('fee_amount', { ascending: false }); // Highest fees first
     
     if (error) {

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Check, Circle, Trash2, Calendar, Flag, Folder, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Check, Circle, Trash2, Calendar, Flag, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';

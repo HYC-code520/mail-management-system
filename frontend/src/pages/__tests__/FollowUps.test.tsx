@@ -163,8 +163,9 @@ describe('FollowUpsPage', () => {
 
     // GroupedFollowUpSection displays mailbox and fees
     expect(screen.getByText(/A1/)).toBeInTheDocument();
-    // Fees are displayed as $X.XX format
-    expect(screen.getByText(/\$10\.00/)).toBeInTheDocument();
+    // Fees are displayed in multiple places (fee display and fee button)
+    const feeElements = screen.getAllByText(/\$10\.00/);
+    expect(feeElements.length).toBeGreaterThanOrEqual(1);
   });
 
   it('displays company name when contact_person is not available', async () => {

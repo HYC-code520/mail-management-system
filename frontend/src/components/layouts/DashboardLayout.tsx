@@ -1,5 +1,5 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Languages, Mail, AlertCircle, Menu, X, User, Settings, LayoutDashboard, Inbox, Users, FileText, CheckSquare, Camera, ChevronLeft, ChevronRight, Bell } from 'lucide-react';
+import { LogOut, Languages, Mail, AlertCircle, Menu, X, User, Settings, LayoutDashboard, Inbox, Users, FileText, CheckSquare, Camera, ChevronLeft, ChevronRight, Bell, DollarSign } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { useState, useEffect, useCallback } from 'react';
@@ -49,12 +49,20 @@ export default function DashboardLayout() {
     }
   }, []);
 
-  // Check Gmail connection status on mount and when location changes
+  // Check Gmail connection status on mount only (not on every navigation)
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void checkGmailStatus(); // Explicitly ignore the promise
-    void checkNewTodos(); // Check for new todos
-  }, [location.pathname, checkGmailStatus, checkNewTodos]); // Re-check when navigating between pages
+    void checkGmailStatus();
+    void checkNewTodos();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  
+  // Re-check todos when navigating TO the todos page (to clear the badge)
+  useEffect(() => {
+    if (location.pathname === '/dashboard/todos') {
+      void checkNewTodos();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.pathname]);
 
   const handleSignOut = async () => {
     try {
@@ -339,6 +347,23 @@ export default function DashboardLayout() {
               </li>
 
               <li>
+                <Link
+                  to="/dashboard/fees"
+                  className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
+                    sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
+                  } ${
+                    location.pathname === '/dashboard/fees'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
+                      : 'text-gray-700 hover:bg-gray-100 rounded-lg'
+                  }`}
+                  title={sidebarCollapsed ? 'Fees' : ''}
+                >
+                  <DollarSign className="w-5 h-5 shrink-0" />
+                  {!sidebarCollapsed && <span className="whitespace-nowrap">Fee Collection</span>}
+                </Link>
+              </li>
+
+              <li>
             <Link
               to="/dashboard/todos"
                   className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
@@ -496,6 +521,17 @@ export default function DashboardLayout() {
                   Email Templates
                 </Link>
                 <Link
+                  to="/dashboard/fees"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className={`block px-4 py-3 rounded-lg font-medium transition-colors ${
+                    location.pathname === '/dashboard/fees'
+                      ? 'bg-blue-50 text-blue-700'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  Fee Collection
+                </Link>
+                <Link
                   to="/dashboard/todos"
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center justify-between px-4 py-3 rounded-lg font-medium transition-colors ${
@@ -558,3 +594,4 @@ export default function DashboardLayout() {
     </div>
   );
 }
+

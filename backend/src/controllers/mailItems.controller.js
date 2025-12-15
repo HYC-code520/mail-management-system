@@ -10,14 +10,8 @@ exports.getMailItems = async (req, res, next) => {
     const supabase = getSupabaseClient(req.user.token);
     const { contact_id } = req.query;
 
-    // Auto-recalculate pending fees when viewing mail items
-    // This ensures fees are always up-to-date
-    try {
-      await feeService.updateFeesForAllPackages(req.user.id);
-    } catch (feeError) {
-      console.error('Error auto-recalculating fees:', feeError);
-      // Continue even if fee calculation fails
-    }
+    // NOTE: Fee recalculation is now handled by the daily cron job
+    // Removing auto-recalculation here to improve page load performance
 
     let query = supabase
       .from('mail_items')

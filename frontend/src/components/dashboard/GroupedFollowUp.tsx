@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Package, Mail, ChevronDown, ChevronUp, Send, MoreVertical, Banknote } from 'lucide-react';
+import { AlertCircle, Package, Mail, ChevronDown, ChevronUp, Send, DollarSign } from 'lucide-react';
 
 interface PackageFee {
   fee_id: string;
@@ -55,27 +55,22 @@ interface GroupedFollowUp {
 
 interface GroupedFollowUpProps {
   groups: GroupedFollowUp[];
-  onWaiveFee: (group: GroupedFollowUp) => void;
   onSendEmail: (group: GroupedFollowUp) => void;
   onMarkAbandoned: (group: GroupedFollowUp) => void;
-  onCollectFee: (group: GroupedFollowUp) => void;
   getDaysSince: (date: string) => number;
   loading?: boolean;
 }
 
 export default function GroupedFollowUpSection({ 
   groups, 
-  onWaiveFee, 
   onSendEmail, 
   onMarkAbandoned,
-  onCollectFee,
   getDaysSince, 
   loading 
 }: GroupedFollowUpProps) {
   const navigate = useNavigate();
   const [isExpanded, setIsExpanded] = useState(true);
   const [displayCount, setDisplayCount] = useState(10);
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [expandedPersons, setExpandedPersons] = useState<Set<string>>(new Set());
 
   const togglePersonExpand = (contactId: string) => {
@@ -375,157 +370,64 @@ export default function GroupedFollowUpSection({
                   </div>
                 )}
                 
-                {/* Context-aware action buttons - Fee collection always takes priority */}
-                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
-                  {/* Priority 1: Has fees AND abandoned - show Collect + Final Notice + Mark Abandoned */}
-                  {hasFees && isAbandoned ? (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onCollectFee(group);
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <Banknote className="w-4 h-4" />
-                        Collect ${group.totalFees.toFixed(0)}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSendEmail(group);
-                        }}
-                        className="px-4 py-2 bg-red-100 hover:bg-red-200 text-red-700 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2"
-                      >
-                        <Send className="w-4 h-4" />
-                        Notice
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMarkAbandoned(group);
-                        }}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
-                        title="Mark items 30+ days old as abandoned"
-                      >
-                        Abandon
-                      </button>
-                    </>
-                  ) : hasFees ? (
-                    // Priority 2: Has fees (not abandoned) - show Collect + Remind + Waive
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onCollectFee(group);
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-green-600 hover:bg-green-700 text-white"
-                      >
-                        <Banknote className="w-4 h-4" />
-                        Collect ${group.totalFees >= 50 ? group.totalFees.toFixed(0) : group.totalFees.toFixed(2)}
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSendEmail(group);
-                        }}
-                        className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Remind
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onWaiveFee(group);
-                        }}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
-                      >
-                        Waive
-                      </button>
-                    </>
-                  ) : isAbandoned ? (
-                    // Priority 3: Abandoned but no fees - show Final Notice + Mark Abandoned
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSendEmail(group);
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-red-100 hover:bg-red-200 text-red-700"
-                      >
-                        <Send className="w-4 h-4" />
-                        Final Notice
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onMarkAbandoned(group);
-                        }}
-                        className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
-                        title="Mark items 30+ days old as abandoned"
-                      >
-                        Mark Abandoned
-                      </button>
-                    </>
-                  ) : (
-                    // Priority 4: No fees, not abandoned - general reminder
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onSendEmail(group);
-                        }}
-                        className="flex-1 px-4 py-2 rounded-lg text-sm font-medium flex items-center justify-center gap-2 transition-colors bg-blue-50 hover:bg-blue-100 text-blue-600"
-                      >
-                        <Send className="w-4 h-4" />
-                        Send Reminder
-                      </button>
-                    </>
-                  )}
-                  
-                  {/* More options dropdown */}
-                  <div className="relative">
-                    <button 
+                {/* Action buttons - all displayed inline */}
+                <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
+                  {/* Fee button - if has fees */}
+                  {hasFees && (
+                    <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setOpenDropdownId(
-                          openDropdownId === group.contact.contact_id ? null : group.contact.contact_id
-                        );
+                        navigate('/dashboard/fees');
                       }}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors bg-green-100 hover:bg-green-200 text-green-700"
                     >
-                      <MoreVertical className="w-4 h-4" />
+                      <DollarSign className="w-4 h-4" />
+                      ${group.totalFees >= 50 ? group.totalFees.toFixed(0) : group.totalFees.toFixed(2)}
                     </button>
-                    
-                    {openDropdownId === group.contact.contact_id && (
-                      <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
-                        <button 
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate(`/dashboard/contacts/${group.contact.contact_id}`);
-                            setOpenDropdownId(null);
-                          }}
-                          className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-lg"
-                        >
-                          👤 View Profile
-                        </button>
-                        
-                        {/* Show Waive Fee option whenever there are fees */}
-                        {hasFees && (
-                          <button 
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onWaiveFee(group);
-                              setOpenDropdownId(null);
-                            }}
-                            className="w-full px-4 py-2 text-left text-sm hover:bg-gray-50 rounded-lg text-gray-900"
-                          >
-                            Waive Fee
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                  )}
+                  
+                  {/* Send Email/Reminder button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSendEmail(group);
+                    }}
+                    className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
+                      isAbandoned 
+                        ? 'bg-red-100 hover:bg-red-200 text-red-700' 
+                        : hasFees 
+                          ? 'bg-orange-100 hover:bg-orange-200 text-orange-700'
+                          : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
+                    }`}
+                  >
+                    <Send className="w-4 h-4" />
+                    {isAbandoned ? 'Final Notice' : 'Remind'}
+                  </button>
+                  
+                  {/* Mark Abandoned button - if 30+ days */}
+                  {isAbandoned && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onMarkAbandoned(group);
+                      }}
+                      className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
+                      title="Mark items 30+ days old as abandoned"
+                    >
+                      Abandon
+                    </button>
+                  )}
+                  
+                  {/* View Profile button */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/dashboard/contacts/${group.contact.contact_id}`);
+                    }}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
+                  >
+                    Profile
+                  </button>
                 </div>
                 
                 {/* Urgency badge */}
