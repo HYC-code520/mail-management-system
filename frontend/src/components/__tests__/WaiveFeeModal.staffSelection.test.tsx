@@ -1,8 +1,9 @@
+import React from 'react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import WaiveFeeModal from '../WaiveFeeModal';
-import * as apiClient from '../../lib/api-client';
+import { api } from '../../lib/api-client';
 
 // Mock the API client
 vi.mock('../../lib/api-client');
@@ -13,7 +14,7 @@ describe('WaiveFeeModal - Staff Selection', () => {
     contact: {
       contact_id: 'contact-1',
       contact_person: 'John Doe',
-      company_name: null,
+      company_name: undefined,
       mailbox_number: 'MB-101'
     },
     packages: [
@@ -42,11 +43,7 @@ describe('WaiveFeeModal - Staff Selection', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    apiClient.api = {
-      fees: {
-        waive: vi.fn().mockResolvedValue({ success: true })
-      }
-    };
+    vi.mocked(api.fees.waive).mockResolvedValue({ success: true });
   });
 
   afterEach(() => {
@@ -96,7 +93,7 @@ describe('WaiveFeeModal - Staff Selection', () => {
     });
 
     // API should not be called
-    expect(apiClient.api.fees.waive).not.toHaveBeenCalled();
+    expect(api.fees.waive).not.toHaveBeenCalled();
   });
 
   it('should highlight selected staff button', () => {
@@ -153,12 +150,11 @@ describe('WaiveFeeModal - Staff Selection', () => {
     const waiveButton = screen.getByRole('button', { name: /Waive \$10.00/i });
     fireEvent.click(waiveButton);
 
-    // Verify API was called with Madison
+    // Verify API was called - staff tracking is now handled server-side
     await waitFor(() => {
-      expect(apiClient.api.fees.waive).toHaveBeenCalledWith(
+      expect(api.fees.waive).toHaveBeenCalledWith(
         'fee-1',
-        'Customer loyalty discount',
-        'Madison'
+        'Customer loyalty discount'
       );
     });
 
@@ -189,12 +185,11 @@ describe('WaiveFeeModal - Staff Selection', () => {
     const waiveButton = screen.getByRole('button', { name: /Waive \$10.00/i });
     fireEvent.click(waiveButton);
 
-    // Verify API was called with Merlin
+    // Verify API was called - staff tracking is now handled server-side
     await waitFor(() => {
-      expect(apiClient.api.fees.waive).toHaveBeenCalledWith(
+      expect(api.fees.waive).toHaveBeenCalledWith(
         'fee-1',
-        'System error correction',
-        'Merlin'
+        'System error correction'
       );
     });
 
@@ -245,7 +240,7 @@ describe('WaiveFeeModal - Staff Selection', () => {
 
   it('should disable staff buttons while saving', async () => {
     // Make API call slow
-    apiClient.api.fees.waive = vi.fn().mockImplementation(
+    vi.mocked(api.fees.waive).mockImplementation(
       () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 100))
     );
 

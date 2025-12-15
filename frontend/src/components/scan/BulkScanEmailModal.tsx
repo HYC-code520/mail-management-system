@@ -87,9 +87,13 @@ export default function BulkScanEmailModal({
       // Show ALL templates
       setTemplates(templatesList);
 
-      // Auto-select first template
+      // Auto-select "New Mail Notification" template for scan sessions
       if (templatesList.length > 0) {
-        setSelectedTemplate(templatesList[0]);
+        const newMailTemplate = templatesList.find(
+          t => t.template_name === 'New Mail Notification' || 
+               t.template_name?.toLowerCase().includes('new mail')
+        );
+        setSelectedTemplate(newMailTemplate || templatesList[0]);
       }
     } catch (err) {
       console.error('Error loading templates:', err);

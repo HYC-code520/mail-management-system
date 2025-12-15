@@ -291,7 +291,7 @@ export default function ContactsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-full mx-auto px-16 py-6">
         <div className="flex items-center justify-center min-h-[60vh]">
           <LoadingSpinner 
             message="Loading contacts..." 
@@ -307,7 +307,7 @@ export default function ContactsPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-full mx-auto px-16 py-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>

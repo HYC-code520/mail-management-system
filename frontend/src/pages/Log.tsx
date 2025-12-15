@@ -1053,7 +1053,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-full mx-auto px-16 py-6">
         <div className="flex flex-col items-center justify-center py-20">
           {/* Spinner */}
           <div className="relative">

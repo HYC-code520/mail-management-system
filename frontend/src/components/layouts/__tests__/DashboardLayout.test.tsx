@@ -74,8 +74,8 @@ describe('DashboardLayout - Gmail Status Indicator', () => {
         expect(api.oauth.getGmailStatus).toHaveBeenCalled();
       });
 
-      // Check for Gmail Connected indicator
-      const gmailIndicator = screen.getByText(/gmail connected/i);
+      // Check for Gmail Connected indicator (wait for state update after API call)
+      const gmailIndicator = await screen.findByText(/gmail connected/i);
       expect(gmailIndicator).toBeInTheDocument();
 
       // Verify it's a link to settings
@@ -398,4 +398,127 @@ describe('DashboardLayout - Gmail Status Indicator', () => {
   });
 });
 
+describe('DashboardLayout - Logo and Branding', () => {
+  const mockUser = {
+    id: 'user-123',
+    email: 'test@example.com'
+  };
 
+  const mockAuthContext = {
+    user: mockUser,
+    signOut: vi.fn(),
+    signIn: vi.fn(),
+    signUp: vi.fn(),
+    session: null,
+    loading: false
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (AuthContextModule.useAuth as any) = vi.fn(() => mockAuthContext);
+    (api.oauth.getGmailStatus as any).mockResolvedValue({
+      connected: true,
+      gmailAddress: 'test@gmail.com'
+    });
+  });
+
+  describe('Logo Display', () => {
+    it('should display the Mei Way Mail logo image', async () => {
+      render(
+        <BrowserRouter>
+          <DashboardLayout />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        const logo = screen.getByAltText('Mei Way Mail Logo');
+        expect(logo).toBeInTheDocument();
+      });
+    });
+
+    it('should have correct logo source path', async () => {
+      render(
+        <BrowserRouter>
+          <DashboardLayout />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        const logo = screen.getByAltText('Mei Way Mail Logo');
+        expect(logo).toHaveAttribute('src', '/assets/images/mei-way-logo.png');
+      });
+    });
+
+    it('should have round logo with correct styling', async () => {
+      render(
+        <BrowserRouter>
+          <DashboardLayout />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        const logo = screen.getByAltText('Mei Way Mail Logo');
+        expect(logo).toHaveClass('rounded-full');
+        expect(logo).toHaveClass('w-12', 'h-12');
+      });
+    });
+
+    it('should wrap logo in link to dashboard', async () => {
+      render(
+        <BrowserRouter>
+          <DashboardLayout />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        const logo = screen.getByAltText('Mei Way Mail Logo');
+        const link = logo.closest('a');
+        expect(link).toHaveAttribute('href', '/dashboard');
+      });
+    });
+  });
+
+  describe('Branding Text', () => {
+    it('should display "Mei Way Mail" text (shortened from "Mei Way Mail Plus")', async () => {
+      render(
+        <BrowserRouter>
+          <DashboardLayout />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        // Both mobile and desktop views have "Mei Way Mail" text
+        const brandTexts = screen.getAllByText('Mei Way Mail');
+        expect(brandTexts.length).toBeGreaterThan(0);
+      });
+    });
+
+    it('should NOT display "Mei Way Mail Plus" (old branding)', async () => {
+      render(
+        <BrowserRouter>
+          <DashboardLayout />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByText('Mei Way Mail Plus')).not.toBeInTheDocument();
+      });
+    });
+
+    it('should have black text color for branding', async () => {
+      render(
+        <BrowserRouter>
+          <DashboardLayout />
+        </BrowserRouter>
+      );
+
+      await waitFor(() => {
+        // Both mobile and desktop views have "Mei Way Mail" text with black color
+        const brandTexts = screen.getAllByText('Mei Way Mail');
+        expect(brandTexts.length).toBeGreaterThan(0);
+        // At least one should have the text-gray-900 class
+        expect(brandTexts.some(el => el.classList.contains('text-gray-900'))).toBe(true);
+      });
+    });
+  });
+});

@@ -162,8 +162,8 @@ Now analyze the image and provide your response:`;
  */
 async function bulkSubmitScanSession(req, res, next) {
   try {
-    const { items, template_id, custom_subject, custom_body } = req.body;
-
+    const { items, scannedBy, templateId, customSubject, customBody, skipNotification } = req.body;
+    
     // Get the logged-in user for sending emails
     const userId = req.user?.id;
     
@@ -264,7 +264,7 @@ async function bulkSubmitScanSession(req, res, next) {
                   mail_item_id: mailItem.mail_item_id,
                   action_type: 'scanned',
                   action_description: `Bulk scanned ${typeGroup.count} ${mailItem.item_type}${typeGroup.count > 1 ? 's' : ''} via Scan Session`,
-                  performed_by: req.body.scanned_by || req.user.email || 'Staff',
+                  performed_by: scannedBy || req.user.email || 'Staff',
                   action_timestamp: new Date().toISOString()
                 });
             } catch (historyError) {
@@ -288,20 +288,38 @@ async function bulkSubmitScanSession(req, res, next) {
             }
           }
 
-          // Get email template - use custom template if provided, otherwise auto-select
-          let template, templateError;
-
-          if (template_id) {
-            // Use template provided from frontend
-            const result = await supabaseAdmin
+          // Send notifications with error handling
+          let emailSent = false;
+          
+          // Skip notification if flag is set
+          if (skipNotification) {
+            console.log(`⏭️ Skipping notification for ${contact.email} (skipNotification flag set)`);
+            return {
+              contact_id: contact.contact_id,
+              contact_name: contact.contact_person || contact.company_name,
+              letterCount: group.letterCount,
+              packageCount: group.packageCount,
+              notificationSent: false,
+              itemsCreated: createdItems.length,
+            };
+          }
+          
+          // Get template - use custom template if provided, otherwise use default logic
+          let template = null;
+          let templateError = null;
+          
+          if (templateId) {
+            // Use custom template selected in frontend
+            const { data: customTemplate, error: customError } = await supabaseAdmin
               .from('message_templates')
               .select('*')
-              .eq('template_id', template_id)
+              .eq('template_id', templateId)
               .single();
-            template = result.data;
-            templateError = result.error;
+            
+            template = customTemplate;
+            templateError = customError;
           } else {
-            // Auto-select template based on item types (legacy behavior)
+            // Fallback: Select appropriate template based on item types
             let templateName;
             const hasLetters = group.letterCount > 0;
             const hasPackages = group.packageCount > 0;
@@ -314,17 +332,16 @@ async function bulkSubmitScanSession(req, res, next) {
               templateName = 'Scan: Letters Only';
             }
 
-            const result = await supabaseAdmin
+            // Get template
+            const { data: autoTemplate, error: autoError } = await supabaseAdmin
               .from('message_templates')
               .select('*')
               .eq('template_name', templateName)
               .single();
-            template = result.data;
-            templateError = result.error;
+            
+            template = autoTemplate;
+            templateError = autoError;
           }
-
-          // Send notifications with error handling
-          let emailSent = false;
           
           if (templateError || !template) {
             // Fallback to generic notification template
@@ -354,6 +371,11 @@ async function bulkSubmitScanSession(req, res, next) {
                     Name: contact.contact_person || contact.company_name || 'Valued Customer',
                     BoxNumber: contact.mailbox_number || 'N/A',
                     Type: typeString.join(' and '),
+                    LetterCount: group.letterCount,
+                    PackageCount: group.packageCount,
+                    TotalCount: group.letterCount + group.packageCount,
+                    LetterText: group.letterCount === 1 ? 'letter' : 'letters',
+                    PackageText: group.packageCount === 1 ? 'package' : 'packages',
                     Date: new Date().toLocaleDateString(),
                   },
                   userId: userId, // Use logged-in user for Gmail OAuth!
@@ -387,12 +409,21 @@ async function bulkSubmitScanSession(req, res, next) {
               }
             }
           } else {
-            // Send notification using scan-specific template (with error handling)
+            // Send notification using selected template (with error handling)
+            // Use custom subject/body if provided, otherwise use template defaults
+            const emailSubject = customSubject || template.subject_line;
+            const emailBody = customBody || template.message_body;
+            
+            // Build item type string for {Type} placeholder
+            const typeString = [];
+            if (group.letterCount > 0) {
+              typeString.push(`${group.letterCount} ${group.letterCount === 1 ? 'letter' : 'letters'}`);
+            }
+            if (group.packageCount > 0) {
+              typeString.push(`${group.packageCount} ${group.packageCount === 1 ? 'package' : 'packages'}`);
+            }
+            
             try {
-              // Use custom subject/body if provided, otherwise use template defaults
-              const emailSubject = custom_subject || template.subject_line;
-              const emailBody = custom_body || template.message_body;
-
               await sendTemplateEmail({
                 to: contact.email,
                 templateSubject: emailSubject,
@@ -403,6 +434,7 @@ async function bulkSubmitScanSession(req, res, next) {
                   LetterCount: group.letterCount,
                   PackageCount: group.packageCount,
                   TotalCount: group.letterCount + group.packageCount,
+                  Type: typeString.join(' and '),
                   Date: new Date().toLocaleDateString(),
                   // Add pluralization text
                   LetterText: group.letterCount === 1 ? 'letter' : 'letters',

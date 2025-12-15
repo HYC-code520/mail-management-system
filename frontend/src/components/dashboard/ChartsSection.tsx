@@ -5,8 +5,8 @@
  */
 
 import React from 'react';
-import { TrendingUp, UserPlus } from 'lucide-react';
-import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { TrendingUp, UserPlus, Loader2 } from 'lucide-react';
+import { BarChart, Bar, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface ChartData {
   date: string;
@@ -31,159 +31,184 @@ export default function ChartsSection({
 }: ChartsSectionProps) {
   
   const handleRangeChange = (range: 7 | 14 | 30) => {
-    console.log('Chart range changed to:', range);
+    if (loading) return; // Prevent multiple clicks while loading
     onTimeRangeChange(range);
   };
 
-  if (loading) {
-    return (
-      <div className="lg:col-span-2 space-y-6 h-full animate-pulse">
-        <div className="h-12 bg-gray-100 rounded-lg"></div>
-        <div className="h-64 bg-gray-100 rounded-lg"></div>
-        <div className="h-64 bg-gray-100 rounded-lg"></div>
-      </div>
-    );
-  }
+  // Format date label - show M T W T F S S for 7 days view
+  const formatDateLabel = (dateStr: string) => {
+    if (chartTimeRange === 7) {
+      const date = new Date(dateStr);
+      const days = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+      return days[date.getDay()];
+    }
+    return dateStr;
+  };
+
+  // Find max value for highlighting
+  const maxMailCount = Math.max(...mailVolumeData.map(d => d.count || 0));
 
   return (
-    <div className="space-y-6">
-      {/* Time Range Toggle - Shared for both charts */}
-      <div className="flex items-center justify-center gap-2 bg-gradient-to-r from-gray-50 to-gray-100 p-1.5 rounded-xl shadow-sm border border-gray-200">
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleRangeChange(7);
-          }}
-          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-            chartTimeRange === 7
-              ? 'bg-white text-blue-700 shadow-md'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-          }`}
-        >
-          7 Days
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleRangeChange(14);
-          }}
-          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-            chartTimeRange === 14
-              ? 'bg-white text-blue-700 shadow-md'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-          }`}
-        >
-          14 Days
-        </button>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            handleRangeChange(30);
-          }}
-          className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
-            chartTimeRange === 30
-              ? 'bg-white text-blue-700 shadow-md'
-              : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
-          }`}
-        >
-          30 Days
-        </button>
+    <div className="bg-white rounded-xl shadow-lg border border-gray-100 p-6 h-full flex flex-col">
+      {/* Time Range Toggle */}
+      <div className="flex items-center justify-center gap-1.5 bg-gradient-to-r from-blue-50 to-purple-50 p-1 rounded-lg shadow-sm border border-blue-100 mb-3">
+        {[7, 14, 30].map((range) => (
+          <button
+            key={range}
+            type="button"
+            disabled={loading}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              handleRangeChange(range as 7 | 14 | 30);
+            }}
+            className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
+              chartTimeRange === range
+                ? 'bg-white text-blue-700 shadow-sm border border-blue-200'
+                : 'text-blue-600 hover:text-blue-800 hover:bg-white/40'
+            } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            {range} Days
+          </button>
+        ))}
+        {loading && (
+          <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin ml-1" />
+        )}
       </div>
 
-      {/* Charts Side by Side on Desktop */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Charts Side by Side */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1">
         {/* Mail Volume Chart */}
-        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-md">
-              <TrendingUp className="w-5 h-5 text-white" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm">
+              <TrendingUp className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">Mail Volume</h2>
+              <h2 className="text-sm font-bold text-gray-900">Mail Volume</h2>
               <p className="text-xs text-gray-500">Last {chartTimeRange} days</p>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={mailVolumeData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="date" 
-                tick={{ fill: '#6B7280', fontSize: 11 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-                interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis 
-                tick={{ fill: '#6B7280', fontSize: 12 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Bar dataKey="count" fill="#3B82F6" radius={[8, 8, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          
+          {/* Chart container with fixed height */}
+          <div className="relative" style={{ height: '180px' }}>
+            {/* Loading overlay */}
+            {loading && (
+              <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+                <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
+              </div>
+            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={mailVolumeData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fill: '#6B7280', fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#E5E7EB' }}
+                  interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 0}
+                  angle={chartTimeRange === 7 ? 0 : -45}
+                  textAnchor={chartTimeRange === 7 ? 'middle' : 'end'}
+                  height={chartTimeRange === 7 ? 30 : 50}
+                  tickFormatter={formatDateLabel}
+                />
+                <YAxis 
+                  tick={{ fill: '#6B7280', fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  width={30}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    fontSize: '12px'
+                  }}
+                />
+                <Bar dataKey="count" radius={[4, 4, 0, 0]}>
+                  {mailVolumeData.map((entry, index) => (
+                    <Cell 
+                      key={`cell-${index}`} 
+                      fill={entry.count === maxMailCount ? '#3B82F6' : '#93C5FD'} 
+                    />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
         </div>
 
         {/* Customer Growth Chart */}
-        <div className="bg-white rounded-xl p-6 shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-          <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-md">
-              <UserPlus className="w-5 h-5 text-white" />
+        <div className="relative">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-7 h-7 bg-gradient-to-br from-green-500 to-emerald-600 rounded-lg flex items-center justify-center shadow-sm">
+              <UserPlus className="w-3.5 h-3.5 text-white" />
             </div>
             <div>
-              <h2 className="text-lg font-bold text-gray-900">New Customers</h2>
-              <p className="text-xs text-gray-500">Added per day (last {chartTimeRange} days)</p>
+              <h2 className="text-sm font-bold text-gray-900">New Customers</h2>
+              <p className="text-xs text-gray-500">Last {chartTimeRange} days</p>
             </div>
           </div>
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={customerGrowthData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-              <XAxis 
-                dataKey="date" 
-                tick={{ fill: '#6B7280', fontSize: 11 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-                interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 1}
-                angle={-45}
-                textAnchor="end"
-                height={60}
-              />
-              <YAxis 
-                tick={{ fill: '#6B7280', fontSize: 12 }}
-                tickLine={{ stroke: '#E5E7EB' }}
-                allowDecimals={false}
-              />
-              <Tooltip 
-                contentStyle={{ 
-                  backgroundColor: '#fff', 
-                  border: '1px solid #E5E7EB',
-                  borderRadius: '8px',
-                  boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-                }}
-              />
-              <Line 
-                type="monotone" 
-                dataKey="customers" 
-                stroke="#10B981" 
-                strokeWidth={3}
-                dot={{ fill: '#10B981', r: 4 }}
-                activeDot={{ r: 6 }}
-              />
-            </LineChart>
-          </ResponsiveContainer>
+          
+          {/* Chart container with fixed height */}
+          <div className="relative" style={{ height: '180px' }}>
+            {/* Loading overlay */}
+            {loading && (
+              <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10 rounded-lg">
+                <Loader2 className="w-8 h-8 text-green-600 animate-spin" />
+              </div>
+            )}
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={customerGrowthData}>
+                <defs>
+                  <linearGradient id="customerGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10B981" stopOpacity={0.4}/>
+                    <stop offset="50%" stopColor="#10B981" stopOpacity={0.2}/>
+                    <stop offset="100%" stopColor="#10B981" stopOpacity={0.05}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" vertical={false} />
+                <XAxis 
+                  dataKey="date" 
+                  tick={{ fill: '#6B7280', fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={{ stroke: '#E5E7EB' }}
+                  interval={chartTimeRange === 30 ? 6 : chartTimeRange === 14 ? 2 : 0}
+                  angle={chartTimeRange === 7 ? 0 : -45}
+                  textAnchor={chartTimeRange === 7 ? 'middle' : 'end'}
+                  height={chartTimeRange === 7 ? 30 : 50}
+                  tickFormatter={formatDateLabel}
+                />
+                <YAxis 
+                  tick={{ fill: '#6B7280', fontSize: 10 }}
+                  tickLine={false}
+                  axisLine={false}
+                  allowDecimals={false}
+                  width={30}
+                />
+                <Tooltip 
+                  contentStyle={{ 
+                    backgroundColor: '#fff', 
+                    border: '1px solid #E5E7EB',
+                    borderRadius: '8px',
+                    boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                    fontSize: '12px'
+                  }}
+                />
+                <Area
+                  type="monotone"
+                  dataKey="customers"
+                  stroke="#10B981"
+                  strokeWidth={3}
+                  fill="url(#customerGradient)"
+                  dot={false}
+                  activeDot={{ r: 5, fill: '#10B981', strokeWidth: 2, stroke: '#fff' }}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
         </div>
       </div>
     </div>

@@ -6,7 +6,7 @@ export default function MailManagementPage() {
   const navigate = useNavigate();
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-full mx-auto px-16 py-6">
       {/* Header */}
       <div className="mb-6">
         <div className="flex justify-between items-center mb-2">

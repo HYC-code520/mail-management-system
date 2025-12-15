@@ -399,7 +399,7 @@ export default function ContactDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-full mx-auto px-16 py-6">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-gray-200 rounded w-48"></div>
           <div className="h-96 bg-gray-100 rounded-lg"></div>
@@ -410,7 +410,7 @@ export default function ContactDetailPage() {
 
   if (!contact) {
     return (
-      <div className="max-w-7xl mx-auto px-6 py-8">
+      <div className="max-w-full mx-auto px-16 py-6">
         <div className="text-center py-12">
           <p className="text-gray-600">Contact not found</p>
         </div>
@@ -419,7 +419,7 @@ export default function ContactDetailPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+    <div className="max-w-full mx-auto px-16 py-6">
       {/* Back Button */}
       <button
         onClick={() => navigate('/dashboard/contacts')}

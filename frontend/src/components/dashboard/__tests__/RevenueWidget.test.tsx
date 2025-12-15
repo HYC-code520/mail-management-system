@@ -17,20 +17,20 @@ describe('RevenueWidget', () => {
   it('should display all revenue metrics', () => {
     renderWithRouter(
       <RevenueWidget
-        monthlyRevenue={125.50}
-        outstandingFees={75.00}
-        totalRevenue={500.25}
+        monthlyRevenue={125}
+        outstandingFees={75}
+        totalRevenue={500}
         loading={false}
       />
     );
 
     expect(screen.getByText('Package Storage Revenue')).toBeInTheDocument();
-    expect(screen.getByText('$125.50')).toBeInTheDocument();
-    expect(screen.getByText('$75.00')).toBeInTheDocument();
-    expect(screen.getByText('$500.25')).toBeInTheDocument();
+    expect(screen.getByText('$125')).toBeInTheDocument();
+    expect(screen.getByText('$75')).toBeInTheDocument();
+    expect(screen.getByText('$500')).toBeInTheDocument();
   });
 
-  it('should display $0.00 when values are zero', () => {
+  it('should display $0 when values are zero', () => {
     renderWithRouter(
       <RevenueWidget
         monthlyRevenue={0}
@@ -40,7 +40,7 @@ describe('RevenueWidget', () => {
       />
     );
 
-    const zeroValues = screen.getAllByText('$0.00');
+    const zeroValues = screen.getAllByText('$0');
     expect(zeroValues.length).toBe(3);
   });
 
@@ -64,16 +64,16 @@ describe('RevenueWidget', () => {
   it('should format large numbers correctly', () => {
     renderWithRouter(
       <RevenueWidget
-        monthlyRevenue={1234.56}
-        outstandingFees={987.65}
-        totalRevenue={5432.10}
+        monthlyRevenue={1234}
+        outstandingFees={988}
+        totalRevenue={5432}
         loading={false}
       />
     );
 
-    expect(screen.getByText('$1234.56')).toBeInTheDocument();
-    expect(screen.getByText('$987.65')).toBeInTheDocument();
-    expect(screen.getByText('$5432.10')).toBeInTheDocument();
+    expect(screen.getByText('$1234')).toBeInTheDocument();
+    expect(screen.getByText('$988')).toBeInTheDocument();
+    expect(screen.getByText('$5432')).toBeInTheDocument();
   });
 
   it('should display section labels correctly', () => {
@@ -101,23 +101,24 @@ describe('RevenueWidget', () => {
       />
     );
 
-    const zeroValues = screen.getAllByText('$0.00');
+    const zeroValues = screen.getAllByText('$0');
     expect(zeroValues.length).toBe(3);
   });
 
-  it('should round to 2 decimal places', () => {
+  it('should round to nearest integer', () => {
     renderWithRouter(
       <RevenueWidget
-        monthlyRevenue={99.999}
-        outstandingFees={50.001}
+        monthlyRevenue={99.6}
+        outstandingFees={50.4}
         totalRevenue={250.5}
         loading={false}
       />
     );
 
-    expect(screen.getByText('$100.00')).toBeInTheDocument();
-    expect(screen.getByText('$50.00')).toBeInTheDocument();
-    expect(screen.getByText('$250.50')).toBeInTheDocument();
+    // Component uses Math.round() so values are rounded to integers
+    expect(screen.getByText('$100')).toBeInTheDocument();
+    expect(screen.getByText('$50')).toBeInTheDocument();
+    expect(screen.getByText('$251')).toBeInTheDocument();
   });
 
   it('should have clickable Outstanding section with correct title', () => {

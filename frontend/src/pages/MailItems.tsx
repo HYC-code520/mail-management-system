@@ -77,7 +77,7 @@ export default function MailItemsPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="max-w-full mx-auto px-16 py-6">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-zinc-700 rounded w-48"></div>
           <div className="h-64 bg-zinc-900 rounded-lg"></div>
@@ -87,7 +87,7 @@ export default function MailItemsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="max-w-full mx-auto px-16 py-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
         <div>

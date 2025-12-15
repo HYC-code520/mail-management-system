@@ -370,6 +370,128 @@ exports.getDashboardStats = async (req, res, next) => {
       });
     }
 
+    // NEW ANALYTICS: Average Response Time After Email Notification
+    // Only counts items where email notification was sent (has last_notified date)
+    // Measures: Time from email notification to customer pickup
+    const pickedUpItems = enrichedMailItems.filter(item => 
+      item.status === 'Picked Up' && item.pickup_date
+    );
+    
+    const notifiedAndPickedItems = pickedUpItems.filter(item => item.last_notified);
+    const avgResponseTime = notifiedAndPickedItems.length > 0
+      ? notifiedAndPickedItems.reduce((sum, item) => {
+          const days = getDaysBetweenNY(item.last_notified, item.pickup_date);
+          return sum + days;
+        }, 0) / notifiedAndPickedItems.length
+      : 0;
+    
+    // Breakdown: How many customers were notified vs walk-ins
+    const emailCustomersCount = notifiedAndPickedItems.length;
+    const walkInCustomersCount = pickedUpItems.length - notifiedAndPickedItems.length;
+    const totalPickupsCount = pickedUpItems.length;
+    
+    // NEW ANALYTICS: Active vs Inactive Customers (last 30 days)
+    const thirtyDaysAgo = getDaysAgoNY(30);
+    const activeCustomerIds = new Set();
+    enrichedMailItems.forEach(item => {
+      if (item.received_date && toNYDateString(item.received_date) >= thirtyDaysAgo) {
+        activeCustomerIds.add(item.contact_id);
+      }
+    });
+    const activeCustomersCount = activeCustomerIds.size;
+    const inactiveCustomersCount = activeContacts.length - activeCustomersCount;
+    
+    // NEW ANALYTICS: Service Tier Distribution
+    const tier1Count = activeContacts.filter(c => c.service_tier === 1).length;
+    const tier2Count = activeContacts.filter(c => c.service_tier === 2).length;
+    
+    // NEW ANALYTICS: Language Preference Distribution
+    const languageDistribution = {
+      English: activeContacts.filter(c => c.language_preference === 'English').length,
+      Chinese: activeContacts.filter(c => c.language_preference === 'Chinese').length,
+      Both: activeContacts.filter(c => c.language_preference === 'Both').length
+    };
+    
+    // NEW ANALYTICS: Status Distribution (all non-picked-up items, INCLUDING abandoned)
+    const statusDistribution = {};
+    enrichedMailItems.forEach(item => {
+      if (item.status !== 'Picked Up') {
+        statusDistribution[item.status] = (statusDistribution[item.status] || 0) + 1;
+      }
+    });
+    
+    // NEW ANALYTICS: Payment Method Distribution
+    const paymentDistribution = {
+      Cash: 0,
+      Zelle: 0,
+      Venmo: 0,
+      PayPal: 0,
+      Check: 0,
+      Other: 0
+    };
+    (packageFees || []).forEach(fee => {
+      if (fee.fee_status === 'paid' && fee.payment_method) {
+        paymentDistribution[fee.payment_method] = (paymentDistribution[fee.payment_method] || 0) + 1;
+      }
+    });
+    
+    // NEW ANALYTICS: Mail Age Distribution (0-3, 4-7, 8-14, 15-30, 30+)
+    const ageDistribution = {
+      '0-3': 0,
+      '4-7': 0,
+      '8-14': 0,
+      '15-30': 0,
+      '30+': 0
+    };
+    allActiveItems.forEach(item => {
+      const days = getDaysSinceNY(item.received_date);
+      if (days <= 3) ageDistribution['0-3']++;
+      else if (days <= 7) ageDistribution['4-7']++;
+      else if (days <= 14) ageDistribution['8-14']++;
+      else if (days <= 30) ageDistribution['15-30']++;
+      else ageDistribution['30+']++;
+    });
+    
+    // NEW ANALYTICS: Staff Performance (from todos)
+    // Get todos completed in the last 7 days (this week)
+    const sevenDaysAgo = getDaysAgoNY(7);
+    const { data: todos } = await supabase
+      .from('todos')
+      .select('is_completed, last_edited_by_name, updated_at')
+      .eq('is_completed', true)
+      .gte('updated_at', sevenDaysAgo);
+    
+    const staffPerformance = {
+      Merlin: (todos || []).filter(t => t.last_edited_by_name === 'Merlin').length,
+      Madison: (todos || []).filter(t => t.last_edited_by_name === 'Madison').length
+    };
+    
+    // NEW ANALYTICS: This Month vs Last Month
+    const lastMonthStart = getDaysAgoNY(60).substring(0, 8) + '01'; // Approximate start of last month
+    const thisMonthStart = todayString.substring(0, 8) + '01';
+    
+    const thisMonthMail = enrichedMailItems.filter(item => {
+      const dateNY = toNYDateString(item.received_date);
+      return dateNY >= thisMonthStart;
+    }).length;
+    
+    const lastMonthMail = enrichedMailItems.filter(item => {
+      const dateNY = toNYDateString(item.received_date);
+      return dateNY >= lastMonthStart && dateNY < thisMonthStart;
+    }).length;
+    
+    const thisMonthCustomers = activeContacts.filter(c => {
+      if (!c.created_at) return false;
+      const dateNY = toNYDateString(c.created_at);
+      return dateNY >= thisMonthStart;
+    }).length;
+    
+    const lastMonthCustomers = activeContacts.filter(c => {
+      if (!c.created_at) return false;
+      const dateNY = toNYDateString(c.created_at);
+      return dateNY >= lastMonthStart && dateNY < thisMonthStart;
+    }).length;
+
     // Return comprehensive stats
     res.json({
       todaysMail,
@@ -388,7 +510,28 @@ exports.getDashboardStats = async (req, res, next) => {
       totalRevenue: revenueStats.totalRevenue,
       waivedFees: revenueStats.waivedFees,
       // Monthly revenue (paid fees in current month)
-      monthlyRevenue: await getMonthlyRevenue(req.user.id, supabase)
+      monthlyRevenue: await getMonthlyRevenue(req.user.id, supabase),
+      // NEW ANALYTICS
+      analytics: {
+        avgResponseTime: parseFloat(avgResponseTime.toFixed(1)),
+        responseTimeBreakdown: {
+          emailCustomers: emailCustomersCount,
+          walkInCustomers: walkInCustomersCount,
+          totalPickups: totalPickupsCount
+        },
+        activeCustomers: activeCustomersCount,
+        inactiveCustomers: inactiveCustomersCount,
+        serviceTiers: { tier1: tier1Count, tier2: tier2Count },
+        languageDistribution,
+        statusDistribution,
+        paymentDistribution,
+        ageDistribution,
+        staffPerformance,
+        comparison: {
+          thisMonth: { mail: thisMonthMail, customers: thisMonthCustomers },
+          lastMonth: { mail: lastMonthMail, customers: lastMonthCustomers }
+        }
+      }
     });
   } catch (error) {
     console.error('Error fetching dashboard stats:', error);

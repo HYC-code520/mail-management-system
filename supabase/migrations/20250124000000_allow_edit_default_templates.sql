@@ -35,3 +35,7 @@ CREATE POLICY "Users can delete own templates." ON message_templates
 
 
 
+
+
+
+

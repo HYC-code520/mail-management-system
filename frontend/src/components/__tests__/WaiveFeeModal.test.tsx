@@ -136,8 +136,9 @@ describe('WaiveFeeModal', () => {
 
     await waitFor(() => {
       expect(api.fees.waive).toHaveBeenCalledTimes(2);
-      expect(api.fees.waive).toHaveBeenCalledWith('fee-1', 'Customer complaint resolution', 'Madison');
-      expect(api.fees.waive).toHaveBeenCalledWith('fee-2', 'Customer complaint resolution', 'Madison');
+      // Staff tracking is now handled server-side
+      expect(api.fees.waive).toHaveBeenCalledWith('fee-1', 'Customer complaint resolution');
+      expect(api.fees.waive).toHaveBeenCalledWith('fee-2', 'Customer complaint resolution');
     });
 
     await waitFor(() => {

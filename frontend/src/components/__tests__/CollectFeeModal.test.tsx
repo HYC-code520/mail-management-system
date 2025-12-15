@@ -161,6 +161,44 @@ describe('CollectFeeModal', () => {
       expect(screen.getByText('Card')).toBeInTheDocument();
       expect(screen.getByText('Venmo')).toBeInTheDocument();
       expect(screen.getByText('Zelle')).toBeInTheDocument();
+      expect(screen.getByText('PayPal')).toBeInTheDocument();
+      expect(screen.getByText('Check')).toBeInTheDocument();
+      expect(screen.getByText('Other')).toBeInTheDocument();
+    });
+
+    it('should allow selecting PayPal as payment method', async () => {
+      vi.mocked(api.fees.markPaid).mockResolvedValue({ success: true });
+
+      render(
+        <BrowserRouter>
+          <CollectFeeModal
+            isOpen={true}
+            onClose={mockOnClose}
+            group={mockGroupWithPackagesOnly}
+            onSuccess={mockOnSuccess}
+          />
+        </BrowserRouter>
+      );
+
+      // Select staff first
+      fireEvent.click(screen.getByRole('button', { name: 'Madison' }));
+
+      // Select PayPal as payment method
+      const paypalButton = screen.getByText('PayPal');
+      fireEvent.click(paypalButton);
+
+      // Collect fee
+      const collectButton = screen.getByRole('button', { name: /Collect \$12\.00/i });
+      fireEvent.click(collectButton);
+
+      await waitFor(() => {
+        expect(api.fees.markPaid).toHaveBeenCalledWith(
+          'fee-1',
+          'paypal',
+          12.00,
+          'Madison'
+        );
+      });
     });
   });
 
@@ -388,8 +426,9 @@ describe('CollectFeeModal', () => {
 
       await waitFor(() => {
         // Should mark only the package as picked up, not the letters
+        // API now only takes 2 arguments (id, status) - staff tracking is handled server-side
         expect(api.mailItems.updateStatus).toHaveBeenCalledTimes(1);
-        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('pkg-1', 'Picked Up', 'Madison');
+        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('pkg-1', 'Picked Up');
       });
 
       await waitFor(() => {
@@ -432,10 +471,11 @@ describe('CollectFeeModal', () => {
 
       await waitFor(() => {
         // Should mark package + 2 letters = 3 items
+        // API now only takes 2 arguments (id, status) - staff tracking is handled server-side
         expect(api.mailItems.updateStatus).toHaveBeenCalledTimes(3);
-        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('pkg-1', 'Picked Up', 'Merlin');
-        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('letter-1', 'Picked Up', 'Merlin');
-        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('letter-2', 'Picked Up', 'Merlin');
+        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('pkg-1', 'Picked Up');
+        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('letter-1', 'Picked Up');
+        expect(api.mailItems.updateStatus).toHaveBeenCalledWith('letter-2', 'Picked Up');
       });
 
       await waitFor(() => {
@@ -517,11 +557,10 @@ describe('CollectFeeModal', () => {
       fireEvent.click(confirmButton);
 
       await waitFor(() => {
-        // Should use email as performed_by
+        // API now only takes 2 arguments (id, status) - staff tracking is handled server-side
         expect(api.mailItems.updateStatus).toHaveBeenCalledWith(
           'pkg-1',
-          'Picked Up',
-          'ariel.chen@pursuit.org'
+          'Picked Up'
         );
       });
     });
@@ -551,10 +590,10 @@ describe('CollectFeeModal', () => {
       fireEvent.click(skipButton);
 
       await waitFor(() => {
+        // API now only takes 2 arguments (id, status) - staff tracking is handled server-side
         expect(api.mailItems.updateStatus).toHaveBeenCalledWith(
           'pkg-1',
-          'Picked Up',
-          'ariel.chen@pursuit.org'
+          'Picked Up'
         );
       });
     });

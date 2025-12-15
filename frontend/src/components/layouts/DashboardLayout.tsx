@@ -199,7 +199,7 @@ export default function DashboardLayout() {
           <div className="flex justify-between items-center py-3 md:py-4">
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center">
-              <h1 className="text-lg md:text-2xl font-bold text-brand">Mei Way Mail Plus</h1>
+              <h1 className="text-lg md:text-2xl font-bold text-gray-900">Mei Way Mail</h1>
             </Link>
 
             {/* Mobile: Hamburger Menu Button */}
@@ -221,18 +221,21 @@ export default function DashboardLayout() {
       {/* Desktop: Left Sidebar */}
       <div className={`hidden lg:flex lg:fixed lg:inset-y-0 lg:z-40 lg:flex-col transition-all duration-300 ${sidebarCollapsed ? 'lg:w-20' : 'lg:w-72'}`}>
         <div className="flex grow flex-col gap-y-5 overflow-y-auto bg-gray-50 pb-4">
-          {/* Logo and Toggle */}
-          <div className="flex h-16 shrink-0 items-center justify-between pt-4 px-6">
-            <div className="flex items-center overflow-hidden min-w-0">
+          {/* Logo and Text Section */}
+          <div className="flex h-20 shrink-0 items-center justify-between pt-6 px-6">
+            <Link to="/dashboard" className="flex items-center gap-3 overflow-hidden min-w-0">
+              <img 
+                src="/assets/images/mei-way-logo.png" 
+                alt="Mei Way Mail Logo" 
+                className="w-12 h-12 rounded-full object-cover shadow-md hover:shadow-lg transition-shadow flex-shrink-0"
+              />
               {!sidebarCollapsed && (
-                <Link to="/dashboard" className="block">
-                  <h1 className="text-xl font-bold text-brand whitespace-nowrap">Mei Way Mail Plus</h1>
-                </Link>
+                <h1 className="text-xl font-bold text-gray-900 whitespace-nowrap">Mei Way Mail</h1>
               )}
-            </div>
+            </Link>
             <button
               onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-              className={`p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0 ${sidebarCollapsed ? 'mx-auto' : 'ml-auto'}`}
+              className={`p-2 hover:bg-gray-200 rounded-lg transition-colors flex-shrink-0 ${sidebarCollapsed ? '' : 'ml-auto'}`}
               title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             >
               {sidebarCollapsed ? (
@@ -247,88 +250,54 @@ export default function DashboardLayout() {
           <nav className="flex flex-1 flex-col px-3">
             <ul role="list" className="flex flex-1 flex-col gap-y-1">
               <li>
-                <Link
-                  to="/dashboard"
+            <Link
+              to="/dashboard"
                   className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
                     sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
                   } ${
-                    location.pathname === '/dashboard'
+                location.pathname === '/dashboard'
                       ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
                       : 'text-gray-700 hover:bg-gray-100 rounded-lg'
-                  }`}
+              }`}
                   title={sidebarCollapsed ? 'Dashboard' : ''}
-                >
+            >
                   <LayoutDashboard className="w-5 h-5 shrink-0" />
                   {!sidebarCollapsed && <span className="whitespace-nowrap">Dashboard</span>}
-                </Link>
+            </Link>
               </li>
-              
+            
               <li>
-                <Link
-                  to="/dashboard/mail"
+            <Link
+              to="/dashboard/mail"
                   className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
                     sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
                   } ${
-                    location.pathname.startsWith('/dashboard/mail')
+                location.pathname.startsWith('/dashboard/mail')
                       ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
                       : 'text-gray-700 hover:bg-gray-100 rounded-lg'
-                  }`}
+              }`}
                   title={sidebarCollapsed ? 'Mail Log' : ''}
-                >
+            >
                   <Inbox className="w-5 h-5 shrink-0" />
                   {!sidebarCollapsed && <span className="whitespace-nowrap">Mail Log</span>}
-                </Link>
+            </Link>
               </li>
-              
+            
               <li>
-                <Link
-                  to="/dashboard/contacts"
+            <Link
+              to="/dashboard/contacts"
                   className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
                     sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
                   } ${
-                    isActive('/dashboard/contacts')
+                isActive('/dashboard/contacts')
                       ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
                       : 'text-gray-700 hover:bg-gray-100 rounded-lg'
-                  }`}
+              }`}
                   title={sidebarCollapsed ? 'Customers' : ''}
-                >
+            >
                   <Users className="w-5 h-5 shrink-0" />
                   {!sidebarCollapsed && <span className="whitespace-nowrap">Customers</span>}
-                </Link>
-              </li>
-
-              <li>
-                <Link
-                  to="/dashboard/templates"
-                  className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
-                    sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
-                  } ${
-                    location.pathname === '/dashboard/templates'
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
-                      : 'text-gray-700 hover:bg-gray-100 rounded-lg'
-                  }`}
-                  title={sidebarCollapsed ? 'Email Templates' : ''}
-                >
-                  <FileText className="w-5 h-5 shrink-0" />
-                  {!sidebarCollapsed && <span className="whitespace-nowrap">Email Templates</span>}
-                </Link>
-              </li>
-
-              <li>
-                <Link
-                  to="/dashboard/todos"
-                  className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
-                    sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
-                  } ${
-                    location.pathname === '/dashboard/todos'
-                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
-                      : 'text-gray-700 hover:bg-gray-100 rounded-lg'
-                  }`}
-                  title={sidebarCollapsed ? 'To-Do' : ''}
-                >
-                  <CheckSquare className="w-5 h-5 shrink-0" />
-                  {!sidebarCollapsed && <span className="whitespace-nowrap">To-Do</span>}
-                </Link>
+            </Link>
               </li>
 
               <li>
@@ -340,44 +309,78 @@ export default function DashboardLayout() {
                     location.pathname === '/dashboard/follow-ups'
                       ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
                       : 'text-gray-700 hover:bg-gray-100 rounded-lg'
-                  }`}
+              }`}
                   title={sidebarCollapsed ? 'Follow-ups' : ''}
                 >
                   <Bell className="w-5 h-5 shrink-0" />
                   {!sidebarCollapsed && <span className="whitespace-nowrap">Follow-ups</span>}
+            </Link>
+              </li>
+
+              <li>
+            <Link
+              to="/dashboard/todos"
+                  className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
+                    sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
+                  } ${
+                location.pathname === '/dashboard/todos'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
+                      : 'text-gray-700 hover:bg-gray-100 rounded-lg'
+                  }`}
+                  title={sidebarCollapsed ? 'To-Do' : ''}
+                >
+                  <CheckSquare className="w-5 h-5 shrink-0" />
+                  {!sidebarCollapsed && <span className="whitespace-nowrap">To-Do</span>}
                 </Link>
               </li>
 
               <li>
-                <Link
-                  to="/dashboard/scan"
+            <Link
+              to="/dashboard/templates"
                   className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
                     sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
                   } ${
-                    location.pathname === '/dashboard/scan'
+                location.pathname === '/dashboard/templates'
                       ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
                       : 'text-gray-700 hover:bg-gray-100 rounded-lg'
-                  }`}
+              }`}
+                  title={sidebarCollapsed ? 'Email Templates' : ''}
+            >
+                  <FileText className="w-5 h-5 shrink-0" />
+                  {!sidebarCollapsed && <span className="whitespace-nowrap">Email Templates</span>}
+            </Link>
+              </li>
+
+              <li>
+            <Link
+              to="/dashboard/scan"
+                  className={`group flex items-center py-3 text-sm font-medium leading-6 transition-all ${
+                    sidebarCollapsed ? 'justify-center px-3' : 'pl-3 pr-3 gap-x-3'
+                  } ${
+                location.pathname === '/dashboard/scan'
+                      ? 'bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-r-full shadow-md -ml-3 pl-6'
+                      : 'text-gray-700 hover:bg-gray-100 rounded-lg'
+              }`}
                   title={sidebarCollapsed ? 'Scan' : ''}
-                >
+            >
                   <Camera className="w-5 h-5 shrink-0" />
                   {!sidebarCollapsed && <span className="whitespace-nowrap">Scan</span>}
-                </Link>
+            </Link>
               </li>
             </ul>
 
             {/* Gmail Status at Bottom */}
             <div className="mt-auto pb-4">
               {gmailConnected !== null && (
-                <Link
-                  to="/dashboard/settings"
+            <Link
+              to="/dashboard/settings"
                   className={`flex items-center py-2 rounded-lg transition-all text-sm font-medium ${
                     sidebarCollapsed ? 'justify-center px-2' : 'px-3 gap-2'
                   } ${
                     gmailConnected
                       ? 'bg-green-50 text-green-700 hover:bg-green-100 border border-green-200'
                       : 'bg-red-50 text-red-700 hover:bg-red-100 border border-red-200 animate-pulse'
-                  }`}
+              }`}
                   title={sidebarCollapsed ? (gmailConnected ? `Gmail: ${gmailAddress}` : 'Connect Gmail') : (gmailConnected ? `Gmail connected: ${gmailAddress}` : 'Gmail disconnected - Click to connect')}
                 >
                   {gmailConnected ? (
@@ -391,9 +394,9 @@ export default function DashboardLayout() {
                       {!sidebarCollapsed && <span className="whitespace-nowrap">Connect Gmail</span>}
                     </>
                   )}
-                </Link>
+            </Link>
               )}
-            </div>
+          </div>
           </nav>
         </div>
       </div>

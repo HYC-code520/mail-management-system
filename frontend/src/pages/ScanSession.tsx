@@ -27,6 +27,7 @@ export default function ScanSessionPage() {
   const [session, setSession] = useState<ScanSession | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [scannedBy, setScannedBy] = useState<string | null>(null); // NEW: Staff selection for scan session
+  const [skipNotification, setSkipNotification] = useState(false); // NEW: Option to skip customer notifications
   
   // UI state
   const [isProcessing, setIsProcessing] = useState(false);
@@ -523,10 +524,14 @@ export default function ScanSessionPage() {
         }));
 
       // Submit to backend with staff name (no template customization)
-      const response = await api.scan.bulkSubmit(items, scannedBy);
+      const response = await api.scan.bulkSubmit(items, scannedBy, undefined, undefined, undefined, skipNotification);
 
       // Success!
-      toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
+      if (skipNotification) {
+        toast.success(`${response.itemsCreated} items logged (no notifications sent)`);
+      } else {
+        toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
+      }
 
       // Confetti animation
       confetti({
@@ -593,11 +598,16 @@ export default function ScanSessionPage() {
         scannedBy!,
         templateId,
         customSubject,
-        customBody
+        customBody,
+        skipNotification
       );
 
       // Success!
-      toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
+      if (skipNotification) {
+        toast.success(`${response.itemsCreated} items logged (no notifications sent)`);
+      } else {
+        toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
+      }
 
       // Confetti animation
       confetti({
@@ -770,6 +780,24 @@ export default function ScanSessionPage() {
                   <p className="mt-1 text-xs text-red-600">Please select who is scanning</p>
                 )}
               </div>
+
+              {/* Skip Notification Option */}
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={skipNotification}
+                    onChange={(e) => setSkipNotification(e.target.checked)}
+                    className="mt-1 w-5 h-5 text-amber-600 border-amber-300 rounded focus:ring-amber-500 focus:ring-2"
+                  />
+                  <div className="flex-1">
+                    <span className="font-medium text-gray-900">Skip customer notifications</span>
+                    <p className="text-xs text-gray-600 mt-1">
+                      Check this if customers don't use email or don't need to be notified. Items will still be logged.
+                    </p>
+                  </div>
+                </label>
+              </div>
               
               {/* Main Action: Quick Send */}
               <button
@@ -781,6 +809,11 @@ export default function ScanSessionPage() {
                   <>
                     <Loader className="w-5 h-5 animate-spin" />
                     Submitting...
+                  </>
+                ) : skipNotification ? (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    Submit All (No Notifications)
                   </>
                 ) : (
                   <>
@@ -822,7 +855,7 @@ export default function ScanSessionPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
-        <div className="max-w-4xl mx-auto px-6 py-4">
+        <div className="max-w-full mx-auto px-16 py-6">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-xl font-bold text-gray-900">
@@ -963,7 +996,7 @@ export default function ScanSessionPage() {
       </div>
 
       {/* Scanned Items List */}
-      <div className="max-w-4xl mx-auto px-6 py-6">
+      <div className="max-w-full mx-auto px-16 py-6">
         {session.items.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <Camera className="w-16 h-16 mx-auto mb-4 text-gray-300" />

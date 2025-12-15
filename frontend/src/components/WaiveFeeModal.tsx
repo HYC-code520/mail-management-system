@@ -78,7 +78,7 @@ export default function WaiveFeeModal({ isOpen, onClose, group, onSuccess }: Wai
       // Waive fees for all pending packages in this group
       for (const pkg of pendingPackages) {
         if (pkg.packageFee && pkg.packageFee.fee_status === 'pending') {
-          await api.fees.waive(pkg.packageFee.fee_id, reason.trim(), waivedBy);
+          await api.fees.waive(pkg.packageFee.fee_id, reason.trim());
           waivedCount++;
           totalWaived += pkg.packageFee.fee_amount;
         }

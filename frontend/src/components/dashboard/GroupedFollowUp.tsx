@@ -118,13 +118,13 @@ export default function GroupedFollowUpSection({
         <div className="flex items-center justify-between p-5 border-b border-gray-200">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-              <AlertCircle className="w-5 h-5 text-gray-400" />
+            <AlertCircle className="w-5 h-5 text-gray-400" />
             </div>
             <div className="flex items-center gap-3">
               <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
               <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full font-semibold">
-                0
-              </span>
+              0
+            </span>
             </div>
           </div>
         </div>
@@ -151,8 +151,8 @@ export default function GroupedFollowUpSection({
           <div className="flex items-center gap-3">
             <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
             <span className="px-3 py-1 bg-gradient-to-r from-orange-100 to-red-100 text-orange-800 text-sm rounded-full font-semibold shadow-sm">
-              {groups.length} {groups.length === 1 ? 'person' : 'people'}
-            </span>
+            {groups.length} {groups.length === 1 ? 'person' : 'people'}
+          </span>
           </div>
         </div>
         <button
@@ -186,7 +186,7 @@ export default function GroupedFollowUpSection({
               <div
                 key={group.contact.contact_id}
                 onClick={() => togglePersonExpand(group.contact.contact_id)}
-                className="relative overflow-hidden p-5 rounded-xl border-2 transition-all duration-200 bg-gradient-to-br from-white to-gray-50 cursor-pointer hover:shadow-xl hover:border-blue-400 hover:-translate-y-0.5 active:translate-y-0 ${
+                className="relative overflow-visible p-5 rounded-xl border-2 transition-all duration-200 bg-gradient-to-br from-white to-gray-50 cursor-pointer hover:shadow-xl hover:border-blue-400 hover:-translate-y-0.5 active:translate-y-0 ${
                   isAbandoned ? 'border-red-300 hover:border-red-400' :
                   hasFees ? 'border-orange-300 hover:border-orange-400' :
                   'border-gray-200'
