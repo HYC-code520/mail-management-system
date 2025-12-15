@@ -175,4 +175,53 @@ describe('AnalyticsSection', () => {
     // Should not show 4th onwards
     expect(screen.queryByText('PayPal: 5')).not.toBeInTheDocument();
   });
+
+  describe('Color Mapping', () => {
+    it('should display Abandoned Package status when present', () => {
+      const dataWithAbandoned = {
+        ...mockAnalyticsData,
+        statusDistribution: {
+          Received: 10,
+          Notified: 20,
+          'Abandoned Package': 5,
+        },
+      };
+
+      render(<AnalyticsSection analytics={dataWithAbandoned} loading={false} />);
+
+      expect(screen.getByText('Abandoned Package: 5')).toBeInTheDocument();
+    });
+
+    it('should handle both Abandoned and Abandoned Package statuses', () => {
+      const dataWithBothAbandoned = {
+        ...mockAnalyticsData,
+        statusDistribution: {
+          Received: 10,
+          Abandoned: 3,
+        },
+      };
+
+      render(<AnalyticsSection analytics={dataWithBothAbandoned} loading={false} />);
+
+      expect(screen.getByText('Abandoned: 3')).toBeInTheDocument();
+    });
+
+    it('should include PayPal in payment distribution when present', () => {
+      const dataWithPayPal = {
+        ...mockAnalyticsData,
+        paymentDistribution: {
+          PayPal: 25,
+          Cash: 10,
+          Zelle: 5,
+          Venmo: 0,
+          Check: 0,
+          Other: 0,
+        },
+      };
+
+      render(<AnalyticsSection analytics={dataWithPayPal} loading={false} />);
+
+      expect(screen.getByText('PayPal: 25')).toBeInTheDocument();
+    });
+  });
 });
