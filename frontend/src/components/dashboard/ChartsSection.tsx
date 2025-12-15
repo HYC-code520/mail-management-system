@@ -64,8 +64,8 @@ export default function ChartsSection({
             }}
             className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-all ${
               chartTimeRange === range
-                ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow-md'
-                : 'text-blue-700 hover:text-blue-900 hover:bg-white/60'
+                ? 'bg-white text-blue-700 shadow-sm border border-blue-200'
+                : 'text-blue-600 hover:text-blue-800 hover:bg-white/40'
             } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
           >
             {range} Days

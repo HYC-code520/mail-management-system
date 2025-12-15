@@ -422,20 +422,20 @@ export default function DashboardPage() {
             {/* Merlin Performance - 1/4 width */}
             <div className="lg:col-span-1" style={{ overflow: 'visible' }}>
               <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-shadow relative" style={{ minHeight: '160px', overflow: 'visible' }}>
-                {/* Avatar positioned on the RIGHT side, extending 10% above card */}
+                {/* Avatar positioned on the RIGHT side - smaller and further right */}
                 <div className="absolute bottom-0 right-0 pointer-events-none" style={{ 
-                  height: '110%',
-                  width: '140px',
-                  right: '-20px',
+                  height: '170px',
+                  width: 'auto',
+                  right: '-60px',
                   bottom: '0',
                   zIndex: 20
                 }}>
                   <img 
                     src="/assets/images/Merlin.png" 
                     alt="Merlin" 
-                    className="w-full h-full object-contain object-bottom"
+                    className="h-full w-auto object-contain object-bottom"
                     style={{ 
-                      filter: 'drop-shadow(3px 3px 8px rgba(0,0,0,0.2))'
+                      filter: 'drop-shadow(4px 4px 12px rgba(0,0,0,0.25))'
                     }}
                   />
                 </div>
@@ -461,20 +461,20 @@ export default function DashboardPage() {
             {/* Madison Performance - 1/4 width */}
             <div className="lg:col-span-1" style={{ overflow: 'visible' }}>
               <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-shadow relative" style={{ minHeight: '160px', overflow: 'visible' }}>
-                {/* Avatar positioned on the RIGHT side, extending 10% above card */}
+                {/* Avatar positioned on the RIGHT side - smaller and further right */}
                 <div className="absolute bottom-0 right-0 pointer-events-none" style={{ 
-                  height: '110%',
-                  width: '140px',
-                  right: '-20px',
+                  height: '170px',
+                  width: 'auto',
+                  right: '-60px',
                   bottom: '0',
                   zIndex: 20
                 }}>
                   <img 
                     src="/assets/images/Madison.png" 
                     alt="Madison" 
-                    className="w-full h-full object-contain object-bottom"
+                    className="h-full w-auto object-contain object-bottom"
                     style={{ 
-                      filter: 'drop-shadow(3px 3px 8px rgba(0,0,0,0.2))'
+                      filter: 'drop-shadow(4px 4px 12px rgba(0,0,0,0.25))'
                     }}
                   />
                 </div>
