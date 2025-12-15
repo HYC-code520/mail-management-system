@@ -63,10 +63,8 @@ describe('GroupedFollowUpSection', () => {
     },
   ];
 
-  const mockOnWaiveFee = vi.fn();
   const mockOnSendEmail = vi.fn();
   const mockOnMarkAbandoned = vi.fn();
-  const mockOnCollectFee = vi.fn();
   const mockGetDaysSince = vi.fn((date) => {
     const diff = new Date().getTime() - new Date(date).getTime();
     return Math.floor(diff / (1000 * 60 * 60 * 24));
@@ -81,10 +79,8 @@ describe('GroupedFollowUpSection', () => {
       <BrowserRouter>
         <GroupedFollowUpSection
           groups={groups}
-          onWaiveFee={mockOnWaiveFee}
           onSendEmail={mockOnSendEmail}
           onMarkAbandoned={mockOnMarkAbandoned}
-          onCollectFee={mockOnCollectFee}
           getDaysSince={getDaysSince}
           loading={false}
         />
@@ -103,8 +99,9 @@ describe('GroupedFollowUpSection', () => {
   it('should display package fees in header', () => {
     renderComponent();
 
-    // Fees are displayed in header as: $12.00 storage fees
-    expect(screen.getByText('$12.00')).toBeInTheDocument();
+    // Fees are displayed in the fee button as: $12.00
+    const feeElements = screen.getAllByText(/\$12\.00/);
+    expect(feeElements.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('storage fees')).toBeInTheDocument();
   });
 
@@ -130,14 +127,14 @@ describe('GroupedFollowUpSection', () => {
     });
   });
 
-  it('should call onCollectFee when collect button is clicked', async () => {
+  it('should navigate to fees page when fee button is clicked', async () => {
     renderComponent();
 
-    // Find the Collect button (for customer with fees)
-    const collectButton = screen.getByRole('button', { name: /Collect \$12/i });
-    fireEvent.click(collectButton);
+    // Find the fee button (for customer with fees)
+    const feeButton = screen.getByRole('button', { name: /\$12\.00/i });
+    fireEvent.click(feeButton);
 
-    expect(mockOnCollectFee).toHaveBeenCalledWith(mockGroups[0]);
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard/fees');
   });
 
   it('should call onSendEmail when remind button is clicked', async () => {
@@ -150,14 +147,14 @@ describe('GroupedFollowUpSection', () => {
     expect(mockOnSendEmail).toHaveBeenCalledWith(mockGroups[0]);
   });
 
-  it('should call onWaiveFee when waive button is clicked', async () => {
+  it('should navigate to profile when profile button is clicked', async () => {
     renderComponent();
 
-    // Find the Waive button
-    const waiveButton = screen.getByText(/Waive/i);
-    fireEvent.click(waiveButton);
+    // Find the Profile button
+    const profileButtons = screen.getAllByText(/Profile/i);
+    fireEvent.click(profileButtons[0]);
 
-    expect(mockOnWaiveFee).toHaveBeenCalledWith(mockGroups[0]);
+    expect(mockNavigate).toHaveBeenCalledWith('/dashboard/contacts/contact-1');
   });
 
   it('should show Notice button and Abandon button for abandoned packages with fees', () => {
@@ -193,8 +190,8 @@ describe('GroupedFollowUpSection', () => {
 
     renderComponent(abandonedGroups, mockGetDaysSinceAbandoned);
 
-    // Should show Notice button (not Final Notice, but Notice for fees + abandoned)
-    expect(screen.getByRole('button', { name: /Notice/i })).toBeInTheDocument();
+    // Should show Final Notice button (abandoned items show "Final Notice" instead of "Remind")
+    expect(screen.getByRole('button', { name: /Final Notice/i })).toBeInTheDocument();
     // Should show Abandon button
     expect(screen.getByRole('button', { name: /Abandon/i })).toBeInTheDocument();
   });
@@ -227,9 +224,9 @@ describe('GroupedFollowUpSection', () => {
     renderComponent(abandonedLettersGroup, mockGetDaysSinceAbandoned);
 
     // Should show Final Notice button
-    expect(screen.getByText(/Final Notice/i)).toBeInTheDocument();
-    // Should show Mark Abandoned button
-    expect(screen.getByText(/Mark Abandoned/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Final Notice/i })).toBeInTheDocument();
+    // Should show Abandon button
+    expect(screen.getByRole('button', { name: /Abandon/i })).toBeInTheDocument();
   });
 
   it('should show loading state', () => {
@@ -237,10 +234,8 @@ describe('GroupedFollowUpSection', () => {
       <BrowserRouter>
         <GroupedFollowUpSection
           groups={[]}
-          onWaiveFee={mockOnWaiveFee}
           onSendEmail={mockOnSendEmail}
           onMarkAbandoned={mockOnMarkAbandoned}
-          onCollectFee={mockOnCollectFee}
           getDaysSince={mockGetDaysSince}
           loading={true}
         />
@@ -258,10 +253,8 @@ describe('GroupedFollowUpSection', () => {
       <BrowserRouter>
         <GroupedFollowUpSection
           groups={[]}
-          onWaiveFee={mockOnWaiveFee}
           onSendEmail={mockOnSendEmail}
           onMarkAbandoned={mockOnMarkAbandoned}
-          onCollectFee={mockOnCollectFee}
           getDaysSince={mockGetDaysSince}
           loading={false}
         />
@@ -314,9 +307,10 @@ describe('GroupedFollowUpSection', () => {
 
     renderComponent(letterOnlyGroups, mockGetDaysSinceRecent);
 
-    // Find the Send Reminder button
-    const sendReminderButton = screen.getByText(/Send Reminder/i);
-    fireEvent.click(sendReminderButton);
+    // Find the Remind button (shows "Remind" for non-abandoned items without fees)
+    // Since this is a fresh letter (2 days old), it shows "Remind"
+    const remindButton = screen.getByRole('button', { name: /Remind/i });
+    fireEvent.click(remindButton);
 
     expect(mockOnSendEmail).toHaveBeenCalledWith(letterOnlyGroups[0]);
   });

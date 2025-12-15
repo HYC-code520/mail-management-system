@@ -20,6 +20,7 @@ import ScanSessionPage from './pages/ScanSession.tsx';
 import DesignSystemPage from './pages/DesignSystem.tsx';
 import SettingsPage from './pages/Settings.tsx';
 import FollowUpsPage from './pages/FollowUps.tsx';
+import FeesPage from './pages/Fees.tsx';
 
 // Layout
 import { AuthProvider } from './contexts/AuthContext.tsx';
@@ -55,6 +56,7 @@ function App() {
             <Route path="templates" element={<TemplatesPage />} />
             <Route path="todos" element={<TodoListPage />} />
             <Route path="follow-ups" element={<FollowUpsPage />} />
+            <Route path="fees" element={<FeesPage />} />
             <Route path="scan" element={<ScanSessionPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="design-system" element={<DesignSystemPage />} />

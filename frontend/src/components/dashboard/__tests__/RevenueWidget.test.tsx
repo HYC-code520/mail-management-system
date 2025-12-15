@@ -131,7 +131,7 @@ describe('RevenueWidget', () => {
       />
     );
 
-    const outstandingSection = screen.getByTitle('View customers who need follow-up');
+    const outstandingSection = screen.getByTitle('View and collect outstanding fees');
     expect(outstandingSection).toBeInTheDocument();
     expect(outstandingSection).toHaveClass('cursor-pointer');
   });
@@ -146,6 +146,6 @@ describe('RevenueWidget', () => {
       />
     );
 
-    expect(screen.getByText('Owed - Click to view')).toBeInTheDocument();
+    expect(screen.getByText('Owed - Click to collect')).toBeInTheDocument();
   });
 });

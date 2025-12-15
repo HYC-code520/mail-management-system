@@ -4,8 +4,6 @@ import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import GroupedFollowUpSection from '../components/dashboard/GroupedFollowUp.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
-import WaiveFeeModal from '../components/WaiveFeeModal.tsx';
-import CollectFeeModal from '../components/CollectFeeModal.tsx';
 import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 
 interface PackageFee {
@@ -62,14 +60,6 @@ export default function FollowUpsPage() {
   const [emailingBulkItems, setEmailingBulkItems] = useState<MailItem[]>([]);
   const [suggestedTemplateType, setSuggestedTemplateType] = useState<string | undefined>(undefined);
   const [emailingGroupKey, setEmailingGroupKey] = useState<string | null>(null);
-
-  // Waive Fee Modal states
-  const [isWaiveFeeModalOpen, setIsWaiveFeeModalOpen] = useState(false);
-  const [waivingGroup, setWaivingGroup] = useState<GroupedFollowUp | null>(null);
-
-  // Collect Fee Modal states
-  const [isCollectFeeModalOpen, setIsCollectFeeModalOpen] = useState(false);
-  const [collectingGroup, setCollectingGroup] = useState<GroupedFollowUp | null>(null);
 
   const loadFollowUps = useCallback(async () => {
     try {
@@ -201,50 +191,6 @@ export default function FollowUpsPage() {
     setEmailingGroupKey(null);
   };
 
-  const openWaiveFeeModal = (group: GroupedFollowUp) => {
-    setWaivingGroup(group);
-    setIsWaiveFeeModalOpen(true);
-  };
-
-  const handleWaiveFeeSuccess = () => {
-    loadFollowUps();
-    setIsWaiveFeeModalOpen(false);
-    setWaivingGroup(null);
-    
-    if (waivingGroup) {
-      const customerName = waivingGroup.contact.contact_person || 
-                          waivingGroup.contact.company_name || 
-                          'Customer';
-      toast.success(`✅ Fee waived for ${customerName}`);
-    }
-  };
-
-  const openCollectFeeModal = (group: GroupedFollowUp) => {
-    setCollectingGroup(group);
-    setIsCollectFeeModalOpen(true);
-  };
-
-  const handleCollectFeeSuccess = async (action: 'collected' | 'waived' | 'skipped') => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
-    loadFollowUps();
-    setIsCollectFeeModalOpen(false);
-    
-    if (collectingGroup) {
-      const customerName = collectingGroup.contact.contact_person || 
-                          collectingGroup.contact.company_name || 
-                          'Customer';
-      
-      if (action === 'collected') {
-        toast.success(`💰 Fee collected from ${customerName}`);
-      } else if (action === 'waived') {
-        toast.success(`✅ Fee waived for ${customerName}`);
-      }
-    }
-    
-    setCollectingGroup(null);
-  };
-
   const handleMarkAbandoned = async (group: GroupedFollowUp) => {
     const allItems = [...group.packages, ...group.letters];
     const abandonedItems = allItems.filter(item => getDaysSince(item.received_date) >= 30);
@@ -297,40 +243,12 @@ export default function FollowUpsPage() {
       {/* Follow-up List */}
       <GroupedFollowUpSection
         groups={followUps}
-        onWaiveFee={openWaiveFeeModal}
         onSendEmail={openSendEmailForGroup}
         onMarkAbandoned={handleMarkAbandoned}
-        onCollectFee={openCollectFeeModal}
         getDaysSince={getDaysSince}
         loading={loading}
       />
 
-      {/* Waive Fee Modal */}
-      {waivingGroup && (
-        <WaiveFeeModal
-          isOpen={isWaiveFeeModalOpen}
-          onClose={() => {
-            setIsWaiveFeeModalOpen(false);
-            setWaivingGroup(null);
-          }}
-          group={waivingGroup}
-          onSuccess={handleWaiveFeeSuccess}
-        />
-      )}
-      
-      {/* Collect Fee Modal */}
-      {collectingGroup && (
-        <CollectFeeModal
-          isOpen={isCollectFeeModalOpen}
-          onClose={() => {
-            setIsCollectFeeModalOpen(false);
-            setCollectingGroup(null);
-          }}
-          group={collectingGroup}
-          onSuccess={handleCollectFeeSuccess}
-        />
-      )}
-      
       {/* Send Email Modal */}
       {emailingMailItem && (
         <SendEmailModal

@@ -71,9 +71,6 @@ export default function ChartsSection({
             {range} Days
           </button>
         ))}
-        {loading && (
-          <Loader2 className="w-3.5 h-3.5 text-blue-600 animate-spin ml-1" />
-        )}
       </div>
 
       {/* Charts Side by Side */}

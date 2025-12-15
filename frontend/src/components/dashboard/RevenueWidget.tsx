@@ -71,11 +71,11 @@ export default function RevenueWidget({
           </div>
         </div>
         
-        {/* Outstanding - Clickable to navigate to Follow-ups */}
+        {/* Outstanding - Clickable to navigate to Fee Collection */}
         <div
           className="relative cursor-pointer group"
-          onClick={() => navigate('/dashboard/follow-ups')}
-          title="View customers who need follow-up"
+          onClick={() => navigate('/dashboard/fees')}
+          title="View and collect outstanding fees"
         >
           <div className="absolute top-0 right-0 w-20 h-20 bg-orange-100 rounded-full -mr-6 -mt-6 opacity-50 -z-10"></div>
           <div className="relative bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl p-4 border-2 border-orange-200 shadow-sm hover:shadow-xl hover:-translate-y-1 hover:border-orange-400 hover:ring-2 hover:ring-orange-300 hover:ring-offset-1 transition-all duration-200 h-full flex flex-col justify-center">
@@ -88,7 +88,7 @@ export default function RevenueWidget({
             <p className="text-4xl font-bold text-orange-700 mb-2">
               ${Math.round(outstandingFees ?? 0)}
             </p>
-            <p className="text-sm text-orange-600 font-medium group-hover:underline">Owed - Click to view</p>
+            <p className="text-sm text-orange-600 font-medium group-hover:underline">Owed - Click to collect</p>
           </div>
         </div>
         
