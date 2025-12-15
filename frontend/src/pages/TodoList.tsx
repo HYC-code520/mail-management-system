@@ -364,7 +364,7 @@ export default function TodoList() {
 
   if (loading) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
         <div className="animate-pulse space-y-6">
           <div className="h-8 bg-gray-200 rounded w-48"></div>
           <div className="h-96 bg-gray-100 rounded-lg"></div>
@@ -374,7 +374,7 @@ export default function TodoList() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto px-4 md:px-6 py-6 md:py-8">
+    <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
       {/* Header with Filter Tabs */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-6">

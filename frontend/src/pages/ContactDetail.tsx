@@ -167,6 +167,7 @@ export default function ContactDetailPage() {
   const [groupedMailHistory, setGroupedMailHistory] = useState<GroupedMailItem[]>([]);
   const [notificationHistory, setNotificationHistory] = useState<Record<string, NotificationHistory[]>>({});
   const [actionHistory, setActionHistory] = useState<Record<string, any[]>>({});
+  const [loadingActionHistory, setLoadingActionHistory] = useState<Set<string>>(new Set());
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [unpaidFees, setUnpaidFees] = useState<UnpaidFee[]>([]);
@@ -237,11 +238,14 @@ export default function ContactDetailPage() {
   // Load action history for all items in a group (combined)
   const loadActionHistoryForGroup = async (groupKey: string, mailItemIds: string[]) => {
     try {
+      // Set loading state
+      setLoadingActionHistory(prev => new Set(prev).add(groupKey));
+
       const historyPromises = mailItemIds.map(id => api.actionHistory.getByMailItem(id));
       const histories = await Promise.all(historyPromises);
-      
+
       // Combine and sort by timestamp
-      const combinedHistory = histories.flat().sort((a, b) => 
+      const combinedHistory = histories.flat().sort((a, b) =>
         new Date(a.action_timestamp).getTime() - new Date(b.action_timestamp).getTime()
       );
 
@@ -251,6 +255,13 @@ export default function ContactDetailPage() {
       }));
     } catch (err) {
       console.error('Error loading action history for group:', err);
+    } finally {
+      // Clear loading state
+      setLoadingActionHistory(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(groupKey);
+        return newSet;
+      });
     }
   };
 
@@ -774,8 +785,9 @@ export default function ContactDetailPage() {
                           <td colSpan={6} className="py-3 sm:py-6 px-3 sm:px-6">
                             <div className="ml-4 sm:ml-10 space-y-4 sm:space-y-6">
                               {/* Action History Section */}
-                              <ActionHistorySection 
+                              <ActionHistorySection
                                 actions={actionHistory[group.groupKey] || []}
+                                loading={loadingActionHistory.has(group.groupKey)}
                               />
                             </div>
                           </td>

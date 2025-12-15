@@ -228,7 +228,7 @@ export default function FollowUpsPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-2">

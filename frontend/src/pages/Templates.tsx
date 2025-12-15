@@ -248,7 +248,7 @@ export default function TemplatesPage() {
 
   if (loading) {
     return (
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+      <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
         <div className="flex items-center justify-center min-h-[60vh]">
           <LoadingSpinner 
             message="Loading templates..." 
@@ -270,7 +270,7 @@ export default function TemplatesPage() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">
+    <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
         <div>
