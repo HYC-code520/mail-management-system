@@ -165,6 +165,41 @@ describe('CollectFeeModal', () => {
       expect(screen.getByText('Check')).toBeInTheDocument();
       expect(screen.getByText('Other')).toBeInTheDocument();
     });
+
+    it('should allow selecting PayPal as payment method', async () => {
+      vi.mocked(api.fees.markPaid).mockResolvedValue({ success: true });
+
+      render(
+        <BrowserRouter>
+          <CollectFeeModal
+            isOpen={true}
+            onClose={mockOnClose}
+            group={mockGroupWithPackagesOnly}
+            onSuccess={mockOnSuccess}
+          />
+        </BrowserRouter>
+      );
+
+      // Select staff first
+      fireEvent.click(screen.getByRole('button', { name: 'Madison' }));
+
+      // Select PayPal as payment method
+      const paypalButton = screen.getByText('PayPal');
+      fireEvent.click(paypalButton);
+
+      // Collect fee
+      const collectButton = screen.getByRole('button', { name: /Collect \$12\.00/i });
+      fireEvent.click(collectButton);
+
+      await waitFor(() => {
+        expect(api.fees.markPaid).toHaveBeenCalledWith(
+          'fee-1',
+          'paypal',
+          12.00,
+          'Madison'
+        );
+      });
+    });
   });
 
   describe('Letter Pickup Toggle', () => {
