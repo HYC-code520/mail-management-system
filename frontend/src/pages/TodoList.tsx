@@ -22,10 +22,6 @@ interface Todo {
   updated_at?: string;
 }
 
-interface TodosByDate {
-  [date: string]: Todo[];
-}
-
 export default function TodoList() {
   const [todos, setTodos] = useState<Todo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -37,14 +33,6 @@ export default function TodoList() {
   const [newTodoStaff, setNewTodoStaff] = useState('Merlin'); // Default to Merlin
   const [filter, setFilter] = useState<'all' | 'active' | 'completed'>('all');
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
-  const [viewMode, setViewMode] = useState<'week' | 'list'>('week'); // week view or list view
-  
-  // Quick add state for each date section
-  const [quickAddOpen, setQuickAddOpen] = useState<string | null>(null);
-  const [quickAddTitle, setQuickAddTitle] = useState('');
-  const [quickAddPriority, setQuickAddPriority] = useState(0);
-  const [quickAddCategory, setQuickAddCategory] = useState('');
-  const [quickAddStaff, setQuickAddStaff] = useState('Merlin');
   
   // Edit modal state
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -269,92 +257,9 @@ export default function TodoList() {
     }
   };
 
-  const handleQuickAdd = async (dateKey: string) => {
-    if (!quickAddTitle.trim()) {
-      toast.error('Please enter a task');
-      return;
-    }
-
-    try {
-      await api.todos.create({
-        title: quickAddTitle.trim(),
-        date_header: dateKey === 'No Date' ? undefined : dateKey,
-        priority: quickAddPriority,
-        category: quickAddCategory || undefined,
-        staff_member: quickAddStaff,
-      });
-      
-      setQuickAddTitle('');
-      setQuickAddPriority(0);
-      setQuickAddCategory('');
-      setQuickAddStaff('Merlin');
-      setQuickAddOpen(null);
-      await loadTodos();
-      toast.success('Task added!');
-    } catch (error: any) {
-      console.error('Failed to add todo:', error);
-      toast.error('Failed to add task');
-    }
-  };
-
-  // Group todos by date
-  const groupedTodos: TodosByDate = todos.reduce((acc, todo) => {
-    // Normalize date to YYYY-MM-DD format, removing time/timezone
-    let dateKey = 'No Date';
-    if (todo.date_header) {
-      dateKey = todo.date_header.split('T')[0]; // Extract just the date part
-    }
-    if (!acc[dateKey]) {
-      acc[dateKey] = [];
-    }
-    acc[dateKey].push(todo);
-    return acc;
-  }, {} as TodosByDate);
-
-  const sortedDateKeys = Object.keys(groupedTodos).sort((a, b) => {
-    if (a === 'No Date') return 1;
-    if (b === 'No Date') return -1;
-    return new Date(b).getTime() - new Date(a).getTime();
-  });
-
   const getPriorityIcon = (priority: number) => {
     if (priority >= 1) return <Flag className="w-4 h-4 text-red-600 fill-red-600" />;
     return null;
-  };
-
-  // Get initials from name (like Apple Notes)
-  const getInitials = (name?: string) => {
-    if (!name) return '?';
-    const parts = name.split(/[.\-_\s]/); // Split by dot, dash, underscore, space
-    if (parts.length >= 2) {
-      return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return name.substring(0, 2).toUpperCase();
-  };
-
-  // Get color for user - assign specific colors to Merlin and Madison
-  const getUserColor = (staffName?: string) => {
-    if (!staffName) return 'bg-gray-500';
-    
-    // Fixed colors for specific staff members
-    if (staffName === 'Merlin' || staffName.toLowerCase().includes('merlin')) {
-      return 'bg-blue-600'; // Merlin = Blue
-    }
-    if (staffName === 'Madison' || staffName.toLowerCase().includes('madison')) {
-      return 'bg-purple-600'; // Madison = Purple
-    }
-    
-    // Fallback to hash-based color for any other users
-    const colors = [
-      'bg-green-500',
-      'bg-pink-500',
-      'bg-orange-500',
-      'bg-teal-500',
-      'bg-indigo-500',
-      'bg-red-500',
-    ];
-    const hash = staffName.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-    return colors[hash % colors.length];
   };
 
   const formatDate = (dateStr: string) => {

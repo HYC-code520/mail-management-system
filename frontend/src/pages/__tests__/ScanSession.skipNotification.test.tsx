@@ -5,13 +5,11 @@
  */
 
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { BrowserRouter } from 'react-router-dom';
 import ScanSession from '../ScanSession';
 import { api } from '../../lib/api-client';
 import * as smartMatch from '../../utils/smartMatch';
-import * as ocr from '../../utils/ocr';
 
 // Mock dependencies
 vi.mock('../../lib/api-client', () => ({
@@ -298,8 +296,6 @@ describe('ScanSession - Skip Notification Feature', () => {
 
   describe('API Call with Skip Notification', () => {
     it('should pass skipNotification=true to API when checkbox is checked', async () => {
-      const user = userEvent.setup();
-
       localStorage.setItem('scanSession', JSON.stringify({
         sessionId: 'test-session',
         items: [{

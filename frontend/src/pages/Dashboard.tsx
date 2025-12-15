@@ -7,7 +7,7 @@ import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import LoadingSpinner from '../components/LoadingSpinner.tsx';
 import RevenueWidget from '../components/dashboard/RevenueWidget.tsx';
-import QuickActionsSection from '../components/dashboard/QuickActionsSection.tsx';
+// QuickActionsSection removed - using inline implementation
 import ChartsSection from '../components/dashboard/ChartsSection.tsx';
 import AnalyticsSection from '../components/dashboard/AnalyticsSection.tsx';
 import toast from 'react-hot-toast';
@@ -140,7 +140,7 @@ export default function DashboardPage() {
     received_date: toNYDateString(getTodayNY()),
     quantity: 1
   });
-  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contacts] = useState<Contact[]>([]);
   
   // Action Modal states (for picked up, forward, abandoned actions)
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -203,17 +203,6 @@ export default function DashboardPage() {
     }
   }, [chartTimeRange]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Helper function to calculate days since a date (NY timezone aware)
-  const getDaysSince = (dateStr: string) => {
-    const todayNY = getTodayNY();
-    const todayDate = new Date(todayNY + 'T00:00:00');
-    const itemDateNY = toNYDateString(dateStr);
-    const itemDate = new Date(itemDateNY + 'T00:00:00');
-    const diffTime = todayDate.getTime() - itemDate.getTime();
-    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-    return Math.max(0, diffDays);
-  };
-
   // Format phone number as user types: 917-822-5751
   const formatPhoneNumber = (value: string) => {
     // Remove all non-digits
@@ -265,17 +254,6 @@ export default function DashboardPage() {
     });
   };
 
-  const openLogMailModal = async () => {
-    setIsLogMailModalOpen(true);
-    // Load contacts for the dropdown
-    try {
-      const contactsData = await api.contacts.getAll();
-      setContacts(contactsData);
-    } catch (err) {
-      console.error('Failed to load contacts:', err);
-      toast.error('Failed to load customers');
-    }
-  };
 
   const closeLogMailModal = () => {
     setIsLogMailModalOpen(false);
