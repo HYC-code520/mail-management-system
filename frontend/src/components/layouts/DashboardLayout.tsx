@@ -199,7 +199,7 @@ export default function DashboardLayout() {
           <div className="flex justify-between items-center py-3 md:py-4">
             {/* Logo */}
             <Link to="/dashboard" className="flex items-center">
-              <h1 className="text-lg md:text-2xl font-bold text-brand">Mei Way Mail Plus</h1>
+              <h1 className="text-lg md:text-2xl font-bold text-gray-900">Mei Way Mail</h1>
             </Link>
 
             {/* Mobile: Hamburger Menu Button */}

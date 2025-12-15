@@ -95,6 +95,8 @@ describe('ScanSession - Skip Notification Feature', () => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
+    // Mock window.confirm to return true for test dialogs
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
     (api.contacts.getAll as any).mockResolvedValue(mockContacts);
     (api.scan.bulkSubmit as any).mockResolvedValue({
       success: true,

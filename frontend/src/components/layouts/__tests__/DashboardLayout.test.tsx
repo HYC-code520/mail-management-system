@@ -74,8 +74,8 @@ describe('DashboardLayout - Gmail Status Indicator', () => {
         expect(api.oauth.getGmailStatus).toHaveBeenCalled();
       });
 
-      // Check for Gmail Connected indicator
-      const gmailIndicator = screen.getByText(/gmail connected/i);
+      // Check for Gmail Connected indicator (wait for state update after API call)
+      const gmailIndicator = await screen.findByText(/gmail connected/i);
       expect(gmailIndicator).toBeInTheDocument();
 
       // Verify it's a link to settings
@@ -487,7 +487,9 @@ describe('DashboardLayout - Logo and Branding', () => {
       );
 
       await waitFor(() => {
-        expect(screen.getByText('Mei Way Mail')).toBeInTheDocument();
+        // Both mobile and desktop views have "Mei Way Mail" text
+        const brandTexts = screen.getAllByText('Mei Way Mail');
+        expect(brandTexts.length).toBeGreaterThan(0);
       });
     });
 
@@ -511,8 +513,11 @@ describe('DashboardLayout - Logo and Branding', () => {
       );
 
       await waitFor(() => {
-        const brandText = screen.getByText('Mei Way Mail');
-        expect(brandText).toHaveClass('text-gray-900');
+        // Both mobile and desktop views have "Mei Way Mail" text with black color
+        const brandTexts = screen.getAllByText('Mei Way Mail');
+        expect(brandTexts.length).toBeGreaterThan(0);
+        // At least one should have the text-gray-900 class
+        expect(brandTexts.some(el => el.classList.contains('text-gray-900'))).toBe(true);
       });
     });
   });

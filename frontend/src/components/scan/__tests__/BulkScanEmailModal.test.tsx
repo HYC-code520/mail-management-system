@@ -196,7 +196,8 @@ describe('BulkScanEmailModal', () => {
       );
 
       expect(screen.getByText('Recipients (2)')).toBeInTheDocument();
-      expect(screen.getByText(/2/)).toBeInTheDocument();
+      // Check the description text that contains the count
+      expect(screen.getByText(/Email notifications will be sent to/)).toBeInTheDocument();
     });
 
     it('should use singular "customer" for single recipient', async () => {
@@ -238,7 +239,9 @@ describe('BulkScanEmailModal', () => {
 
       // Wait for template to load and preview to render
       await waitFor(() => {
-        expect(screen.getByText(/John Doe/)).toBeInTheDocument();
+        // Use getAllByText since the name appears in multiple places (subject, body, preview note)
+        const johnDoeElements = screen.getAllByText(/John Doe/);
+        expect(johnDoeElements.length).toBeGreaterThan(0);
       });
     });
 

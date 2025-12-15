@@ -653,7 +653,7 @@ export default function DashboardPage() {
         )}
 
         {/* Mail Age Distribution - 2/5 width */}
-        {stats?.analytics && (
+        {stats?.analytics?.ageDistribution && (
           <div className="lg:col-span-2 bg-white rounded-xl p-4 shadow-lg border border-gray-100 h-full flex flex-col">
             <div className="flex items-center gap-2 mb-3">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
