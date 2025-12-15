@@ -420,14 +420,23 @@ export default function DashboardPage() {
         {stats?.analytics && (
           <>
             {/* Merlin Performance - 1/4 width */}
-            <div className="lg:col-span-1 overflow-visible">
+            <div className="lg:col-span-1" style={{ overflow: 'visible' }}>
               <div className="bg-gradient-to-br from-blue-50 to-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-shadow relative" style={{ minHeight: '160px', overflow: 'visible' }}>
-                <div className="absolute bottom-0 right-0 flex items-end justify-end pointer-events-none" style={{ height: 'calc(100% + 20px)', width: '280px' }}>
+                {/* Avatar positioned on the RIGHT side, extending beyond card bounds */}
+                <div className="absolute bottom-0 right-0 pointer-events-none" style={{ 
+                  height: 'calc(100% + 40px)', 
+                  width: '100px',
+                  right: '-10px',
+                  bottom: '-10px',
+                  zIndex: 20
+                }}>
                   <img 
                     src="/assets/images/Merlin.png" 
                     alt="Merlin" 
-                    className="w-auto object-contain object-bottom"
-                    style={{ height: 'calc(100% + 20px)' }}
+                    className="w-full h-full object-cover object-bottom"
+                    style={{ 
+                      filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))'
+                    }}
                   />
                 </div>
                 
@@ -450,14 +459,23 @@ export default function DashboardPage() {
             </div>
 
             {/* Madison Performance - 1/4 width */}
-            <div className="lg:col-span-1 overflow-visible">
+            <div className="lg:col-span-1" style={{ overflow: 'visible' }}>
               <div className="bg-gradient-to-br from-purple-50 to-white rounded-xl p-4 shadow-md border border-gray-100 hover:shadow-lg transition-shadow relative" style={{ minHeight: '160px', overflow: 'visible' }}>
-                <div className="absolute bottom-0 right-0 flex items-end justify-end pointer-events-none" style={{ height: 'calc(100% + 20px)', width: '280px' }}>
+                {/* Avatar positioned on the RIGHT side, extending beyond card bounds */}
+                <div className="absolute bottom-0 right-0 pointer-events-none" style={{ 
+                  height: 'calc(100% + 40px)', 
+                  width: '100px',
+                  right: '-10px',
+                  bottom: '-10px',
+                  zIndex: 20
+                }}>
                   <img 
                     src="/assets/images/Madison.png" 
                     alt="Madison" 
-                    className="w-auto object-contain object-bottom"
-                    style={{ height: 'calc(100% + 20px)' }}
+                    className="w-full h-full object-cover object-bottom"
+                    style={{ 
+                      filter: 'drop-shadow(2px 2px 4px rgba(0,0,0,0.1))'
+                    }}
                   />
                 </div>
                 
@@ -597,7 +615,7 @@ export default function DashboardPage() {
                     );
                   })()}
                 </div>
-                {/* Mini Sparkline Trend */}
+                {/* Mini Sparkline Trend - BIGGER */}
                 {(() => {
                   const lastMonth = stats.analytics.comparison.lastMonth.mail;
                   const thisMonth = stats.analytics.comparison.thisMonth.mail;
@@ -606,13 +624,13 @@ export default function DashboardPage() {
                   const thisMonthHeight = (thisMonth / maxValue) * 100;
                   
                   return (
-                    <div className="flex items-end gap-0.5 h-8">
+                    <div className="flex items-end gap-1.5 h-16">
                       <div 
-                        className="w-1.5 bg-green-300 rounded-t transition-all duration-300"
+                        className="w-4 bg-green-300 rounded-t transition-all duration-300"
                         style={{ height: `${lastMonthHeight}%` }}
                       />
                       <div 
-                        className="w-1.5 bg-green-500 rounded-t transition-all duration-300"
+                        className="w-4 bg-green-500 rounded-t transition-all duration-300"
                         style={{ height: `${thisMonthHeight}%` }}
                       />
                     </div>
@@ -645,7 +663,7 @@ export default function DashboardPage() {
                     );
                   })()}
                 </div>
-                {/* Mini Sparkline Trend */}
+                {/* Mini Sparkline Trend - BIGGER */}
                 {(() => {
                   const lastMonth = stats.analytics.comparison.lastMonth.customers;
                   const thisMonth = stats.analytics.comparison.thisMonth.customers;
@@ -654,13 +672,13 @@ export default function DashboardPage() {
                   const thisMonthHeight = (thisMonth / maxValue) * 100;
                   
                   return (
-                    <div className="flex items-end gap-0.5 h-8">
+                    <div className="flex items-end gap-1.5 h-16">
                       <div 
-                        className="w-1.5 bg-orange-300 rounded-t transition-all duration-300"
+                        className="w-4 bg-orange-300 rounded-t transition-all duration-300"
                         style={{ height: `${lastMonthHeight}%` }}
                       />
                       <div 
-                        className="w-1.5 bg-orange-500 rounded-t transition-all duration-300"
+                        className="w-4 bg-orange-500 rounded-t transition-all duration-300"
                         style={{ height: `${thisMonthHeight}%` }}
                       />
                     </div>
