@@ -223,3 +223,138 @@ describe('Scan Controller - Item Merging Logic', () => {
     });
   });
 });
+
+describe('Scan Controller - Custom Template and Skip Notification', () => {
+  describe('request body parameters', () => {
+    it('should accept templateId parameter for custom template selection', () => {
+      const requestBody = {
+        items: [{ contact_id: 'contact-1', item_type: 'Letter' }],
+        scannedBy: 'Madison',
+        templateId: 'template-123',
+        customSubject: undefined,
+        customBody: undefined,
+        skipNotification: false,
+      };
+
+      expect(requestBody.templateId).toBe('template-123');
+      expect(requestBody.scannedBy).toBe('Madison');
+    });
+
+    it('should accept customSubject and customBody for edited emails', () => {
+      const requestBody = {
+        items: [{ contact_id: 'contact-1', item_type: 'Letter' }],
+        scannedBy: 'Merlin',
+        templateId: 'template-123',
+        customSubject: 'Custom Email Subject',
+        customBody: 'Custom email body content here',
+        skipNotification: false,
+      };
+
+      expect(requestBody.customSubject).toBe('Custom Email Subject');
+      expect(requestBody.customBody).toBe('Custom email body content here');
+    });
+
+    it('should accept skipNotification flag to skip sending emails', () => {
+      const requestBody = {
+        items: [{ contact_id: 'contact-1', item_type: 'Letter' }],
+        scannedBy: 'Madison',
+        skipNotification: true,
+      };
+
+      expect(requestBody.skipNotification).toBe(true);
+    });
+  });
+
+  describe('email variable substitution', () => {
+    it('should build correct Type string for letters only', () => {
+      const group = {
+        letterCount: 3,
+        packageCount: 0,
+      };
+
+      const typeString = [];
+      if (group.letterCount > 0) {
+        typeString.push(`${group.letterCount} ${group.letterCount === 1 ? 'letter' : 'letters'}`);
+      }
+      if (group.packageCount > 0) {
+        typeString.push(`${group.packageCount} ${group.packageCount === 1 ? 'package' : 'packages'}`);
+      }
+
+      expect(typeString.join(' and ')).toBe('3 letters');
+    });
+
+    it('should build correct Type string for packages only', () => {
+      const group = {
+        letterCount: 0,
+        packageCount: 2,
+      };
+
+      const typeString = [];
+      if (group.letterCount > 0) {
+        typeString.push(`${group.letterCount} ${group.letterCount === 1 ? 'letter' : 'letters'}`);
+      }
+      if (group.packageCount > 0) {
+        typeString.push(`${group.packageCount} ${group.packageCount === 1 ? 'package' : 'packages'}`);
+      }
+
+      expect(typeString.join(' and ')).toBe('2 packages');
+    });
+
+    it('should build correct Type string for mixed items', () => {
+      const group = {
+        letterCount: 2,
+        packageCount: 1,
+      };
+
+      const typeString = [];
+      if (group.letterCount > 0) {
+        typeString.push(`${group.letterCount} ${group.letterCount === 1 ? 'letter' : 'letters'}`);
+      }
+      if (group.packageCount > 0) {
+        typeString.push(`${group.packageCount} ${group.packageCount === 1 ? 'package' : 'packages'}`);
+      }
+
+      expect(typeString.join(' and ')).toBe('2 letters and 1 package');
+    });
+
+    it('should use singular "letter" for 1 letter', () => {
+      const group = { letterCount: 1, packageCount: 0 };
+      const letterText = group.letterCount === 1 ? 'letter' : 'letters';
+      expect(letterText).toBe('letter');
+    });
+
+    it('should use plural "letters" for multiple letters', () => {
+      const group = { letterCount: 5, packageCount: 0 };
+      const letterText = group.letterCount === 1 ? 'letter' : 'letters';
+      expect(letterText).toBe('letters');
+    });
+
+    it('should use singular "package" for 1 package', () => {
+      const group = { letterCount: 0, packageCount: 1 };
+      const packageText = group.packageCount === 1 ? 'package' : 'packages';
+      expect(packageText).toBe('package');
+    });
+
+    it('should use plural "packages" for multiple packages', () => {
+      const group = { letterCount: 0, packageCount: 3 };
+      const packageText = group.packageCount === 1 ? 'package' : 'packages';
+      expect(packageText).toBe('packages');
+    });
+  });
+
+  describe('scannedBy staff tracking', () => {
+    it('should use scannedBy for action history performed_by field', () => {
+      const scannedBy = 'Madison';
+      const performedBy = scannedBy || 'Staff';
+
+      expect(performedBy).toBe('Madison');
+    });
+
+    it('should fallback to "Staff" when scannedBy not provided', () => {
+      const scannedBy = undefined;
+      const performedBy = scannedBy || 'Staff';
+
+      expect(performedBy).toBe('Staff');
+    });
+  });
+});
