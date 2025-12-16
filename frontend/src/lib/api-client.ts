@@ -57,7 +57,12 @@ class ApiClient {
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || `Request failed with status ${response.status}`);
+      // Include status code in error for better debugging
+      const statusText = response.status === 429 ? 'Rate limited - please wait a moment'
+                       : response.status === 400 ? 'Bad request'
+                       : response.status === 500 ? 'Server error'
+                       : `Error ${response.status}`;
+      throw new Error(error.error || error.message || statusText);
     }
 
     // Handle 204 No Content (common for DELETE requests)
