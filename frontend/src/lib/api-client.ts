@@ -249,6 +249,21 @@ export const api = {
       }>;
     }) =>
       apiClient.post('/scan/smart-match', data),
+
+    // Batch smart match - process up to 10 images in ONE API call (10x cheaper)
+    smartMatchBatch: (data: {
+      images: Array<{
+        data: string;
+        mimeType: string;
+      }>;
+      contacts: Array<{
+        contact_id: string;
+        contact_person?: string;
+        company_name?: string;
+        mailbox_number?: string;
+      }>;
+    }) =>
+      apiClient.post('/scan/smart-match-batch', data),
   },
 
   stats: {

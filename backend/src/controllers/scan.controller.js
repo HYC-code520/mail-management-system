@@ -62,7 +62,7 @@ async function smartMatchWithGemini(req, res, next) {
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash'
+      model: 'gemini-2.5-flash'  // Best flash model - fast and accurate
     });
 
     // Build contact list string for Gemini - show BOTH personal name and business name
@@ -189,18 +189,34 @@ Now analyze the image and provide your response:`;
   } catch (error) {
     console.error('❌ Gemini smart matching failed:', error);
 
-    // Check if it's a rate limit error
-    const isRateLimited = error.message?.includes('429') ||
-                         error.message?.includes('Too Many Requests') ||
-                         error.message?.includes('RESOURCE_EXHAUSTED');
+    // Check if it's a rate limit or quota error
+    const errorMsg = error.message || '';
+    const isRateLimited = errorMsg.includes('429') ||
+                         errorMsg.includes('Too Many Requests') ||
+                         errorMsg.includes('RESOURCE_EXHAUSTED');
 
-    if (isRateLimited) {
+    // Check if quota exhausted (daily limit reached)
+    const isQuotaExhausted = errorMsg.includes('quota') ||
+                            errorMsg.includes('QUOTA_EXCEEDED') ||
+                            errorMsg.includes('exhausted');
+
+    if (isRateLimited || isQuotaExhausted) {
+      const isLikelyQuota = isQuotaExhausted ||
+        (isRateLimited && errorMsg.toLowerCase().includes('resource'));
+
+      console.error(`⚠️ Gemini ${isLikelyQuota ? 'QUOTA' : 'RATE'} limit hit:`, errorMsg);
+
       return res.status(429).json({
-        error: 'AI service is temporarily busy. Please wait a moment and try again.',
+        error: isLikelyQuota
+          ? 'Daily AI quota exhausted. Please check your Google AI Studio quota at https://aistudio.google.com/ or wait until tomorrow.'
+          : 'AI service is temporarily busy. Please wait a moment and try again.',
         extractedText: '',
         matchedContact: null,
         confidence: 0,
-        reason: 'Rate limit exceeded - please wait a few seconds between scans',
+        reason: isLikelyQuota
+          ? 'Daily quota exceeded - check Google AI Studio for quota reset time'
+          : 'Rate limit exceeded - please wait a few seconds between scans',
+        quotaExhausted: isLikelyQuota,
       });
     }
 
@@ -563,8 +579,151 @@ async function bulkSubmitScanSession(req, res, next) {
   }
 }
 
+/**
+ * Batch Smart AI matching using Gemini Vision
+ * Process multiple images in ONE API call (10x cost savings)
+ */
+async function batchSmartMatchWithGemini(req, res, next) {
+  try {
+    const { images, contacts } = req.body;
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'Images array is required' });
+    }
+
+    if (images.length > 10) {
+      return res.status(400).json({ error: 'Maximum 10 images per batch' });
+    }
+
+    if (!contacts || !Array.isArray(contacts)) {
+      return res.status(400).json({ error: 'Contacts array is required' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY is not set in environment variables');
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash'
+    });
+
+    // Build contact list string
+    const contactListStr = contacts
+      .map((c, idx) => {
+        const personName = c.contact_person || '';
+        const businessName = c.company_name || '';
+        const displayName = [personName, businessName].filter(Boolean).join(' / ') || 'Unknown';
+        const mailbox = c.mailbox_number || 'N/A';
+        return `${idx + 1}. ${displayName} (Mailbox: ${mailbox})`;
+      })
+      .join('\n');
+
+    // Build prompt for batch processing
+    const prompt = `You are analyzing ${images.length} photographs of mail labels/envelopes. For EACH image, extract the recipient name and match to the customer list.
+
+CUSTOMER LIST:
+${contactListStr}
+
+For EACH image (labeled IMAGE_1, IMAGE_2, etc.), provide:
+- EXTRACTED: the recipient name you found
+- MATCHED: customer number from list, or "NONE"
+- CONFIDENCE: 0-100
+
+RESPONSE FORMAT (one block per image):
+---IMAGE_1---
+EXTRACTED: [name]
+MATCHED: [number or NONE]
+CONFIDENCE: [0-100]
+
+---IMAGE_2---
+EXTRACTED: [name]
+MATCHED: [number or NONE]
+CONFIDENCE: [0-100]
+
+(continue for all ${images.length} images)
+
+IMPORTANT: Analyze each image separately. Handle name variations (order, abbreviations, partial matches).`;
+
+    // Build image parts array
+    const imageParts = images.map((img, idx) => ({
+      inlineData: {
+        data: img.data,
+        mimeType: img.mimeType || 'image/jpeg',
+      },
+    }));
+
+    console.log(`🤖 Batch processing ${images.length} images in ONE API call...`);
+    const startTime = Date.now();
+
+    const result = await callGeminiWithRetry(model, [prompt, ...imageParts], 3);
+    const responseText = result.response.text().trim();
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ Batch processed ${images.length} images in ${duration}ms`);
+    console.log('📄 Batch Response:', responseText.substring(0, 500) + '...');
+
+    // Parse response for each image
+    const results = [];
+    const imageBlocks = responseText.split(/---IMAGE_\d+---/).filter(block => block.trim());
+
+    for (let i = 0; i < images.length; i++) {
+      const block = imageBlocks[i] || '';
+
+      const extractedMatch = block.match(/EXTRACTED:\s*(.+)/i);
+      const matchedMatch = block.match(/MATCHED:\s*(.+)/i);
+      const confidenceMatch = block.match(/CONFIDENCE:\s*(\d+)/i);
+
+      const extractedText = extractedMatch ? extractedMatch[1].trim() : '';
+      const matchedIndexStr = matchedMatch ? matchedMatch[1].trim() : 'NONE';
+      const confidence = confidenceMatch ? parseInt(confidenceMatch[1], 10) / 100 : 0;
+
+      let matchedContact = null;
+      if (matchedIndexStr !== 'NONE') {
+        const matchedIndex = parseInt(matchedIndexStr, 10);
+        if (!isNaN(matchedIndex) && matchedIndex >= 1 && matchedIndex <= contacts.length) {
+          matchedContact = contacts[matchedIndex - 1];
+        }
+      }
+
+      results.push({
+        imageIndex: i,
+        extractedText,
+        matchedContact,
+        confidence,
+      });
+    }
+
+    console.log(`✅ Batch results: ${results.filter(r => r.matchedContact).length}/${results.length} matched`);
+
+    res.json({
+      success: true,
+      results,
+      duration,
+      imageCount: images.length,
+    });
+  } catch (error) {
+    console.error('❌ Batch Gemini matching failed:', error);
+
+    const errorMsg = error.message || '';
+    const isRateLimited = errorMsg.includes('429') ||
+                         errorMsg.includes('Too Many Requests') ||
+                         errorMsg.includes('RESOURCE_EXHAUSTED');
+
+    if (isRateLimited) {
+      return res.status(429).json({
+        error: 'AI service is temporarily busy. Please try again.',
+        results: [],
+      });
+    }
+
+    next(error);
+  }
+}
+
 module.exports = {
   bulkSubmitScanSession,
   smartMatchWithGemini,
+  batchSmartMatchWithGemini,
 };
 

@@ -51,6 +51,12 @@ export default function ScanSessionPage() {
   // Email preview modal state
   const [showEmailModal, setShowEmailModal] = useState(false);
 
+  // Batch mode state (for cost savings - 10 images in 1 API call)
+  const [batchMode, setBatchMode] = useState(false);
+  const [batchQueue, setBatchQueue] = useState<Array<{ blob: Blob; previewUrl: string }>>([]);
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const BATCH_SIZE = 10;
+
   // Load contacts and check for existing session on mount
   useEffect(() => {
     loadContacts();
@@ -136,8 +142,14 @@ export default function ScanSessionPage() {
   };
   
   const handleCameraCapture = (photoBlob: Blob) => {
+    // If batch mode is ON, add to queue instead of processing
+    if (batchMode) {
+      addToBatchQueue(photoBlob);
+      return;
+    }
+
     // Show immediate feedback - non-blocking position at top
-    toast.loading('Processing... Keep scanning!', { 
+    toast.loading('Processing... Keep scanning!', {
       id: 'photo-processing',
       duration: 3000,
       position: 'top-center',
@@ -153,12 +165,171 @@ export default function ScanSessionPage() {
         marginTop: '20px'
       }
     });
-    
+
     if (quickScanMode) {
       processPhotoBackground(photoBlob);
     } else {
       processPhoto(photoBlob);
     }
+  };
+
+  // Add photo to batch queue
+  const addToBatchQueue = (photoBlob: Blob) => {
+    setBatchQueue(prev => {
+      if (prev.length >= BATCH_SIZE) {
+        toast.error(`Batch is full (${BATCH_SIZE} photos). Process current batch first.`);
+        return prev;
+      }
+
+      const previewUrl = URL.createObjectURL(photoBlob);
+      const newQueue = [...prev, { blob: photoBlob, previewUrl }];
+      const newCount = newQueue.length;
+
+      toast.success(`📸 Added to batch (${newCount}/${BATCH_SIZE})`, { duration: 1500 });
+
+      // Auto-process when batch is full
+      if (newCount === BATCH_SIZE) {
+        toast('Batch full! Processing automatically...', { icon: '🚀', duration: 2000 });
+        // Small delay to let state update, then process
+        setTimeout(() => processBatchQueue(), 500);
+      }
+
+      return newQueue;
+    });
+  };
+
+  // Queue for items that need manual review from batch processing
+  const [batchReviewQueue, setBatchReviewQueue] = useState<ScannedItem[]>([]);
+
+  // Process all photos in batch queue
+  const processBatchQueue = async () => {
+    if (batchQueue.length === 0) {
+      toast.error('No photos in batch queue');
+      return;
+    }
+
+    if (!session) {
+      toast.error('No active session. Please start a session first.');
+      return;
+    }
+
+    setIsProcessingBatch(true);
+    toast.loading(`Processing ${batchQueue.length} photos...`, { id: 'batch-processing' });
+
+    try {
+      // Convert all blobs to base64
+      const images = await Promise.all(
+        batchQueue.map(async (item) => {
+          const base64 = await blobToBase64(item.blob);
+          const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+          return {
+            data: base64Data,
+            mimeType: item.blob.type || 'image/jpeg',
+          };
+        })
+      );
+
+      // Prepare contacts for API
+      const simplifiedContacts = contacts.map(c => ({
+        contact_id: c.contact_id,
+        contact_person: c.contact_person,
+        company_name: c.company_name,
+        mailbox_number: c.mailbox_number,
+      }));
+
+      console.log(`🤖 Sending ${images.length} images in batch...`);
+      const startTime = Date.now();
+
+      // Call batch API
+      const response = await api.scan.smartMatchBatch({
+        images,
+        contacts: simplifiedContacts,
+      });
+
+      const duration = Date.now() - startTime;
+      console.log(`✅ Batch processed in ${duration}ms:`, response);
+
+      toast.dismiss('batch-processing');
+
+      // Process each result
+      let matchedCount = 0;
+      const itemsToAdd: ScannedItem[] = [];
+      const itemsNeedingReview: ScannedItem[] = [];
+
+      for (let i = 0; i < response.results.length; i++) {
+        const result = response.results[i];
+        const queueItem = batchQueue[i];
+
+        const item: ScannedItem = {
+          id: `item-${Date.now()}-${i}`,
+          photoBlob: queueItem.blob,
+          photoPreviewUrl: queueItem.previewUrl,
+          extractedText: result.extractedText || '',
+          matchedContact: result.matchedContact || null,
+          confidence: result.confidence || 0,
+          itemType: 'Letter',
+          status: (result.matchedContact && result.confidence >= CONFIDENCE_THRESHOLD)
+            ? 'matched'
+            : (result.matchedContact ? 'uncertain' : 'failed'),
+          scannedAt: new Date().toISOString(),
+        };
+
+        if (result.matchedContact && result.confidence >= 0.5) {
+          // High enough confidence - auto-add to session
+          itemsToAdd.push(item);
+          matchedCount++;
+        } else {
+          // Low confidence - queue for manual review
+          itemsNeedingReview.push(item);
+        }
+      }
+
+      // Add all matched items to session at once
+      if (itemsToAdd.length > 0) {
+        setSession(prev => {
+          if (!prev) return prev;
+          return { ...prev, items: [...prev.items, ...itemsToAdd] };
+        });
+      }
+
+      // Queue items needing review
+      if (itemsNeedingReview.length > 0) {
+        setBatchReviewQueue(itemsNeedingReview);
+        // Show first one for review
+        setPendingItem(itemsNeedingReview[0]);
+        toast(`${itemsNeedingReview.length} items need manual review`, { icon: '⚠️', duration: 3000 });
+      }
+
+      toast.success(`✅ Batch complete! ${matchedCount}/${response.results.length} auto-matched`, {
+        duration: 3000,
+      });
+
+      // Clear the batch queue
+      setBatchQueue([]);
+
+    } catch (error) {
+      console.error('❌ Batch processing failed:', error);
+      toast.dismiss('batch-processing');
+      toast.error('Batch processing failed. Try processing individually.');
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  // Helper to convert blob to base64
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to convert blob to base64'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -170,8 +341,15 @@ export default function ScanSessionPage() {
 
     console.log(`📸 File selected: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
 
+    // If batch mode is ON, add to queue instead of processing
+    if (batchMode) {
+      addToBatchQueue(file);
+      event.target.value = ''; // Reset input
+      return;
+    }
+
     // Show immediate feedback - non-blocking position at top
-    toast.loading('Processing... Keep scanning!', { 
+    toast.loading('Processing... Keep scanning!', {
       id: 'photo-processing',
       duration: 3000,
       position: 'top-center',
@@ -370,8 +548,13 @@ export default function ScanSessionPage() {
         : 'No match found';
     } catch (geminiError) {
       // Fallback to Tesseract OCR + fuzzy matching
+      const errorMsg = geminiError instanceof Error ? geminiError.message : '';
+      const isQuotaError = errorMsg.toLowerCase().includes('quota') ||
+                          errorMsg.includes('limit: 0');
       console.log('⚠️ Gemini failed, falling back to Tesseract OCR...', geminiError);
-      toast('Using backup OCR...', { icon: '🔄', duration: 2000 });
+      toast(isQuotaError
+        ? '⚠️ Daily AI quota exhausted - using backup OCR'
+        : 'Using backup OCR...', { icon: '🔄', duration: 3000 });
 
       try {
         const ocrResult = await extractRecipientName(photoBlob);
@@ -464,14 +647,25 @@ export default function ScanSessionPage() {
     });
 
     setPendingItem(null);
-    
+
+    // Check if there are more items in batch review queue
+    if (batchReviewQueue.length > 0) {
+      const remainingItems = batchReviewQueue.filter(i => i.id !== item.id);
+      setBatchReviewQueue(remainingItems);
+      if (remainingItems.length > 0) {
+        // Show next item for review
+        setPendingItem(remainingItems[0]);
+        toast(`${remainingItems.length} more items to review`, { icon: '📋', duration: 1500 });
+      }
+    }
+
     // In Quick Scan Mode, use shorter toast duration
     const toastDuration = quickScanMode ? 1000 : 2000;
     toast.success(
       `✓ ${item.matchedContact?.contact_person || item.matchedContact?.company_name || 'Item'}`,
       { duration: toastDuration }
     );
-    
+
     // Vibration feedback
     if (navigator.vibrate) {
       navigator.vibrate(200);
@@ -482,7 +676,20 @@ export default function ScanSessionPage() {
     if (pendingItem?.photoPreviewUrl) {
       URL.revokeObjectURL(pendingItem.photoPreviewUrl);
     }
+
+    const currentPendingId = pendingItem?.id;
     setPendingItem(null);
+
+    // Check if there are more items in batch review queue
+    if (batchReviewQueue.length > 0 && currentPendingId) {
+      const remainingItems = batchReviewQueue.filter(i => i.id !== currentPendingId);
+      setBatchReviewQueue(remainingItems);
+      if (remainingItems.length > 0) {
+        // Show next item for review
+        setPendingItem(remainingItems[0]);
+        toast(`Skipped. ${remainingItems.length} more items to review`, { icon: '⏭️', duration: 1500 });
+      }
+    }
   };
 
   const removeItem = (itemId: string) => {
@@ -951,11 +1158,86 @@ export default function ScanSessionPage() {
             </label>
           </div>
           
+          {/* Batch Mode Toggle - Cost Savings */}
+          <div className="mt-3 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
+            <input
+              type="checkbox"
+              id="batchMode"
+              checked={batchMode}
+              onChange={(e) => {
+                setBatchMode(e.target.checked);
+                if (!e.target.checked) {
+                  // Clear queue when disabling batch mode
+                  batchQueue.forEach(item => URL.revokeObjectURL(item.previewUrl));
+                  setBatchQueue([]);
+                }
+              }}
+              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+            />
+            <label htmlFor="batchMode" className="flex-1 cursor-pointer">
+              <span className="font-semibold text-blue-900">💰 Batch Mode (10x Cost Savings)</span>
+              <p className="text-xs text-blue-700 mt-0.5">
+                Collect {BATCH_SIZE} photos, then process all at once. Uses 1 API call instead of 10.
+              </p>
+            </label>
+          </div>
+
+          {/* Batch Queue Status */}
+          {batchMode && (
+            <div className="mt-3 bg-blue-100 border border-blue-300 rounded-lg p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-medium text-blue-900">
+                  📸 Batch Queue: {batchQueue.length} / {BATCH_SIZE}
+                </span>
+                {batchQueue.length > 0 && (
+                  <button
+                    onClick={processBatchQueue}
+                    disabled={isProcessingBatch}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {isProcessingBatch ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>Process {batchQueue.length} Photos</>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Batch Queue Thumbnails */}
+              {batchQueue.length > 0 && (
+                <div className="flex gap-2 flex-wrap">
+                  {batchQueue.map((item, idx) => (
+                    <div key={idx} className="relative">
+                      <img
+                        src={item.previewUrl}
+                        alt={`Queue ${idx + 1}`}
+                        className="w-12 h-12 object-cover rounded border border-blue-300"
+                      />
+                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
+                        {idx + 1}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {batchQueue.length === 0 && (
+                <p className="text-xs text-blue-600">
+                  Take photos to add to the batch. Photos will be processed together when you click "Process".
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Debug Panel - Shows processing status */}
-          {quickScanMode && (
+          {quickScanMode && !batchMode && (
             <div className="mt-3 bg-gray-100 border border-gray-300 rounded-lg p-3">
               <p className="text-xs font-mono text-gray-700">
-                🟢 Scanned: {session.items.length} | 🔵 Processing: {processingQueue} | 
+                🟢 Scanned: {session.items.length} | 🔵 Processing: {processingQueue} |
                 📊 Total contacts: {contacts.length}
               </p>
             </div>
