@@ -501,50 +501,50 @@ export default function DashboardPage() {
 
         {/* Today's Overview - 1/2 width (single horizontal line) */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100 h-full flex flex-col justify-center">
+          <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100 h-full flex flex-col justify-center overflow-hidden">
             <h2 className="text-sm font-bold text-gray-900 mb-3">Today's Overview</h2>
-            
-            <div className="flex items-center justify-between gap-4">
+
+            <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {/* Today's Mail */}
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
                 <div className="w-10 h-10 bg-blue-500 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
                   <Mail className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-600 whitespace-nowrap">Today's Mail</p>
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-600 truncate">Today's Mail</p>
                   <p className="text-xl font-bold text-gray-900">{stats?.todaysMail || 0}</p>
                 </div>
               </div>
 
               {/* Pending Pickups */}
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
                 <div className="w-10 h-10 bg-purple-500 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
                   <Package className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-600 whitespace-nowrap">Pending Pickups</p>
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-600 truncate">Pending Pickups</p>
                   <p className="text-xl font-bold text-gray-900">{stats?.pendingPickups || 0}</p>
                 </div>
               </div>
 
               {/* Overdue */}
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
                 <div className="w-10 h-10 bg-red-500 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
                   <AlertCircle className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-600 whitespace-nowrap">Overdue</p>
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-600 truncate">Overdue</p>
                   <p className="text-xl font-bold text-red-600">{stats?.overdueMail || 0}</p>
                 </div>
               </div>
 
               {/* Completed Today */}
-              <div className="flex items-center gap-2 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
                 <div className="w-10 h-10 bg-green-500 rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
                   <CheckCircle2 className="w-5 h-5 text-white" />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-600 whitespace-nowrap">Completed Today</p>
+                <div className="min-w-0">
+                  <p className="text-xs text-gray-600 truncate">Completed</p>
                   <p className="text-xl font-bold text-green-600">{stats?.completedToday || 0}</p>
                 </div>
               </div>
