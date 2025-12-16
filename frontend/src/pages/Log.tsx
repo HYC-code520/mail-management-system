@@ -1927,7 +1927,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         <div className="space-y-6">
                           {/* Combined Action History Timeline */}
                           <div>
-                            <h3 className="font-bold text-gray-900 mb-3">Action History</h3>
                             <ActionHistorySection
                               actions={getGroupActionHistory(group)}
                               loading={false}
