@@ -9,10 +9,10 @@ const feeService = require('../services/fee.service');
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
- * Call Gemini with retry logic for rate limiting (429 errors)
- * Uses exponential backoff: 1s, 2s, 4s, 8s...
+ * Call Gemini with retry logic for rate limiting (429) and overload (503) errors
+ * Uses exponential backoff: 2s, 4s, 8s...
  */
-async function callGeminiWithRetry(model, content, maxRetries = 3) {
+async function callGeminiWithRetry(model, content, maxRetries = 4) {
   let lastError;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -21,22 +21,39 @@ async function callGeminiWithRetry(model, content, maxRetries = 3) {
       return result;
     } catch (error) {
       lastError = error;
-      const isRateLimited = error.message?.includes('429') ||
-                           error.message?.includes('Too Many Requests') ||
-                           error.message?.includes('RESOURCE_EXHAUSTED');
+      
+      // Check for retryable errors
+      const errorMsg = error.message || '';
+      const statusCode = error.status || 0;
+      
+      const isRateLimited = statusCode === 429 ||
+                           errorMsg.includes('429') ||
+                           errorMsg.includes('Too Many Requests') ||
+                           errorMsg.includes('RESOURCE_EXHAUSTED');
+      
+      const isOverloaded = statusCode === 503 ||
+                          errorMsg.includes('503') ||
+                          errorMsg.includes('overloaded') ||
+                          errorMsg.includes('Service Unavailable');
+      
+      const shouldRetry = (isRateLimited || isOverloaded) && attempt < maxRetries;
 
-      if (isRateLimited && attempt < maxRetries) {
-        const delayMs = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s...
-        console.log(`⏳ Rate limited, waiting ${delayMs/1000}s before retry ${attempt + 1}/${maxRetries}...`);
+      if (shouldRetry) {
+        // Exponential backoff: 2s, 4s, 8s, 16s
+        const delayMs = Math.pow(2, attempt + 1) * 1000;
+        const errorType = isOverloaded ? 'Service overloaded' : 'Rate limited';
+        console.log(`⏳ ${errorType}, waiting ${delayMs/1000}s before retry ${attempt + 1}/${maxRetries}...`);
         await sleep(delayMs);
-      } else if (!isRateLimited) {
-        // Non-rate-limit error, don't retry
+      } else if (!isRateLimited && !isOverloaded) {
+        // Non-retryable error (e.g., invalid API key, bad request)
+        console.error('❌ Non-retryable Gemini error:', errorMsg);
         throw error;
       }
     }
   }
 
   // All retries exhausted
+  console.error(`❌ All ${maxRetries} retries exhausted. Last error:`, lastError.message);
   throw lastError;
 }
 
@@ -144,7 +161,7 @@ Now analyze the image and provide your response:`;
     ];
 
     console.log('🤖 Calling Gemini with smart matching...');
-    const result = await callGeminiWithRetry(model, [prompt, ...imageParts], 3);
+    const result = await callGeminiWithRetry(model, [prompt, ...imageParts], 4);
     const responseText = result.response.text().trim();
 
     console.log('📄 Gemini Response:', responseText.substring(0, 200) + '...');
@@ -189,36 +206,62 @@ Now analyze the image and provide your response:`;
   } catch (error) {
     console.error('❌ Gemini smart matching failed:', error);
 
-    // Check if it's a rate limit or quota error
+    // Check if it's a rate limit, quota, or overload error
     const errorMsg = error.message || '';
-    const isRateLimited = errorMsg.includes('429') ||
+    const statusCode = error.status || 0;
+    
+    const isRateLimited = statusCode === 429 ||
+                         errorMsg.includes('429') ||
                          errorMsg.includes('Too Many Requests') ||
                          errorMsg.includes('RESOURCE_EXHAUSTED');
 
-    // Check if quota exhausted (daily limit reached)
     const isQuotaExhausted = errorMsg.includes('quota') ||
                             errorMsg.includes('QUOTA_EXCEEDED') ||
                             errorMsg.includes('exhausted');
+    
+    const isOverloaded = statusCode === 503 ||
+                        errorMsg.includes('503') ||
+                        errorMsg.includes('overloaded') ||
+                        errorMsg.includes('Service Unavailable');
 
-    if (isRateLimited || isQuotaExhausted) {
+    // If it's a known temporary issue, return 429 to trigger fallback
+    if (isRateLimited || isQuotaExhausted || isOverloaded) {
       const isLikelyQuota = isQuotaExhausted ||
         (isRateLimited && errorMsg.toLowerCase().includes('resource'));
 
-      console.error(`⚠️ Gemini ${isLikelyQuota ? 'QUOTA' : 'RATE'} limit hit:`, errorMsg);
+      let errorType = 'RATE';
+      let userMessage = 'AI service is temporarily busy. Please wait a moment and try again.';
+      let reason = 'Rate limit exceeded - please wait a few seconds between scans';
+      
+      if (isLikelyQuota) {
+        errorType = 'QUOTA';
+        userMessage = 'Daily AI quota exhausted. Please check your Google AI Studio quota at https://aistudio.google.com/ or wait until tomorrow.';
+        reason = 'Daily quota exceeded - check Google AI Studio for quota reset time';
+      } else if (isOverloaded) {
+        errorType = 'OVERLOAD';
+        userMessage = 'Google AI service is temporarily overloaded. Retrying automatically...';
+        reason = 'Service temporarily overloaded - this should be rare with a paid API key';
+      }
+
+      console.error(`⚠️ Gemini ${errorType} limit hit:`, errorMsg);
 
       return res.status(429).json({
-        error: isLikelyQuota
-          ? 'Daily AI quota exhausted. Please check your Google AI Studio quota at https://aistudio.google.com/ or wait until tomorrow.'
-          : 'AI service is temporarily busy. Please wait a moment and try again.',
+        error: userMessage,
         extractedText: '',
         matchedContact: null,
         confidence: 0,
-        reason: isLikelyQuota
-          ? 'Daily quota exceeded - check Google AI Studio for quota reset time'
-          : 'Rate limit exceeded - please wait a few seconds between scans',
+        reason,
         quotaExhausted: isLikelyQuota,
+        serviceOverloaded: isOverloaded,
       });
     }
+
+    // Unknown error - log details for debugging
+    console.error('⚠️ Unknown Gemini error:', {
+      message: errorMsg,
+      status: statusCode,
+      type: error.constructor.name,
+    });
 
     next(error);
   }
@@ -656,7 +699,7 @@ IMPORTANT: Analyze each image separately. Handle name variations (order, abbrevi
     console.log(`🤖 Batch processing ${images.length} images in ONE API call...`);
     const startTime = Date.now();
 
-    const result = await callGeminiWithRetry(model, [prompt, ...imageParts], 3);
+    const result = await callGeminiWithRetry(model, [prompt, ...imageParts], 4);
     const responseText = result.response.text().trim();
 
     const duration = Date.now() - startTime;

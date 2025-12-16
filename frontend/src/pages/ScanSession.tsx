@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, CheckCircle, XCircle, Loader, Trash2, Edit, Send, ArrowLeft, Video } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, Loader, Trash2, Edit, Send, ArrowLeft, Video, Zap, DollarSign, Info, Users, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
@@ -52,7 +52,7 @@ export default function ScanSessionPage() {
   const [showEmailModal, setShowEmailModal] = useState(false);
 
   // Batch mode state (for cost savings - 10 images in 1 API call)
-  const [batchMode, setBatchMode] = useState(false);
+  const [batchMode, setBatchMode] = useState(true); // Default ON for demos and efficiency
   const [batchQueue, setBatchQueue] = useState<Array<{ blob: Blob; previewUrl: string }>>([]);
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const BATCH_SIZE = 10;
@@ -402,8 +402,11 @@ export default function ScanSessionPage() {
     const processingId = `photo-${Date.now()}`;
     console.log(`🔄 [${processingId}] Background processing started`);
     
-    // RATE LIMITING: Gemini has 15 RPM limit, so wait at least 4 seconds between calls
-    const MIN_DELAY_MS = 4000; // 4 seconds = 15 calls per minute
+    // RATE LIMITING: Adjust based on your API tier
+    // - FREE tier: 15 RPM = 4000ms delay
+    // - PAID tier: 360+ RPM = 200-1000ms delay is safe
+    // Using 2000ms (2s) for reliable operation and avoiding 429 errors
+    const MIN_DELAY_MS = 2000; // 2 seconds = 30 calls per minute (very safe for all paid tiers)
     const now = Date.now();
     const timeSinceLastCall = now - lastGeminiCallRef.current;
     
@@ -1128,67 +1131,105 @@ export default function ScanSessionPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="sticky top-0 z-10">
         <div className="max-w-full mx-auto px-16 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Scan Session
-              </h2>
-              <p className="text-sm text-gray-600">
-                {session.items.length} items scanned
-              </p>
+          {/* Title */}
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Scan Session</h2>
+          </div>
+          
+          {/* Compact Configuration Panel - All in One Row */}
+          <div className="flex items-center gap-4 p-4">
+            {/* Quick Scan Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="quickScanMode"
+                checked={quickScanMode}
+                onChange={(e) => setQuickScanMode(e.target.checked)}
+                className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+              />
+              <Zap className="w-4 h-4 text-green-600" />
+              <label htmlFor="quickScanMode" className="cursor-pointer flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-900">Quick Scan</span>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Recommended</span>
+              </label>
+              <div className="group relative">
+                <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-50">
+                  Auto-accept high confidence matches (≥70%) for faster bulk scanning. Uncheck if you want to review each scan manually.
+                </div>
+              </div>
             </div>
-          </div>
-          
-          {/* Quick Scan Mode Toggle */}
-          <div className="mt-4 flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg p-3">
-            <input
-              type="checkbox"
-              id="quickScanMode"
-              checked={quickScanMode}
-              onChange={(e) => setQuickScanMode(e.target.checked)}
-              className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
-            />
-            <label htmlFor="quickScanMode" className="flex-1 cursor-pointer">
-              <span className="font-semibold text-green-900">⚡ Quick Scan Mode (Recommended)</span>
-              <p className="text-xs text-green-700 mt-0.5">
-                Auto-accept high confidence matches (≥70%) for faster bulk scanning. Uncheck if you want to review each scan manually.
-              </p>
-            </label>
-          </div>
-          
-          {/* Batch Mode Toggle - Cost Savings */}
-          <div className="mt-3 flex items-center gap-3 bg-blue-50 border border-blue-200 rounded-lg p-3">
-            <input
-              type="checkbox"
-              id="batchMode"
-              checked={batchMode}
-              onChange={(e) => {
-                setBatchMode(e.target.checked);
-                if (!e.target.checked) {
-                  // Clear queue when disabling batch mode
-                  batchQueue.forEach(item => URL.revokeObjectURL(item.previewUrl));
-                  setBatchQueue([]);
-                }
-              }}
-              className="w-5 h-5 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
-            />
-            <label htmlFor="batchMode" className="flex-1 cursor-pointer">
-              <span className="font-semibold text-blue-900">💰 Batch Mode (10x Cost Savings)</span>
-              <p className="text-xs text-blue-700 mt-0.5">
-                Collect {BATCH_SIZE} photos, then process all at once. Uses 1 API call instead of 10.
-              </p>
-            </label>
+            
+            <div className="w-px h-6 bg-gray-300"></div>
+            
+            {/* Batch Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="batchMode"
+                checked={batchMode}
+                onChange={(e) => {
+                  setBatchMode(e.target.checked);
+                  if (!e.target.checked) {
+                    // Clear queue when disabling batch mode
+                    batchQueue.forEach(item => URL.revokeObjectURL(item.previewUrl));
+                    setBatchQueue([]);
+                  }
+                }}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <DollarSign className="w-4 h-4 text-blue-600" />
+              <label htmlFor="batchMode" className="cursor-pointer flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-900">Batch Mode</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">10x Savings</span>
+              </label>
+              <div className="group relative">
+                <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-50">
+                  Collect {BATCH_SIZE} photos, then process all at once. Uses 1 API call instead of 10 - saves cost AND avoids rate limits!
+                </div>
+              </div>
+            </div>
+
+            <div className="w-px h-6 bg-gray-300"></div>
+
+            {/* Status Indicators */}
+            <div className="flex items-center gap-4 ml-auto">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">
+                  <span className="font-semibold">{session.items.length}</span> Scanned
+                </span>
+              </div>
+              {quickScanMode && !batchMode && processingQueue > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                  <span className="text-sm text-gray-700">
+                    <span className="font-semibold">{processingQueue}</span> Processing
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  <span className="font-semibold">{contacts.length}</span> Contacts
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Batch Queue Status */}
           {batchMode && (
-            <div className="mt-3 bg-blue-100 border border-blue-300 rounded-lg p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-blue-900">
-                  📸 Batch Queue: {batchQueue.length} / {BATCH_SIZE}
-                </span>
+            <div className="mt-4 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900">
+                    Batch Queue: {batchQueue.length} / {BATCH_SIZE}
+                  </span>
+                </div>
                 {batchQueue.length > 0 && (
                   <button
                     onClick={processBatchQueue}
@@ -1208,38 +1249,26 @@ export default function ScanSessionPage() {
               </div>
 
               {/* Batch Queue Thumbnails */}
-              {batchQueue.length > 0 && (
+              {batchQueue.length > 0 ? (
                 <div className="flex gap-2 flex-wrap">
                   {batchQueue.map((item, idx) => (
                     <div key={idx} className="relative">
                       <img
                         src={item.previewUrl}
                         alt={`Queue ${idx + 1}`}
-                        className="w-12 h-12 object-cover rounded border border-blue-300"
+                        className="w-16 h-16 object-cover rounded-lg border-2 border-blue-300 shadow-sm"
                       />
-                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center">
+                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow">
                         {idx + 1}
                       </span>
                     </div>
                   ))}
                 </div>
-              )}
-
-              {batchQueue.length === 0 && (
-                <p className="text-xs text-blue-600">
+              ) : (
+                <p className="text-sm text-blue-600">
                   Take photos to add to the batch. Photos will be processed together when you click "Process".
                 </p>
               )}
-            </div>
-          )}
-
-          {/* Debug Panel - Shows processing status */}
-          {quickScanMode && !batchMode && (
-            <div className="mt-3 bg-gray-100 border border-gray-300 rounded-lg p-3">
-              <p className="text-xs font-mono text-gray-700">
-                🟢 Scanned: {session.items.length} | 🔵 Processing: {processingQueue} |
-                📊 Total contacts: {contacts.length}
-              </p>
             </div>
           )}
         </div>
@@ -1343,8 +1372,8 @@ export default function ScanSessionPage() {
         {session.items.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <Camera className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <p>No items scanned yet</p>
-            <p className="text-sm">Tap "Scan Next Item" to begin</p>
+            <p className="text-lg font-medium mb-2">No items scanned yet</p>
+            <p className="text-sm">Use "Webcam" or "Upload/Camera" below to start scanning</p>
           </div>
         ) : (
           <div className="space-y-3">

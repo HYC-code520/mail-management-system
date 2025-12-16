@@ -80,7 +80,7 @@ Be precise and only return the actual text you see, nothing else.`;
 
 /**
  * Test Gemini API key and quota status
- * Simple endpoint to check if the API key is working
+ * Simple endpoint to check if the API key is working and provide diagnostics
  */
 async function testGeminiKey(req, res) {
   try {
@@ -110,29 +110,53 @@ async function testGeminiKey(req, res) {
     const duration = Date.now() - startTime;
     console.log(`✅ Gemini API key working! Response: "${text}" in ${duration}ms`);
 
+    // Check if response includes rate limit headers (would indicate tier info)
+    const usageMetadata = response.usageMetadata;
+    
     res.json({
       success: true,
-      message: 'Gemini API key is working',
+      message: 'Gemini API key is working perfectly! ✅',
       apiKey: maskedKey,
       response: text,
       duration,
-      model: 'gemini-2.0-flash',
+      model: 'gemini-2.5-flash',
+      usageMetadata: usageMetadata || 'Not available',
+      tips: [
+        'Your API key is working correctly',
+        'If you encounter 503 errors, the improved retry logic will now handle them automatically',
+        'Check https://aistudio.google.com/ to view your API usage and tier',
+        'Paid API keys should rarely hit 503 overload errors',
+      ],
     });
   } catch (error) {
     console.error('❌ Gemini API key test failed:', error);
 
     const errorMsg = error.message || '';
-    const isQuotaError = errorMsg.includes('429') ||
+    const statusCode = error.status || 0;
+    
+    const isQuotaError = statusCode === 429 ||
+                        errorMsg.includes('429') ||
                         errorMsg.includes('RESOURCE_EXHAUSTED') ||
                         errorMsg.includes('quota');
+    
+    const isOverloadError = statusCode === 503 ||
+                           errorMsg.includes('503') ||
+                           errorMsg.includes('overloaded');
 
-    res.status(isQuotaError ? 429 : 500).json({
+    let suggestion = 'Check that your GEMINI_API_KEY is valid and not expired.';
+    if (isQuotaError) {
+      suggestion = '⚠️ Quota exhausted. Check https://aistudio.google.com/ for your usage and limits. Paid tier users have much higher limits.';
+    } else if (isOverloadError) {
+      suggestion = '⚠️ Service temporarily overloaded. With a paid API key, this should be rare. Try again in a moment.';
+    }
+
+    res.status(isQuotaError || isOverloadError ? 429 : 500).json({
       success: false,
       error: error.message,
+      statusCode,
       isQuotaError,
-      suggestion: isQuotaError
-        ? 'Your daily quota may be exhausted. Check https://aistudio.google.com/ for quota status, or wait until tomorrow.'
-        : 'Check that your GEMINI_API_KEY is valid and not expired.',
+      isOverloadError,
+      suggestion,
     });
   }
 }

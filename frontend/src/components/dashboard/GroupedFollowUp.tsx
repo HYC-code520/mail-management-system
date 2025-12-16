@@ -159,7 +159,7 @@ export default function GroupedFollowUpSection({
       </div>
       
       {isExpanded && (
-        <div className="p-4 space-y-3">
+        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
           {groups.slice(0, displayCount).map((group) => {
             const customerName = group.contact.contact_person || 
                                group.contact.company_name || 
@@ -445,12 +445,14 @@ export default function GroupedFollowUpSection({
           
           {/* Show more button */}
           {groups.length > displayCount && (
-            <button
-              onClick={() => setDisplayCount(displayCount + 10)}
-              className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
-            >
-              Show {Math.min(10, groups.length - displayCount)} more
-            </button>
+            <div className="lg:col-span-2">
+              <button
+                onClick={() => setDisplayCount(displayCount + 10)}
+                className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+              >
+                Show {Math.min(10, groups.length - displayCount)} more
+              </button>
+            </div>
           )}
         </div>
       )}
