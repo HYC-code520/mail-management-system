@@ -79,3 +79,4 @@ Or visit in browser: `http://localhost:5000/api/ocr/test-gemini`
 
 ---
 *Created: December 16, 2025*
+

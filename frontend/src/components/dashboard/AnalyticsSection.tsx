@@ -82,6 +82,9 @@ export default function AnalyticsSection({ analytics, loading }: AnalyticsSectio
     })
     .filter(item => item.value > 0);
 
+  // Define preferred payment method order
+  const paymentOrder = ['cash', 'check', 'zelle', 'paypal', 'venmo', 'other'];
+  
   const paymentData = Object.entries(analytics.paymentDistribution)
     .map(([name, value]) => {
       let color = COLORS.blue;
@@ -90,11 +93,16 @@ export default function AnalyticsSection({ analytics, loading }: AnalyticsSectio
       else if (lowerName === 'check') color = COLORS.blue;
       else if (lowerName === 'zelle') color = COLORS.purple;
       else if (lowerName === 'venmo') color = COLORS.pink;
-      else if (lowerName === 'paypal') color = COLORS.indigo;
+      else if (lowerName === 'paypal') color = COLORS.yellow;
       else if (lowerName === 'other') color = COLORS.orange;
-      return { name, value, color };
+      return { name, value, color, lowerName };
     })
-    .filter(item => item.value > 0);
+    .filter(item => item.value > 0)
+    .sort((a, b) => {
+      const indexA = paymentOrder.indexOf(a.lowerName);
+      const indexB = paymentOrder.indexOf(b.lowerName);
+      return indexA - indexB;
+    });
 
   return (
     <div className="space-y-8">
@@ -230,7 +238,7 @@ export default function AnalyticsSection({ analytics, loading }: AnalyticsSectio
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="text-xs text-gray-600 space-y-1.5 flex-1">
-                  {paymentData.slice(0, 3).map((item) => (
+                  {paymentData.slice(0, 4).map((item) => (
                     <div key={item.name} className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{backgroundColor: item.color}}></div>
                       <span className="font-medium text-xs truncate">{item.name}: {item.value}</span>

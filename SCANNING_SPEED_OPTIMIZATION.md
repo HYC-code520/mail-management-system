@@ -174,3 +174,4 @@ You can reduce `MIN_DELAY_MS` further, but test carefully:
 ---
 *Created: December 16, 2025*
 *Speed improvement: 4x faster for sequential scanning*
+

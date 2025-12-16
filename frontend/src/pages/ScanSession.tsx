@@ -810,6 +810,10 @@ export default function ScanSessionPage() {
         origin: { y: 0.6 }
       });
 
+      // Play "You've Got Mail" sound
+      const audio = new Audio('/youve-got-mail-sound.mp3');
+      audio.play().catch(console.error);
+
       // Clean up
       session.items.forEach(item => {
         if (item.photoPreviewUrl) {
@@ -885,6 +889,10 @@ export default function ScanSessionPage() {
         spread: 70,
         origin: { y: 0.6 }
       });
+
+      // Play "You've Got Mail" sound
+      const audio = new Audio('/youve-got-mail-sound.mp3');
+      audio.play().catch(console.error);
 
       // Clean up
       session.items.forEach(item => {

@@ -95,9 +95,11 @@ describe('AnalyticsSection', () => {
     render(<AnalyticsSection analytics={mockAnalyticsData} loading={false} />);
 
     expect(screen.getByText('Payment')).toBeInTheDocument();
+    // Payment methods are sorted by custom order: cash, check, zelle, paypal
     expect(screen.getByText('Cash: 20')).toBeInTheDocument();
+    expect(screen.getByText('Check: 3')).toBeInTheDocument();
     expect(screen.getByText('Zelle: 15')).toBeInTheDocument();
-    expect(screen.getByText('Venmo: 10')).toBeInTheDocument();
+    expect(screen.getByText('PayPal: 5')).toBeInTheDocument();
   });
 
   it('should hide Language section when all values are zero', () => {
@@ -165,15 +167,17 @@ describe('AnalyticsSection', () => {
     expect(screen.queryByText('Abandoned: 2')).not.toBeInTheDocument();
   });
 
-  it('should limit payment items to 3 in legend', () => {
+  it('should limit payment items to 4 in legend', () => {
     render(<AnalyticsSection analytics={mockAnalyticsData} loading={false} />);
 
-    // Should show first 3 payment methods
+    // Should show first 4 payment methods in custom order (cash, check, zelle, paypal)
     expect(screen.getByText('Cash: 20')).toBeInTheDocument();
+    expect(screen.getByText('Check: 3')).toBeInTheDocument();
     expect(screen.getByText('Zelle: 15')).toBeInTheDocument();
-    expect(screen.getByText('Venmo: 10')).toBeInTheDocument();
-    // Should not show 4th onwards
-    expect(screen.queryByText('PayPal: 5')).not.toBeInTheDocument();
+    expect(screen.getByText('PayPal: 5')).toBeInTheDocument();
+    // Should not show 5th onwards (venmo, other)
+    expect(screen.queryByText('Venmo: 10')).not.toBeInTheDocument();
+    expect(screen.queryByText('Other: 2')).not.toBeInTheDocument();
   });
 
   describe('Color Mapping', () => {
@@ -221,7 +225,10 @@ describe('AnalyticsSection', () => {
 
       render(<AnalyticsSection analytics={dataWithPayPal} loading={false} />);
 
+      // PayPal should appear in custom sort order (after cash, check, zelle)
       expect(screen.getByText('PayPal: 25')).toBeInTheDocument();
+      expect(screen.getByText('Cash: 10')).toBeInTheDocument();
+      expect(screen.getByText('Zelle: 5')).toBeInTheDocument();
     });
   });
 });

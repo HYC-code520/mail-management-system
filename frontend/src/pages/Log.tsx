@@ -953,37 +953,92 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   // Jump to a specific row (scroll + highlight + expand + load history)
   // This is used by the edit toast to jump to the updated row
   const jumpToRow = useCallback(async (groupKey: string) => {
-    // Find the group
+    // Find the group in groupedItems (for data)
     const group = groupedItems.find(g => g.groupKey === groupKey);
     if (!group) return;
-    
-    // 1. Scroll to the row
-    const rowElement = document.getElementById(`row-${groupKey}`);
-    if (rowElement) {
-      rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+    // Find the index of the group in sortedGroups (for pagination)
+    // We need to recalculate sortedGroups here since it's not in dependencies
+    const sorted = [...groupedItems].sort((a, b) => {
+      let comparison = 0;
+      switch (sortColumn) {
+        case 'date':
+          comparison = new Date(a.latestReceivedDate).getTime() - new Date(b.latestReceivedDate).getTime();
+          break;
+        case 'status':
+          comparison = a.displayStatus.localeCompare(b.displayStatus);
+          break;
+        case 'customer': {
+          const nameA = a.contact?.contact_person || a.contact?.company_name || '';
+          const nameB = b.contact?.contact_person || b.contact?.company_name || '';
+          comparison = nameA.localeCompare(nameB);
+          break;
+        }
+        case 'type':
+          comparison = a.itemType.localeCompare(b.itemType);
+          break;
+        case 'quantity':
+          comparison = a.totalQuantity - b.totalQuantity;
+          break;
+        default:
+          comparison = new Date(a.latestReceivedDate).getTime() - new Date(b.latestReceivedDate).getTime();
+      }
+      return sortDirection === 'desc' ? -comparison : comparison;
+    });
+
+    const groupIndex = sorted.findIndex(g => g.groupKey === groupKey);
+    if (groupIndex === -1) return;
+
+    // Calculate which page this group is on
+    const targetPage = Math.floor(groupIndex / rowsPerPage) + 1;
+
+    // 1. Navigate to the correct page first
+    if (targetPage !== currentPage) {
+      setCurrentPage(targetPage);
+      // Wait for React to re-render the page
+      await new Promise(resolve => setTimeout(resolve, 100));
     }
-    
-    // 2. Highlight the row
+
+    // 2. Scroll to the row (with retry since DOM might not be ready)
+    const scrollToRow = () => {
+      const rowElement = document.getElementById(`row-${groupKey}`);
+      if (rowElement) {
+        rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        return true;
+      }
+      return false;
+    };
+
+    // Try immediately, then retry after short delays
+    if (!scrollToRow()) {
+      await new Promise(resolve => setTimeout(resolve, 150));
+      if (!scrollToRow()) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        scrollToRow();
+      }
+    }
+
+    // 3. Highlight the row
     setHighlightedGroupKeys(new Set([groupKey]));
     setTimeout(() => setHighlightedGroupKeys(new Set()), 6000); // Highlight for 6 seconds
-    
-    // 3. Expand the row
+
+    // 4. Expand the row
     setExpandedRows(prev => {
       const newSet = new Set(prev);
       newSet.add(groupKey);
       return newSet;
     });
-    
-    // 4. Wait a bit then load action history
+
+    // 5. Wait a bit then load action history
     await new Promise(resolve => setTimeout(resolve, 300));
-    
-    // 5. Load action history for all items in the group
+
+    // 6. Load action history for all items in the group
     try {
-      const historyPromises = group.items.map(item => 
+      const historyPromises = group.items.map(item =>
         api.actionHistory.getByMailItem(item.mail_item_id)
       );
       const histories = await Promise.all(historyPromises);
-      const combinedHistory = histories.flat().sort((a, b) => 
+      const combinedHistory = histories.flat().sort((a, b) =>
         new Date(a.action_timestamp).getTime() - new Date(b.action_timestamp).getTime()
       );
       setActionHistory(prev => ({
@@ -993,7 +1048,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     } catch (err) {
       console.error('Failed to load action history:', err);
     }
-  }, [groupedItems]);
+  }, [groupedItems, sortColumn, sortDirection, rowsPerPage, currentPage]);
 
   // Sorting for grouped items
   const sortedGroups = [...groupedItems].sort((a, b) => {
@@ -1927,7 +1982,6 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         <div className="space-y-6">
                           {/* Combined Action History Timeline */}
                           <div>
-                            <h3 className="font-bold text-gray-900 mb-3">Action History</h3>
                             <ActionHistorySection
                               actions={getGroupActionHistory(group)}
                               loading={false}

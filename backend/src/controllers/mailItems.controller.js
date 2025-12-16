@@ -296,6 +296,23 @@ exports.updateMailItemStatus = async (req, res, next) => {
       if (description !== undefined && description !== existingMailItem.description) {
         actionDescriptions.push(`Notes updated`);
       }
+
+      // Received date change
+      if (received_date !== undefined) {
+        const existingDateStr = existingMailItem.received_date ? new Date(existingMailItem.received_date).toISOString().split('T')[0] : null;
+        const newDateStr = new Date(received_date).toISOString().split('T')[0];
+        if (existingDateStr !== newDateStr) {
+          const formatDate = (dateStr) => {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+          };
+          actionDescriptions.push(`Date: ${formatDate(existingMailItem.received_date)} → ${formatDate(received_date)}`);
+          if (!previousValue) {
+            previousValue = existingDateStr;
+            newValue = newDateStr;
+          }
+        }
+      }
       
       if (actionDescriptions.length > 0) {
         // Determine action type based on what changed
