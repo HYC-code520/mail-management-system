@@ -61,10 +61,8 @@ async function smartMatchWithGemini(req, res, next) {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // Use gemini-2.0-flash-lite for higher rate limits (30 RPM vs 15 RPM for 2.5-flash)
-    // Or gemini-1.5-flash for even higher limits
     const model = genAI.getGenerativeModel({
-      model: 'gemini-2.0-flash-lite'
+      model: 'gemini-2.0-flash'
     });
 
     // Build contact list string for Gemini - show BOTH personal name and business name
