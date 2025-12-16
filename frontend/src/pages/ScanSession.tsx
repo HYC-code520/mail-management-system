@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, CheckCircle, XCircle, Loader, Trash2, Edit, Send, ArrowLeft, Video } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, Loader, Trash2, Edit, Send, ArrowLeft, Video, Zap, DollarSign, Info, Users, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
 import { api } from '../lib/api-client';
-import { initOCRWorker, terminateOCRWorker } from '../utils/ocr';
+import { initOCRWorker, terminateOCRWorker, extractRecipientName } from '../utils/ocr';
 import { smartMatchWithGemini } from '../utils/smartMatch';
+import { matchContactByName } from '../utils/nameMatching';
 import CameraModal from '../components/scan/CameraModal';
 import BulkScanEmailModal from '../components/scan/BulkScanEmailModal';
 import type {
@@ -49,6 +50,12 @@ export default function ScanSessionPage() {
 
   // Email preview modal state
   const [showEmailModal, setShowEmailModal] = useState(false);
+
+  // Batch mode state (for cost savings - 10 images in 1 API call)
+  const [batchMode, setBatchMode] = useState(true); // Default ON for demos and efficiency
+  const [batchQueue, setBatchQueue] = useState<Array<{ blob: Blob; previewUrl: string }>>([]);
+  const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const BATCH_SIZE = 10;
 
   // Load contacts and check for existing session on mount
   useEffect(() => {
@@ -135,8 +142,14 @@ export default function ScanSessionPage() {
   };
   
   const handleCameraCapture = (photoBlob: Blob) => {
+    // If batch mode is ON, add to queue instead of processing
+    if (batchMode) {
+      addToBatchQueue(photoBlob);
+      return;
+    }
+
     // Show immediate feedback - non-blocking position at top
-    toast.loading('Processing... Keep scanning!', { 
+    toast.loading('Processing... Keep scanning!', {
       id: 'photo-processing',
       duration: 3000,
       position: 'top-center',
@@ -152,12 +165,171 @@ export default function ScanSessionPage() {
         marginTop: '20px'
       }
     });
-    
+
     if (quickScanMode) {
       processPhotoBackground(photoBlob);
     } else {
       processPhoto(photoBlob);
     }
+  };
+
+  // Add photo to batch queue
+  const addToBatchQueue = (photoBlob: Blob) => {
+    setBatchQueue(prev => {
+      if (prev.length >= BATCH_SIZE) {
+        toast.error(`Batch is full (${BATCH_SIZE} photos). Process current batch first.`);
+        return prev;
+      }
+
+      const previewUrl = URL.createObjectURL(photoBlob);
+      const newQueue = [...prev, { blob: photoBlob, previewUrl }];
+      const newCount = newQueue.length;
+
+      toast.success(`📸 Added to batch (${newCount}/${BATCH_SIZE})`, { duration: 1500 });
+
+      // Auto-process when batch is full
+      if (newCount === BATCH_SIZE) {
+        toast('Batch full! Processing automatically...', { icon: '🚀', duration: 2000 });
+        // Small delay to let state update, then process
+        setTimeout(() => processBatchQueue(), 500);
+      }
+
+      return newQueue;
+    });
+  };
+
+  // Queue for items that need manual review from batch processing
+  const [batchReviewQueue, setBatchReviewQueue] = useState<ScannedItem[]>([]);
+
+  // Process all photos in batch queue
+  const processBatchQueue = async () => {
+    if (batchQueue.length === 0) {
+      toast.error('No photos in batch queue');
+      return;
+    }
+
+    if (!session) {
+      toast.error('No active session. Please start a session first.');
+      return;
+    }
+
+    setIsProcessingBatch(true);
+    toast.loading(`Processing ${batchQueue.length} photos...`, { id: 'batch-processing' });
+
+    try {
+      // Convert all blobs to base64
+      const images = await Promise.all(
+        batchQueue.map(async (item) => {
+          const base64 = await blobToBase64(item.blob);
+          const base64Data = base64.includes(',') ? base64.split(',')[1] : base64;
+          return {
+            data: base64Data,
+            mimeType: item.blob.type || 'image/jpeg',
+          };
+        })
+      );
+
+      // Prepare contacts for API
+      const simplifiedContacts = contacts.map(c => ({
+        contact_id: c.contact_id,
+        contact_person: c.contact_person,
+        company_name: c.company_name,
+        mailbox_number: c.mailbox_number,
+      }));
+
+      console.log(`🤖 Sending ${images.length} images in batch...`);
+      const startTime = Date.now();
+
+      // Call batch API
+      const response = await api.scan.smartMatchBatch({
+        images,
+        contacts: simplifiedContacts,
+      });
+
+      const duration = Date.now() - startTime;
+      console.log(`✅ Batch processed in ${duration}ms:`, response);
+
+      toast.dismiss('batch-processing');
+
+      // Process each result
+      let matchedCount = 0;
+      const itemsToAdd: ScannedItem[] = [];
+      const itemsNeedingReview: ScannedItem[] = [];
+
+      for (let i = 0; i < response.results.length; i++) {
+        const result = response.results[i];
+        const queueItem = batchQueue[i];
+
+        const item: ScannedItem = {
+          id: `item-${Date.now()}-${i}`,
+          photoBlob: queueItem.blob,
+          photoPreviewUrl: queueItem.previewUrl,
+          extractedText: result.extractedText || '',
+          matchedContact: result.matchedContact || null,
+          confidence: result.confidence || 0,
+          itemType: 'Letter',
+          status: (result.matchedContact && result.confidence >= CONFIDENCE_THRESHOLD)
+            ? 'matched'
+            : (result.matchedContact ? 'uncertain' : 'failed'),
+          scannedAt: new Date().toISOString(),
+        };
+
+        if (result.matchedContact && result.confidence >= 0.5) {
+          // High enough confidence - auto-add to session
+          itemsToAdd.push(item);
+          matchedCount++;
+        } else {
+          // Low confidence - queue for manual review
+          itemsNeedingReview.push(item);
+        }
+      }
+
+      // Add all matched items to session at once
+      if (itemsToAdd.length > 0) {
+        setSession(prev => {
+          if (!prev) return prev;
+          return { ...prev, items: [...prev.items, ...itemsToAdd] };
+        });
+      }
+
+      // Queue items needing review
+      if (itemsNeedingReview.length > 0) {
+        setBatchReviewQueue(itemsNeedingReview);
+        // Show first one for review
+        setPendingItem(itemsNeedingReview[0]);
+        toast(`${itemsNeedingReview.length} items need manual review`, { icon: '⚠️', duration: 3000 });
+      }
+
+      toast.success(`✅ Batch complete! ${matchedCount}/${response.results.length} auto-matched`, {
+        duration: 3000,
+      });
+
+      // Clear the batch queue
+      setBatchQueue([]);
+
+    } catch (error) {
+      console.error('❌ Batch processing failed:', error);
+      toast.dismiss('batch-processing');
+      toast.error('Batch processing failed. Try processing individually.');
+    } finally {
+      setIsProcessingBatch(false);
+    }
+  };
+
+  // Helper to convert blob to base64
+  const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        if (typeof reader.result === 'string') {
+          resolve(reader.result);
+        } else {
+          reject(new Error('Failed to convert blob to base64'));
+        }
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
   };
 
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -169,8 +341,15 @@ export default function ScanSessionPage() {
 
     console.log(`📸 File selected: ${file.name}, size: ${(file.size / 1024).toFixed(2)} KB`);
 
+    // If batch mode is ON, add to queue instead of processing
+    if (batchMode) {
+      addToBatchQueue(file);
+      event.target.value = ''; // Reset input
+      return;
+    }
+
     // Show immediate feedback - non-blocking position at top
-    toast.loading('Processing... Keep scanning!', { 
+    toast.loading('Processing... Keep scanning!', {
       id: 'photo-processing',
       duration: 3000,
       position: 'top-center',
@@ -223,8 +402,11 @@ export default function ScanSessionPage() {
     const processingId = `photo-${Date.now()}`;
     console.log(`🔄 [${processingId}] Background processing started`);
     
-    // RATE LIMITING: Gemini has 15 RPM limit, so wait at least 4 seconds between calls
-    const MIN_DELAY_MS = 4000; // 4 seconds = 15 calls per minute
+    // RATE LIMITING: Adjust based on your API tier
+    // - FREE tier: 15 RPM = 4000ms delay
+    // - PAID tier: 360+ RPM = 200-1000ms delay is safe
+    // Using 2000ms (2s) for reliable operation and avoiding 429 errors
+    const MIN_DELAY_MS = 2000; // 2 seconds = 30 calls per minute (very safe for all paid tiers)
     const now = Date.now();
     const timeSinceLastCall = now - lastGeminiCallRef.current;
     
@@ -282,7 +464,19 @@ export default function ScanSessionPage() {
       }
     } catch (error) {
       console.error(`❌ [${processingId}] Background processing failed:`, error);
-      toast.error('Failed to process one photo. Continue scanning!', { duration: 2000 });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const isRateLimited = errorMessage.includes('429') ||
+                           errorMessage.includes('busy') ||
+                           errorMessage.includes('Too Many');
+
+      if (isRateLimited) {
+        toast.error('AI is busy - slow down scanning or wait a moment', {
+          duration: 3000,
+          icon: '⏳'
+        });
+      } else {
+        toast.error('Failed to process one photo. Continue scanning!', { duration: 2000 });
+      }
     } finally {
       // Decrement queue counter
       setProcessingQueue(prev => {
@@ -303,7 +497,18 @@ export default function ScanSessionPage() {
     } catch (error) {
       console.error('❌ Photo processing failed:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to process photo: ${errorMessage}. Please try again.`);
+      const isRateLimited = errorMessage.includes('429') ||
+                           errorMessage.includes('busy') ||
+                           errorMessage.includes('Too Many');
+
+      if (isRateLimited) {
+        toast.error('AI is busy - please wait a moment and try again', {
+          duration: 3000,
+          icon: '⏳'
+        });
+      } else {
+        toast.error(`Failed to process photo: ${errorMessage}. Please try again.`);
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -321,18 +526,59 @@ export default function ScanSessionPage() {
     console.log('👁️ Preview image:', previewUrl);
     console.log('💡 TIP: Copy the URL above and paste in browser to see the photo being processed');
 
-    // Use Gemini smart matching (now with 1,500 requests/day!)
+    // Use Gemini smart matching with Tesseract fallback
     console.log('🤖 Using Gemini AI for smart matching...');
-    
-    const smartResult = await smartMatchWithGemini(photoBlob, contacts);
-    console.log('🎯 Gemini smart match result:', smartResult);
 
-    const finalText = smartResult.extractedText || '';
-    const finalContact = smartResult.matchedContact || null;
-    const finalConfidence = smartResult.confidence || 0;
-    const matchReason = smartResult.matchedContact 
-      ? `Gemini AI matched: ${smartResult.matchedContact.contact_person || smartResult.matchedContact.company_name}`
-      : 'No match found';
+    let finalText = '';
+    let finalContact: Contact | null = null;
+    let finalConfidence = 0;
+    let matchReason = 'No match found';
+
+    try {
+      const smartResult = await smartMatchWithGemini(photoBlob, contacts);
+      console.log('🎯 Gemini smart match result:', smartResult);
+
+      // Check if Gemini had an error (rate limit, etc.)
+      if (smartResult.error) {
+        throw new Error(smartResult.error);
+      }
+
+      finalText = smartResult.extractedText || '';
+      finalContact = smartResult.matchedContact || null;
+      finalConfidence = smartResult.confidence || 0;
+      matchReason = smartResult.matchedContact
+        ? `Gemini AI matched: ${smartResult.matchedContact.contact_person || smartResult.matchedContact.company_name}`
+        : 'No match found';
+    } catch (geminiError) {
+      // Fallback to Tesseract OCR + fuzzy matching
+      const errorMsg = geminiError instanceof Error ? geminiError.message : '';
+      const isQuotaError = errorMsg.toLowerCase().includes('quota') ||
+                          errorMsg.includes('limit: 0');
+      console.log('⚠️ Gemini failed, falling back to Tesseract OCR...', geminiError);
+      toast(isQuotaError
+        ? '⚠️ Daily AI quota exhausted - using backup OCR'
+        : 'Using backup OCR...', { icon: '🔄', duration: 3000 });
+
+      try {
+        const ocrResult = await extractRecipientName(photoBlob);
+        console.log('📝 Tesseract OCR result:', ocrResult);
+
+        finalText = ocrResult.text || '';
+
+        if (finalText) {
+          // Use fuzzy matching to find contact
+          const matchResult = matchContactByName(finalText, contacts);
+          if (matchResult) {
+            finalContact = matchResult.contact;
+            finalConfidence = matchResult.confidence;
+            matchReason = `Tesseract+Fuzzy matched: ${matchResult.contact.contact_person || matchResult.contact.company_name}`;
+          }
+        }
+      } catch (ocrError) {
+        console.error('❌ Tesseract OCR also failed:', ocrError);
+        // Both failed - finalText stays empty
+      }
+    }
 
     toast.dismiss('processing');
 
@@ -404,14 +650,25 @@ export default function ScanSessionPage() {
     });
 
     setPendingItem(null);
-    
+
+    // Check if there are more items in batch review queue
+    if (batchReviewQueue.length > 0) {
+      const remainingItems = batchReviewQueue.filter(i => i.id !== item.id);
+      setBatchReviewQueue(remainingItems);
+      if (remainingItems.length > 0) {
+        // Show next item for review
+        setPendingItem(remainingItems[0]);
+        toast(`${remainingItems.length} more items to review`, { icon: '📋', duration: 1500 });
+      }
+    }
+
     // In Quick Scan Mode, use shorter toast duration
     const toastDuration = quickScanMode ? 1000 : 2000;
     toast.success(
       `✓ ${item.matchedContact?.contact_person || item.matchedContact?.company_name || 'Item'}`,
       { duration: toastDuration }
     );
-    
+
     // Vibration feedback
     if (navigator.vibrate) {
       navigator.vibrate(200);
@@ -422,7 +679,20 @@ export default function ScanSessionPage() {
     if (pendingItem?.photoPreviewUrl) {
       URL.revokeObjectURL(pendingItem.photoPreviewUrl);
     }
+
+    const currentPendingId = pendingItem?.id;
     setPendingItem(null);
+
+    // Check if there are more items in batch review queue
+    if (batchReviewQueue.length > 0 && currentPendingId) {
+      const remainingItems = batchReviewQueue.filter(i => i.id !== currentPendingId);
+      setBatchReviewQueue(remainingItems);
+      if (remainingItems.length > 0) {
+        // Show next item for review
+        setPendingItem(remainingItems[0]);
+        toast(`Skipped. ${remainingItems.length} more items to review`, { icon: '⏭️', duration: 1500 });
+      }
+    }
   };
 
   const removeItem = (itemId: string) => {
@@ -861,43 +1131,144 @@ export default function ScanSessionPage() {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
-      <div className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <div className="sticky top-0 z-10">
         <div className="max-w-full mx-auto px-16 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-gray-900">
-                Scan Session
-              </h2>
-              <p className="text-sm text-gray-600">
-                {session.items.length} items scanned
-              </p>
+          {/* Title */}
+          <div className="mb-4">
+            <h2 className="text-2xl font-bold text-gray-900">Scan Session</h2>
+          </div>
+          
+          {/* Compact Configuration Panel - All in One Row */}
+          <div className="flex items-center gap-4 p-4">
+            {/* Quick Scan Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="quickScanMode"
+                checked={quickScanMode}
+                onChange={(e) => setQuickScanMode(e.target.checked)}
+                className="w-4 h-4 text-green-600 rounded focus:ring-2 focus:ring-green-500"
+              />
+              <Zap className="w-4 h-4 text-green-600" />
+              <label htmlFor="quickScanMode" className="cursor-pointer flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-900">Quick Scan</span>
+                <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Recommended</span>
+              </label>
+              <div className="group relative">
+                <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-50">
+                  Auto-accept high confidence matches (≥70%) for faster bulk scanning. Uncheck if you want to review each scan manually.
+                </div>
+              </div>
+            </div>
+            
+            <div className="w-px h-6 bg-gray-300"></div>
+            
+            {/* Batch Mode Toggle */}
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="batchMode"
+                checked={batchMode}
+                onChange={(e) => {
+                  setBatchMode(e.target.checked);
+                  if (!e.target.checked) {
+                    // Clear queue when disabling batch mode
+                    batchQueue.forEach(item => URL.revokeObjectURL(item.previewUrl));
+                    setBatchQueue([]);
+                  }
+                }}
+                className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
+              />
+              <DollarSign className="w-4 h-4 text-blue-600" />
+              <label htmlFor="batchMode" className="cursor-pointer flex items-center gap-1.5">
+                <span className="text-sm font-medium text-gray-900">Batch Mode</span>
+                <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">10x Savings</span>
+              </label>
+              <div className="group relative">
+                <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
+                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-50">
+                  Collect {BATCH_SIZE} photos, then process all at once. Uses 1 API call instead of 10 - saves cost AND avoids rate limits!
+                </div>
+              </div>
+            </div>
+
+            <div className="w-px h-6 bg-gray-300"></div>
+
+            {/* Status Indicators */}
+            <div className="flex items-center gap-4 ml-auto">
+              <div className="flex items-center gap-1.5">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm text-gray-700">
+                  <span className="font-semibold">{session.items.length}</span> Scanned
+                </span>
+              </div>
+              {quickScanMode && !batchMode && processingQueue > 0 && (
+                <div className="flex items-center gap-1.5">
+                  <Activity className="w-3.5 h-3.5 text-blue-500 animate-pulse" />
+                  <span className="text-sm text-gray-700">
+                    <span className="font-semibold">{processingQueue}</span> Processing
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-gray-400" />
+                <span className="text-sm text-gray-500">
+                  <span className="font-semibold">{contacts.length}</span> Contacts
+                </span>
+              </div>
             </div>
           </div>
-          
-          {/* Quick Scan Mode Toggle */}
-          <div className="mt-4 flex items-center gap-3 bg-green-50 border border-green-200 rounded-lg p-3">
-            <input
-              type="checkbox"
-              id="quickScanMode"
-              checked={quickScanMode}
-              onChange={(e) => setQuickScanMode(e.target.checked)}
-              className="w-5 h-5 text-green-600 rounded focus:ring-2 focus:ring-green-500"
-            />
-            <label htmlFor="quickScanMode" className="flex-1 cursor-pointer">
-              <span className="font-semibold text-green-900">⚡ Quick Scan Mode (Recommended)</span>
-              <p className="text-xs text-green-700 mt-0.5">
-                Auto-accept high confidence matches (≥70%) for faster bulk scanning. Uncheck if you want to review each scan manually.
-              </p>
-            </label>
-          </div>
-          
-          {/* Debug Panel - Shows processing status */}
-          {quickScanMode && (
-            <div className="mt-3 bg-gray-100 border border-gray-300 rounded-lg p-3">
-              <p className="text-xs font-mono text-gray-700">
-                🟢 Scanned: {session.items.length} | 🔵 Processing: {processingQueue} | 
-                📊 Total contacts: {contacts.length}
-              </p>
+
+          {/* Batch Queue Status */}
+          {batchMode && (
+            <div className="mt-4 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Camera className="w-4 h-4 text-blue-600" />
+                  <span className="text-sm font-medium text-blue-900">
+                    Batch Queue: {batchQueue.length} / {BATCH_SIZE}
+                  </span>
+                </div>
+                {batchQueue.length > 0 && (
+                  <button
+                    onClick={processBatchQueue}
+                    disabled={isProcessingBatch}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                  >
+                    {isProcessingBatch ? (
+                      <>
+                        <Loader className="w-4 h-4 animate-spin" />
+                        Processing...
+                      </>
+                    ) : (
+                      <>Process {batchQueue.length} Photos</>
+                    )}
+                  </button>
+                )}
+              </div>
+
+              {/* Batch Queue Thumbnails */}
+              {batchQueue.length > 0 ? (
+                <div className="flex gap-2 flex-wrap">
+                  {batchQueue.map((item, idx) => (
+                    <div key={idx} className="relative">
+                      <img
+                        src={item.previewUrl}
+                        alt={`Queue ${idx + 1}`}
+                        className="w-16 h-16 object-cover rounded-lg border-2 border-blue-300 shadow-sm"
+                      />
+                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow">
+                        {idx + 1}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-blue-600">
+                  Take photos to add to the batch. Photos will be processed together when you click "Process".
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -1001,8 +1372,8 @@ export default function ScanSessionPage() {
         {session.items.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
             <Camera className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <p>No items scanned yet</p>
-            <p className="text-sm">Tap "Scan Next Item" to begin</p>
+            <p className="text-lg font-medium mb-2">No items scanned yet</p>
+            <p className="text-sm">Use "Webcam" or "Upload/Camera" below to start scanning</p>
           </div>
         ) : (
           <div className="space-y-3">

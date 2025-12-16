@@ -1,6 +1,6 @@
 # Project Error & Solutions Log
 
-**Total Entries:** 35 | **Last Updated:** 2025-12-09
+**Total Entries:** 36 | **Last Updated:** 2025-12-16
 
 ## Quick Navigation
 
@@ -4107,3 +4107,98 @@ After fixing this issue, we created **backend timezone utilities** (`backend/src
 
 ---
 
+
+### #36 - Gemini API Quota Exhausted & Batch Mode Implementation
+
+**Timestamp:** `2025-12-16 04:00:00 - 05:30:00`  
+**Category:** `INTEGRATION + FEATURE`  
+**Status:** `SOLVED`  
+**Error Message:** `429 Too Many Requests - You exceeded your current quota... limit: 0, model: gemini-2.5-flash`
+
+**Context:** 
+User couldn't scan any mail items - kept getting 429 errors from Gemini API even after waiting hours. The free tier daily quota was exhausted.
+
+**Root Cause Analysis:**
+1. **Gemini 2.5-flash has only ~15 requests/day free** (not 1,500 like older models)
+2. **Each scan = 1 API request** - quota burns quickly with bulk scanning
+3. **Different models have different limits:**
+   - `gemini-1.5-flash`: 1,500 RPD (deprecated)
+   - `gemini-2.0-flash`: ~30 RPD free
+   - `gemini-2.5-flash`: ~15 RPD free (best model but most limited)
+
+**Solution Implemented:**
+
+**Part 1: Enable Billing (Immediate Fix)**
+- User set up billing in Google AI Studio
+- Switched to `gemini-2.5-flash` (best model, unlimited with billing)
+- Cost: ~$0.04 per 100 scans
+
+**Part 2: Batch Mode (10x Cost Savings)**
+Implemented batch processing to send up to 10 images in ONE API call:
+
+```javascript
+// Backend: New batch endpoint
+POST /api/scan/smart-match-batch
+{
+  images: [{ data: base64, mimeType: 'image/jpeg' }, ...], // up to 10
+  contacts: [{ contact_id, contact_person, company_name, mailbox_number }, ...]
+}
+
+// Response
+{
+  results: [
+    { imageIndex: 0, extractedText: "John Doe", matchedContact: {...}, confidence: 0.95 },
+    { imageIndex: 1, extractedText: "Jane Smith", matchedContact: {...}, confidence: 0.88 },
+    // ... up to 10 results
+  ],
+  duration: 5200, // ms for all 10
+  imageCount: 10
+}
+```
+
+**Frontend Changes:**
+- Added "Batch Mode" toggle in ScanSession.tsx
+- Batch queue collects up to 10 photos with thumbnails
+- "Process Batch" button sends all at once
+- Auto-processes when queue reaches 10
+- Low-confidence items queued for sequential review
+
+**Bugs Fixed During Implementation:**
+1. **Stale state in batch counter** - Used functional setState to fix React closure issue
+2. **Multiple low-confidence items lost** - Added `batchReviewQueue` to show items one-by-one
+3. **Missing session check** - Added null check before batch processing
+
+**Files Changed:**
+- `backend/src/controllers/scan.controller.js` - Added `batchSmartMatchWithGemini()`
+- `backend/src/controllers/ocr.controller.js` - Added `testGeminiKey()` diagnostic endpoint
+- `backend/src/routes/scan.routes.js` - Added `/smart-match-batch` route
+- `backend/src/routes/ocr.routes.js` - Added `/test-gemini` route
+- `frontend/src/lib/api-client.ts` - Added `smartMatchBatch()` API method
+- `frontend/src/pages/ScanSession.tsx` - Added batch mode UI and logic
+- `frontend/src/utils/smartMatch.ts` - Improved quota error detection
+
+**Cost Comparison:**
+
+| Mode | 100 scans | API Calls | Approx Cost |
+|------|-----------|-----------|-------------|
+| Single (demo) | 100 | 100 | ~$0.04 |
+| Batch (client) | 100 | 10 | ~$0.004 |
+
+**Testing Checklist:**
+- [x] Normal mode (batch OFF) - single scan works
+- [x] Batch mode - photos queue correctly
+- [x] Process button - all images processed
+- [x] Low-confidence items - shown for review
+- [x] Submit flow - items saved correctly
+- [ ] Demo day dry run needed
+
+**Prevention Strategy:**
+1. **Set spending alerts** in Google Cloud Console
+2. **Use batch mode for bulk operations** to reduce costs
+3. **Monitor API usage** via Google AI Studio dashboard
+4. **Add diagnostic endpoint** `/api/ocr/test-gemini` to check API status
+
+**Related Errors:**
+- [Error #25-30](#30-gemini-flash-lite-quota-exhausted---20-requestsday-limit) - Previous rate limiting issues
+
+---

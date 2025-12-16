@@ -93,11 +93,25 @@ export async function smartMatchWithGemini(
       message: error instanceof Error ? error.message : 'Unknown',
       stack: error instanceof Error ? error.stack : undefined,
     });
+
+    // Check if it's a rate limit or quota error
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const isQuotaExhausted = errorMessage.toLowerCase().includes('quota') ||
+                            errorMessage.includes('limit: 0') ||
+                            errorMessage.includes('QUOTA_EXCEEDED');
+    const isRateLimited = errorMessage.includes('429') ||
+                         errorMessage.includes('Too Many Requests') ||
+                         errorMessage.includes('busy');
+
     return {
       extractedText: '',
       matchedContact: null,
       confidence: 0,
-      error: error instanceof Error ? error.message : 'Unknown error',
+      error: isQuotaExhausted
+        ? 'Daily AI quota exhausted - falling back to backup OCR'
+        : isRateLimited
+        ? 'AI is busy - please wait a moment and try again'
+        : errorMessage,
     };
   }
 }

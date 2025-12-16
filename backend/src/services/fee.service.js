@@ -46,7 +46,8 @@ function calculateFeeForPackage(mailItem, asOfDate = new Date()) {
 /**
  * Create initial fee record for a package
  * Called when a package is first logged
- * 
+ * Automatically calculates fee based on received_date (for backdated packages)
+ *
  * @param {string} mailItemId - UUID of mail item
  * @param {string} contactId - UUID of contact
  * @param {string} userId - UUID of user
@@ -54,14 +55,36 @@ function calculateFeeForPackage(mailItem, asOfDate = new Date()) {
  */
 async function createFeeRecord(mailItemId, contactId, userId) {
   try {
+    // First, fetch the mail item to get the received_date for fee calculation
+    const { data: mailItem, error: fetchError } = await supabaseAdmin
+      .from('mail_items')
+      .select('received_date')
+      .eq('mail_item_id', mailItemId)
+      .single();
+
+    if (fetchError || !mailItem) {
+      console.error('❌ Error fetching mail item for fee calculation:', fetchError);
+      // Fallback to $0 if we can't fetch the mail item
+    }
+
+    // Calculate initial fee based on received_date (handles backdated packages)
+    let feeAmount = 0.00;
+    let daysCharged = 0;
+
+    if (mailItem?.received_date) {
+      const calculation = calculateFeeForPackage(mailItem, new Date());
+      feeAmount = calculation.feeAmount;
+      daysCharged = calculation.daysCharged;
+    }
+
     const { data, error } = await supabaseAdmin
       .from('package_fees')
       .insert({
         mail_item_id: mailItemId,
         contact_id: contactId,
         user_id: userId,
-        fee_amount: 0.00, // Starts at $0
-        days_charged: 0,   // Day 0
+        fee_amount: feeAmount,
+        days_charged: daysCharged,
         daily_rate: 2.00,
         grace_period_days: 1,
         fee_status: 'pending',
@@ -69,13 +92,13 @@ async function createFeeRecord(mailItemId, contactId, userId) {
       })
       .select()
       .single();
-    
+
     if (error) {
       console.error('❌ Error creating fee record:', error);
       throw error;
     }
-    
-    console.log(`✅ Created fee record for package ${mailItemId}: $0.00 (Day 0)`);
+
+    console.log(`✅ Created fee record for package ${mailItemId}: $${feeAmount.toFixed(2)} (Day ${daysCharged})`);
     return data;
   } catch (error) {
     console.error('Error in createFeeRecord:', error);

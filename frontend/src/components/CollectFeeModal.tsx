@@ -10,7 +10,6 @@ import Modal from './Modal.tsx';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import { CreditCard, Banknote, Smartphone, CheckCircle, XCircle, ArrowRight, PackageCheck, Mail, AlertTriangle } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext.tsx';
 
 interface PackageFee {
   fee_id: string;
@@ -73,7 +72,6 @@ export default function CollectFeeModal({
   isPickupFlow = false,
   onMarkPickedUp
 }: CollectFeeModalProps) {
-  const { user } = useAuth();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [waiveReason, setWaiveReason] = useState('');
   const [showWaiveInput, setShowWaiveInput] = useState(false);
@@ -119,14 +117,6 @@ export default function CollectFeeModal({
   const pendingPackages = group.packages.filter(
     pkg => pkg.packageFee && pkg.packageFee.fee_status === 'pending' && pkg.packageFee.fee_amount > 0
   );
-
-  // Helper to get staff name for performed_by field
-  const getPerformedBy = (): string => {
-    // For collect flow, use the selected staff name
-    if (collectedBy) return collectedBy;
-    // For waive/skip flow or fallback, use email
-    return user?.email || 'Staff';
-  };
 
   // Calculate total fee - use edited amount if in edit mode, otherwise use original
   const displayAmount = isEditingAmount && editedAmount ? parseFloat(editedAmount) : group.totalFees;
@@ -221,22 +211,21 @@ export default function CollectFeeModal({
       const shouldMarkPickedUp = markAsPickedUp || (isPickupFlow && onMarkPickedUp);
       
       if (shouldMarkPickedUp) {
-        const performedBy = getPerformedBy();
         // Mark all packages in this group as picked up
         for (const pkg of group.packages) {
           await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up');
         }
-        
+
         // Mark letters as picked up if checkbox is checked
         if (markLettersAsPickedUp && group.letters.length > 0) {
           for (const letter of group.letters) {
             await api.mailItems.updateStatus(letter.mail_item_id, 'Picked Up');
           }
         }
-        
+
         // Show appropriate toast message
-        const itemsMarked = markLettersAsPickedUp && group.letters.length > 0 
-          ? 'all items' 
+        const itemsMarked = markLettersAsPickedUp && group.letters.length > 0
+          ? 'all items'
           : 'packages';
         toast.success(
           `✅ Waived $${totalWaived.toFixed(2)} & marked ${itemsMarked} as Picked Up`,
@@ -272,9 +261,8 @@ export default function CollectFeeModal({
     try {
       // If checkbox is checked or pickup flow, mark items as picked up
       const shouldMarkPickedUp = markAsPickedUp || (isPickupFlow && onMarkPickedUp);
-      
+
       if (shouldMarkPickedUp) {
-        const performedBy = getPerformedBy();
         // Mark all packages in this group as picked up
         for (const pkg of group.packages) {
           await api.mailItems.updateStatus(pkg.mail_item_id, 'Picked Up');

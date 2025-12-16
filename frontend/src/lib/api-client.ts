@@ -17,7 +17,7 @@ class ApiClient {
   /**
    * Make an authenticated API request
    */
-  private async request(endpoint: string, options: RequestInit = {}) {
+  private async request(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<any> {
     const token = await this.getAuthToken();
     
     if (!token) {
@@ -34,9 +34,35 @@ class ApiClient {
     const url = `${API_BASE_URL}${endpoint}`;
     const response = await fetch(url, { ...options, headers });
 
+    // Handle 401 Unauthorized - token might be expired
+    if (response.status === 401 && retryCount === 0) {
+      console.log('🔄 Token expired, refreshing session...');
+      
+      // Force refresh the session
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('❌ Session refresh failed:', error);
+        // Redirect to sign-in page
+        window.location.href = '/signin';
+        throw new Error('Session expired. Please log in again.');
+      }
+      
+      if (session) {
+        console.log('✅ Session refreshed, retrying request...');
+        // Retry the request with the new token (only once)
+        return this.request(endpoint, options, retryCount + 1);
+      }
+    }
+
     if (!response.ok) {
       const error = await response.json().catch(() => ({ error: 'Request failed' }));
-      throw new Error(error.error || `Request failed with status ${response.status}`);
+      // Include status code in error for better debugging
+      const statusText = response.status === 429 ? 'Rate limited - please wait a moment'
+                       : response.status === 400 ? 'Bad request'
+                       : response.status === 500 ? 'Server error'
+                       : `Error ${response.status}`;
+      throw new Error(error.error || error.message || statusText);
     }
 
     // Handle 204 No Content (common for DELETE requests)
@@ -223,6 +249,21 @@ export const api = {
       }>;
     }) =>
       apiClient.post('/scan/smart-match', data),
+
+    // Batch smart match - process up to 10 images in ONE API call (10x cheaper)
+    smartMatchBatch: (data: {
+      images: Array<{
+        data: string;
+        mimeType: string;
+      }>;
+      contacts: Array<{
+        contact_id: string;
+        contact_person?: string;
+        company_name?: string;
+        mailbox_number?: string;
+      }>;
+    }) =>
+      apiClient.post('/scan/smart-match-batch', data),
   },
 
   stats: {

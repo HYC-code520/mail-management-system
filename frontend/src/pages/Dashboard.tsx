@@ -762,7 +762,7 @@ export default function DashboardPage() {
                 View All
               </button>
             </div>
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
               {stats.needsFollowUp.slice(0, 4).map((group) => (
                 <div key={group.contact.contact_id} className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2.5 border border-orange-200 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-1">

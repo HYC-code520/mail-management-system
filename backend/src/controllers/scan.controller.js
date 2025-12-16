@@ -4,6 +4,60 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 const feeService = require('../services/fee.service');
 
 /**
+ * Sleep helper for retry delays
+ */
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Call Gemini with retry logic for rate limiting (429) and overload (503) errors
+ * Uses exponential backoff: 2s, 4s, 8s...
+ */
+async function callGeminiWithRetry(model, content, maxRetries = 4) {
+  let lastError;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await model.generateContent(content);
+      return result;
+    } catch (error) {
+      lastError = error;
+      
+      // Check for retryable errors
+      const errorMsg = error.message || '';
+      const statusCode = error.status || 0;
+      
+      const isRateLimited = statusCode === 429 ||
+                           errorMsg.includes('429') ||
+                           errorMsg.includes('Too Many Requests') ||
+                           errorMsg.includes('RESOURCE_EXHAUSTED');
+      
+      const isOverloaded = statusCode === 503 ||
+                          errorMsg.includes('503') ||
+                          errorMsg.includes('overloaded') ||
+                          errorMsg.includes('Service Unavailable');
+      
+      const shouldRetry = (isRateLimited || isOverloaded) && attempt < maxRetries;
+
+      if (shouldRetry) {
+        // Exponential backoff: 2s, 4s, 8s, 16s
+        const delayMs = Math.pow(2, attempt + 1) * 1000;
+        const errorType = isOverloaded ? 'Service overloaded' : 'Rate limited';
+        console.log(`⏳ ${errorType}, waiting ${delayMs/1000}s before retry ${attempt + 1}/${maxRetries}...`);
+        await sleep(delayMs);
+      } else if (!isRateLimited && !isOverloaded) {
+        // Non-retryable error (e.g., invalid API key, bad request)
+        console.error('❌ Non-retryable Gemini error:', errorMsg);
+        throw error;
+      }
+    }
+  }
+
+  // All retries exhausted
+  console.error(`❌ All ${maxRetries} retries exhausted. Last error:`, lastError.message);
+  throw lastError;
+}
+
+/**
  * Smart AI matching using Gemini Vision
  * Extracts text AND intelligently matches to contact list
  */
@@ -24,9 +78,8 @@ async function smartMatchWithGemini(req, res, next) {
     }
 
     const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-    // Use gemini-2.5-flash (NOT flash-lite!) - gives 1,500 requests/day instead of 20!
-    const model = genAI.getGenerativeModel({ 
-      model: 'gemini-2.5-flash'
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash'  // Best flash model - fast and accurate
     });
 
     // Build contact list string for Gemini - show BOTH personal name and business name
@@ -108,7 +161,7 @@ Now analyze the image and provide your response:`;
     ];
 
     console.log('🤖 Calling Gemini with smart matching...');
-    const result = await model.generateContent([prompt, ...imageParts]);
+    const result = await callGeminiWithRetry(model, [prompt, ...imageParts], 4);
     const responseText = result.response.text().trim();
 
     console.log('📄 Gemini Response:', responseText.substring(0, 200) + '...');
@@ -152,6 +205,64 @@ Now analyze the image and provide your response:`;
     });
   } catch (error) {
     console.error('❌ Gemini smart matching failed:', error);
+
+    // Check if it's a rate limit, quota, or overload error
+    const errorMsg = error.message || '';
+    const statusCode = error.status || 0;
+    
+    const isRateLimited = statusCode === 429 ||
+                         errorMsg.includes('429') ||
+                         errorMsg.includes('Too Many Requests') ||
+                         errorMsg.includes('RESOURCE_EXHAUSTED');
+
+    const isQuotaExhausted = errorMsg.includes('quota') ||
+                            errorMsg.includes('QUOTA_EXCEEDED') ||
+                            errorMsg.includes('exhausted');
+    
+    const isOverloaded = statusCode === 503 ||
+                        errorMsg.includes('503') ||
+                        errorMsg.includes('overloaded') ||
+                        errorMsg.includes('Service Unavailable');
+
+    // If it's a known temporary issue, return 429 to trigger fallback
+    if (isRateLimited || isQuotaExhausted || isOverloaded) {
+      const isLikelyQuota = isQuotaExhausted ||
+        (isRateLimited && errorMsg.toLowerCase().includes('resource'));
+
+      let errorType = 'RATE';
+      let userMessage = 'AI service is temporarily busy. Please wait a moment and try again.';
+      let reason = 'Rate limit exceeded - please wait a few seconds between scans';
+      
+      if (isLikelyQuota) {
+        errorType = 'QUOTA';
+        userMessage = 'Daily AI quota exhausted. Please check your Google AI Studio quota at https://aistudio.google.com/ or wait until tomorrow.';
+        reason = 'Daily quota exceeded - check Google AI Studio for quota reset time';
+      } else if (isOverloaded) {
+        errorType = 'OVERLOAD';
+        userMessage = 'Google AI service is temporarily overloaded. Retrying automatically...';
+        reason = 'Service temporarily overloaded - this should be rare with a paid API key';
+      }
+
+      console.error(`⚠️ Gemini ${errorType} limit hit:`, errorMsg);
+
+      return res.status(429).json({
+        error: userMessage,
+        extractedText: '',
+        matchedContact: null,
+        confidence: 0,
+        reason,
+        quotaExhausted: isLikelyQuota,
+        serviceOverloaded: isOverloaded,
+      });
+    }
+
+    // Unknown error - log details for debugging
+    console.error('⚠️ Unknown Gemini error:', {
+      message: errorMsg,
+      status: statusCode,
+      type: error.constructor.name,
+    });
+
     next(error);
   }
 }
@@ -511,8 +622,151 @@ async function bulkSubmitScanSession(req, res, next) {
   }
 }
 
+/**
+ * Batch Smart AI matching using Gemini Vision
+ * Process multiple images in ONE API call (10x cost savings)
+ */
+async function batchSmartMatchWithGemini(req, res, next) {
+  try {
+    const { images, contacts } = req.body;
+
+    if (!images || !Array.isArray(images) || images.length === 0) {
+      return res.status(400).json({ error: 'Images array is required' });
+    }
+
+    if (images.length > 10) {
+      return res.status(400).json({ error: 'Maximum 10 images per batch' });
+    }
+
+    if (!contacts || !Array.isArray(contacts)) {
+      return res.status(400).json({ error: 'Contacts array is required' });
+    }
+
+    if (!process.env.GEMINI_API_KEY) {
+      throw new Error('GEMINI_API_KEY is not set in environment variables');
+    }
+
+    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+    const model = genAI.getGenerativeModel({
+      model: 'gemini-2.5-flash'
+    });
+
+    // Build contact list string
+    const contactListStr = contacts
+      .map((c, idx) => {
+        const personName = c.contact_person || '';
+        const businessName = c.company_name || '';
+        const displayName = [personName, businessName].filter(Boolean).join(' / ') || 'Unknown';
+        const mailbox = c.mailbox_number || 'N/A';
+        return `${idx + 1}. ${displayName} (Mailbox: ${mailbox})`;
+      })
+      .join('\n');
+
+    // Build prompt for batch processing
+    const prompt = `You are analyzing ${images.length} photographs of mail labels/envelopes. For EACH image, extract the recipient name and match to the customer list.
+
+CUSTOMER LIST:
+${contactListStr}
+
+For EACH image (labeled IMAGE_1, IMAGE_2, etc.), provide:
+- EXTRACTED: the recipient name you found
+- MATCHED: customer number from list, or "NONE"
+- CONFIDENCE: 0-100
+
+RESPONSE FORMAT (one block per image):
+---IMAGE_1---
+EXTRACTED: [name]
+MATCHED: [number or NONE]
+CONFIDENCE: [0-100]
+
+---IMAGE_2---
+EXTRACTED: [name]
+MATCHED: [number or NONE]
+CONFIDENCE: [0-100]
+
+(continue for all ${images.length} images)
+
+IMPORTANT: Analyze each image separately. Handle name variations (order, abbreviations, partial matches).`;
+
+    // Build image parts array
+    const imageParts = images.map((img, idx) => ({
+      inlineData: {
+        data: img.data,
+        mimeType: img.mimeType || 'image/jpeg',
+      },
+    }));
+
+    console.log(`🤖 Batch processing ${images.length} images in ONE API call...`);
+    const startTime = Date.now();
+
+    const result = await callGeminiWithRetry(model, [prompt, ...imageParts], 4);
+    const responseText = result.response.text().trim();
+
+    const duration = Date.now() - startTime;
+    console.log(`✅ Batch processed ${images.length} images in ${duration}ms`);
+    console.log('📄 Batch Response:', responseText.substring(0, 500) + '...');
+
+    // Parse response for each image
+    const results = [];
+    const imageBlocks = responseText.split(/---IMAGE_\d+---/).filter(block => block.trim());
+
+    for (let i = 0; i < images.length; i++) {
+      const block = imageBlocks[i] || '';
+
+      const extractedMatch = block.match(/EXTRACTED:\s*(.+)/i);
+      const matchedMatch = block.match(/MATCHED:\s*(.+)/i);
+      const confidenceMatch = block.match(/CONFIDENCE:\s*(\d+)/i);
+
+      const extractedText = extractedMatch ? extractedMatch[1].trim() : '';
+      const matchedIndexStr = matchedMatch ? matchedMatch[1].trim() : 'NONE';
+      const confidence = confidenceMatch ? parseInt(confidenceMatch[1], 10) / 100 : 0;
+
+      let matchedContact = null;
+      if (matchedIndexStr !== 'NONE') {
+        const matchedIndex = parseInt(matchedIndexStr, 10);
+        if (!isNaN(matchedIndex) && matchedIndex >= 1 && matchedIndex <= contacts.length) {
+          matchedContact = contacts[matchedIndex - 1];
+        }
+      }
+
+      results.push({
+        imageIndex: i,
+        extractedText,
+        matchedContact,
+        confidence,
+      });
+    }
+
+    console.log(`✅ Batch results: ${results.filter(r => r.matchedContact).length}/${results.length} matched`);
+
+    res.json({
+      success: true,
+      results,
+      duration,
+      imageCount: images.length,
+    });
+  } catch (error) {
+    console.error('❌ Batch Gemini matching failed:', error);
+
+    const errorMsg = error.message || '';
+    const isRateLimited = errorMsg.includes('429') ||
+                         errorMsg.includes('Too Many Requests') ||
+                         errorMsg.includes('RESOURCE_EXHAUSTED');
+
+    if (isRateLimited) {
+      return res.status(429).json({
+        error: 'AI service is temporarily busy. Please try again.',
+        results: [],
+      });
+    }
+
+    next(error);
+  }
+}
+
 module.exports = {
   bulkSubmitScanSession,
   smartMatchWithGemini,
+  batchSmartMatchWithGemini,
 };
 

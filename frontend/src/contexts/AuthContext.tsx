@@ -40,12 +40,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(session?.user ?? null);
       setLoading(false);
       
-      // Clear any old errors when session changes
+      // Log auth state changes for debugging
       if (_event === 'TOKEN_REFRESHED') {
         console.log('✅ Token refreshed successfully');
       }
       if (_event === 'SIGNED_OUT') {
         console.log('👋 User signed out');
+      }
+      if (_event === 'USER_UPDATED') {
+        console.log('👤 User updated');
+      }
+      if (_event === 'SIGNED_IN') {
+        console.log('✅ User signed in');
       }
     });
 

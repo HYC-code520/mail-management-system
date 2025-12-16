@@ -190,7 +190,9 @@ describe('ScanSession', () => {
       await user.click(startButton);
 
       await waitFor(() => {
-        expect(screen.getByText(/0 items scanned/i)).toBeInTheDocument();
+        // The text is now "0 Scanned" with the number in a separate span
+        expect(screen.getByText('0')).toBeInTheDocument();
+        expect(screen.getByText('Scanned')).toBeInTheDocument();
         // "End Session" button only shows when items exist (> 0)
         expect(screen.queryByRole('button', { name: /End Session/i })).not.toBeInTheDocument();
       });

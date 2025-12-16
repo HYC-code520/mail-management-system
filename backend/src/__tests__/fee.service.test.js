@@ -115,8 +115,83 @@ describe('Fee Service', () => {
   });
 
   describe('createFeeRecord', () => {
-    it('should create initial fee record with $0', async () => {
-      const mockInsert = jest.fn().mockReturnValue({
+    it('should create fee record with calculated fee for backdated package', async () => {
+      // Mock mail item with received_date 5 days ago (should have fee)
+      const fiveDaysAgo = new Date();
+      fiveDaysAgo.setDate(fiveDaysAgo.getDate() - 5);
+
+      // Mock getDaysBetweenNY to return 5 days
+      getDaysBetweenNY.mockReturnValue(5);
+
+      const mockMailItemSelect = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({
+            data: { received_date: fiveDaysAgo.toISOString() },
+            error: null,
+          }),
+        }),
+      });
+
+      const mockFeeInsert = jest.fn().mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({
+            data: {
+              fee_id: 'test-fee-id',
+              mail_item_id: 'test-mail-id',
+              fee_amount: 8.00, // (5 days - 1 grace) * $2 = $8
+              days_charged: 5,
+            },
+            error: null,
+          }),
+        }),
+      });
+
+      // First call fetches mail_items, second call inserts into package_fees
+      supabaseAdmin.from
+        .mockReturnValueOnce({ select: mockMailItemSelect })
+        .mockReturnValueOnce({ insert: mockFeeInsert });
+
+      const result = await feeService.createFeeRecord(
+        'test-mail-id',
+        'test-contact-id',
+        'test-user-id'
+      );
+
+      // Verify mail_items was queried first
+      expect(supabaseAdmin.from).toHaveBeenCalledWith('mail_items');
+      // Verify package_fees insert was called with calculated fee
+      expect(supabaseAdmin.from).toHaveBeenCalledWith('package_fees');
+      expect(mockFeeInsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mail_item_id: 'test-mail-id',
+          contact_id: 'test-contact-id',
+          user_id: 'test-user-id',
+          fee_amount: 8.00, // Calculated fee for 5 days
+          days_charged: 5,
+          daily_rate: 2.00,
+          grace_period_days: 1,
+          fee_status: 'pending',
+        })
+      );
+    });
+
+    it('should create fee record with $0 for new package (day 0)', async () => {
+      // Mock mail item with today's received_date (should have $0 fee)
+      const today = new Date();
+
+      // Mock getDaysBetweenNY to return 0 days
+      getDaysBetweenNY.mockReturnValue(0);
+
+      const mockMailItemSelect = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({
+            data: { received_date: today.toISOString() },
+            error: null,
+          }),
+        }),
+      });
+
+      const mockFeeInsert = jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           single: jest.fn().mockResolvedValue({
             data: {
@@ -130,34 +205,39 @@ describe('Fee Service', () => {
         }),
       });
 
-      supabaseAdmin.from.mockReturnValue({
-        insert: mockInsert,
-      });
+      supabaseAdmin.from
+        .mockReturnValueOnce({ select: mockMailItemSelect })
+        .mockReturnValueOnce({ insert: mockFeeInsert });
 
-      const result = await feeService.createFeeRecord(
+      await feeService.createFeeRecord(
         'test-mail-id',
         'test-contact-id',
         'test-user-id'
       );
 
-      expect(supabaseAdmin.from).toHaveBeenCalledWith('package_fees');
-      expect(mockInsert).toHaveBeenCalledWith(
+      expect(mockFeeInsert).toHaveBeenCalledWith(
         expect.objectContaining({
-          mail_item_id: 'test-mail-id',
-          contact_id: 'test-contact-id',
-          user_id: 'test-user-id',
           fee_amount: 0.00,
           days_charged: 0,
-          daily_rate: 2.00,
-          grace_period_days: 1,
-          fee_status: 'pending',
         })
       );
     });
 
     it('should handle errors when creating fee record', async () => {
       const dbError = { message: 'Database error' };
-      const mockInsert = jest.fn().mockReturnValue({
+
+      // Mock successful mail item fetch
+      const mockMailItemSelect = jest.fn().mockReturnValue({
+        eq: jest.fn().mockReturnValue({
+          single: jest.fn().mockResolvedValue({
+            data: { received_date: new Date().toISOString() },
+            error: null,
+          }),
+        }),
+      });
+
+      // Mock failed insert
+      const mockFeeInsert = jest.fn().mockReturnValue({
         select: jest.fn().mockReturnValue({
           single: jest.fn().mockResolvedValue({
             data: null,
@@ -166,9 +246,9 @@ describe('Fee Service', () => {
         }),
       });
 
-      supabaseAdmin.from.mockReturnValue({
-        insert: mockInsert,
-      });
+      supabaseAdmin.from
+        .mockReturnValueOnce({ select: mockMailItemSelect })
+        .mockReturnValueOnce({ insert: mockFeeInsert });
 
       await expect(
         feeService.createFeeRecord('test-mail-id', 'test-contact-id', 'test-user-id')
