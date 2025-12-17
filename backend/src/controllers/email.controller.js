@@ -179,7 +179,7 @@ async function sendNotificationEmail(req, res, next) {
         .insert({
           mail_item_id: mail_item_id,
           contact_id: contact_id,
-          notified_by: req.body.sent_by || req.user.email || 'System',
+          notified_by: req.body.sent_by || 'Staff', // Use sent_by which should be "Merlin" or "Madison"
           notification_method: 'Email',
           notified_at: new Date().toISOString()
         });
@@ -196,7 +196,7 @@ async function sendNotificationEmail(req, res, next) {
           mail_item_id: mail_item_id,
           action_type: 'notified',
           action_description: `Email notification sent via ${template.template_name || template.template_type}`,
-          performed_by: req.body.sent_by || req.user.email || 'System',
+          performed_by: req.body.sent_by || 'Staff', // Use sent_by which should be "Merlin" or "Madison"
           notes: `Template: ${template.template_name || template.template_type}`
         });
 
@@ -332,7 +332,7 @@ async function sendCustomEmail(req, res, next) {
         .insert({
           mail_item_id: mail_item_id,
           contact_id: contact_id,
-          notified_by: req.body.sent_by || req.user.email || 'System',
+          notified_by: req.body.sent_by || 'Staff', // Use sent_by which should be "Merlin" or "Madison"
           notification_method: 'Email',
           notified_at: new Date().toISOString()
         });
@@ -349,7 +349,7 @@ async function sendCustomEmail(req, res, next) {
           mail_item_id: mail_item_id,
           action_type: 'notified',
           action_description: `Custom email sent: ${subject}`,
-          performed_by: req.body.sent_by || req.user.email || 'System',
+          performed_by: req.body.sent_by || 'Staff', // Use sent_by which should be "Merlin" or "Madison"
           notes: `Subject: ${subject}`
         });
 
@@ -623,7 +623,7 @@ async function sendBulkNotification(req, res, next) {
       mail_item_id: itemId,
       action_type: 'bulk_notified',
       action_description: `Summary notification sent (${totalItems} items total)`,
-      performed_by: sent_by || req.user.email || 'System',
+      performed_by: sent_by || 'Staff', // Use sent_by which should be "Merlin" or "Madison"
       notes: `Template: ${template.template_name}, Items: ${totalPackages} packages, ${totalLetters} letters`,
       created_at: actionTimestamp
     }));

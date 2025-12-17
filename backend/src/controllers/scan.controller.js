@@ -375,7 +375,7 @@ async function bulkSubmitScanSession(req, res, next) {
                   mail_item_id: mailItem.mail_item_id,
                   action_type: 'scanned',
                   action_description: `Bulk scanned ${typeGroup.count} ${mailItem.item_type}${typeGroup.count > 1 ? 's' : ''} via Scan Session`,
-                  performed_by: scannedBy || req.user.email || 'Staff',
+                  performed_by: scannedBy || 'Staff', // Use scannedBy which should be "Merlin" or "Madison"
                   action_timestamp: new Date().toISOString()
                 });
             } catch (historyError) {
