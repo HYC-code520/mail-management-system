@@ -96,12 +96,17 @@ export default function GroupedFollowUpSection({
             <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
           </div>
         </div>
-        <div className="p-4 space-y-3">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="animate-pulse">
-              <div className="h-32 bg-gray-100 rounded-xl"></div>
-            </div>
-          ))}
+        <div className="p-8 flex flex-col items-center justify-center">
+          <div className="w-24 h-24">
+            <img
+              src="/mail-moving-animation.gif"
+              alt="Loading mail animation"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <p className="mt-4 text-base font-medium text-gray-600 animate-pulse">
+            Loading follow-ups...
+          </p>
         </div>
       </div>
     );

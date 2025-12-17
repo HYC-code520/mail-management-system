@@ -5,24 +5,42 @@ interface LoadingSpinnerProps {
   message?: string;
   fullScreen?: boolean;
   size?: 'sm' | 'md' | 'lg';
+  variant?: 'spinner' | 'mail';
 }
 
 export default function LoadingSpinner({ 
   message = 'Loading...', 
   fullScreen = false,
-  size = 'md'
+  size = 'md',
+  variant = 'spinner'
 }: LoadingSpinnerProps) {
-  const sizeClasses = {
+  const spinnerSizeClasses = {
     sm: 'w-4 h-4',
     md: 'w-8 h-8',
     lg: 'w-12 h-12'
   };
 
+  const mailSizeClasses = {
+    sm: 'w-16 h-16',
+    md: 'w-24 h-24',
+    lg: 'w-32 h-32'
+  };
+
   const content = (
     <div className="flex flex-col items-center justify-center gap-3">
-      <Loader2 className={`${sizeClasses[size]} animate-spin text-blue-600`} />
+      {variant === 'mail' ? (
+        <div className={mailSizeClasses[size]}>
+          <img
+            src="/mail-moving-animation.gif"
+            alt="Loading mail animation"
+            className="w-full h-full object-contain"
+          />
+        </div>
+      ) : (
+        <Loader2 className={`${spinnerSizeClasses[size]} animate-spin text-blue-600`} />
+      )}
       {message && (
-        <p className="text-sm text-gray-600 animate-pulse">{message}</p>
+        <p className={`${variant === 'mail' ? 'text-base font-medium' : 'text-sm'} text-gray-600 animate-pulse`}>{message}</p>
       )}
     </div>
   );

@@ -388,11 +388,12 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="max-w-full mx-auto px-16 py-6">
-        {/* Loading spinner with message */}
+        {/* Loading animation with message */}
         <div className="flex items-center justify-center min-h-[60vh]">
           <LoadingSpinner 
             message="Loading dashboard data..." 
             size="lg"
+            variant="mail"
           />
         </div>
         

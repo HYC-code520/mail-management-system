@@ -253,6 +253,7 @@ export default function TemplatesPage() {
           <LoadingSpinner 
             message="Loading templates..." 
             size="lg"
+            variant="mail"
           />
         </div>
         <div className="animate-pulse space-y-6 opacity-50 mt-8">
