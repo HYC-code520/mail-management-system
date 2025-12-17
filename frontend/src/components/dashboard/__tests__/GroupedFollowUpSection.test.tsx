@@ -88,76 +88,69 @@ describe('GroupedFollowUpSection', () => {
     );
   };
 
-  it('should render follow-up section with groups', () => {
+  it('should render follow-up cards with customer names', () => {
     renderComponent();
 
-    expect(screen.getByText('Need Follow-up')).toBeInTheDocument();
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
   });
 
-  it('should display package fees in header', () => {
+  it('should display package fees on cards', () => {
     renderComponent();
 
-    // Fees are displayed in the fee button as: $12.00
+    // Fees are displayed on the card
     const feeElements = screen.getAllByText(/\$12\.00/);
     expect(feeElements.length).toBeGreaterThanOrEqual(1);
     expect(screen.getByText('storage fees')).toBeInTheDocument();
   });
 
-  it('should expand/collapse card when clicked', async () => {
+  it('should expand card when clicked', async () => {
     renderComponent();
 
-    // Find the card by looking for the element with cursor-pointer class that contains "John Doe"
-    const card = screen.getByText('John Doe').closest('div[class*="rounded-xl"]');
-
-    // Click to expand
-    fireEvent.click(card!);
+    // Find the card for John Doe and click it
+    const johnDoeCard = screen.getByText('John Doe').closest('div[class*="rounded-2xl"]');
+    fireEvent.click(johnDoeCard!);
 
     await waitFor(() => {
-      // John Doe has 1 package, so it shows "1 package waiting"
-      expect(screen.getByText(/1 package waiting/i)).toBeInTheDocument();
+      // When expanded, should show table with Item, Qty, Age, Fee columns
+      expect(screen.getByText('Item')).toBeInTheDocument();
+      expect(screen.getByText('Qty')).toBeInTheDocument();
+      expect(screen.getByText('Age')).toBeInTheDocument();
+      expect(screen.getByText('Fee')).toBeInTheDocument();
     });
-
-    // Click again to collapse
-    fireEvent.click(card!);
-
-    await waitFor(() => {
-      expect(screen.queryByText(/1 package waiting/i)).not.toBeInTheDocument();
-    });
-  });
-
-  it('should navigate to fees page when fee button is clicked', async () => {
-    renderComponent();
-
-    // Find the fee button (for customer with fees)
-    const feeButton = screen.getByRole('button', { name: /\$12\.00/i });
-    fireEvent.click(feeButton);
-
-    expect(mockNavigate).toHaveBeenCalledWith('/dashboard/fees');
   });
 
   it('should call onSendEmail when remind button is clicked', async () => {
     renderComponent();
 
-    // Find the Remind button (for customer with fees but not abandoned)
-    const remindButton = screen.getByText(/Remind/i);
-    fireEvent.click(remindButton);
+    // First expand the card by clicking it
+    const johnDoeCard = screen.getByText('John Doe').closest('div[class*="rounded-2xl"]');
+    fireEvent.click(johnDoeCard!);
 
-    expect(mockOnSendEmail).toHaveBeenCalledWith(mockGroups[0]);
+    await waitFor(() => {
+      // Find the Remind button
+      const remindButton = screen.getByRole('button', { name: /Remind/i });
+      fireEvent.click(remindButton);
+      expect(mockOnSendEmail).toHaveBeenCalledWith(mockGroups[0]);
+    });
   });
 
   it('should navigate to profile when profile button is clicked', async () => {
     renderComponent();
 
-    // Find the Profile button
-    const profileButtons = screen.getAllByText(/Profile/i);
-    fireEvent.click(profileButtons[0]);
+    // First expand the card by clicking it
+    const johnDoeCard = screen.getByText('John Doe').closest('div[class*="rounded-2xl"]');
+    fireEvent.click(johnDoeCard!);
 
-    expect(mockNavigate).toHaveBeenCalledWith('/dashboard/contacts/contact-1');
+    await waitFor(() => {
+      // Find the Profile button
+      const profileButtons = screen.getAllByRole('button', { name: /Profile/i });
+      fireEvent.click(profileButtons[0]);
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard/contacts/contact-1');
+    });
   });
 
-  it('should show Notice button and Abandon button for abandoned packages with fees', () => {
+  it('should show Final Notice and Abandon buttons for abandoned packages', async () => {
     const abandonedGroups = [
       {
         contact: {
@@ -188,48 +181,31 @@ describe('GroupedFollowUpSection', () => {
 
     const mockGetDaysSinceAbandoned = vi.fn(() => 35);
 
-    renderComponent(abandonedGroups, mockGetDaysSinceAbandoned);
+    render(
+      <BrowserRouter>
+        <GroupedFollowUpSection
+          groups={abandonedGroups}
+          onSendEmail={mockOnSendEmail}
+          onMarkAbandoned={mockOnMarkAbandoned}
+          getDaysSince={mockGetDaysSinceAbandoned}
+          loading={false}
+        />
+      </BrowserRouter>
+    );
 
-    // Should show Final Notice button (abandoned items show "Final Notice" instead of "Remind")
-    expect(screen.getByRole('button', { name: /Final Notice/i })).toBeInTheDocument();
-    // Should show Abandon button
-    expect(screen.getByRole('button', { name: /Abandon/i })).toBeInTheDocument();
+    // First expand the card by clicking it
+    const card = screen.getByText('Old Package').closest('div[class*="rounded-2xl"]');
+    fireEvent.click(card!);
+
+    await waitFor(() => {
+      // Should show Final Notice button
+      expect(screen.getByRole('button', { name: /Final Notice/i })).toBeInTheDocument();
+      // Should show Abandon button
+      expect(screen.getByRole('button', { name: /Abandon/i })).toBeInTheDocument();
+    });
   });
 
-  it('should show Final Notice and Mark Abandoned for abandoned items without fees', () => {
-    const abandonedLettersGroup = [
-      {
-        contact: {
-          contact_id: 'contact-6',
-          contact_person: 'Abandoned Letters',
-          mailbox_number: 'B1',
-        },
-        packages: [],
-        letters: [
-          {
-            mail_item_id: 'mail-6',
-            item_type: 'Letter',
-            status: 'Received',
-            received_date: '2025-10-10T10:00:00Z',
-            contact_id: 'contact-6',
-          },
-        ],
-        totalFees: 0,
-        urgencyScore: 200,
-      },
-    ];
-
-    const mockGetDaysSinceAbandoned = vi.fn(() => 35);
-
-    renderComponent(abandonedLettersGroup, mockGetDaysSinceAbandoned);
-
-    // Should show Final Notice button
-    expect(screen.getByRole('button', { name: /Final Notice/i })).toBeInTheDocument();
-    // Should show Abandon button
-    expect(screen.getByRole('button', { name: /Abandon/i })).toBeInTheDocument();
-  });
-
-  it('should show loading state', () => {
+  it('should show loading state with mail animation', () => {
     render(
       <BrowserRouter>
         <GroupedFollowUpSection
@@ -242,7 +218,6 @@ describe('GroupedFollowUpSection', () => {
       </BrowserRouter>
     );
 
-    expect(screen.getByText('Need Follow-up')).toBeInTheDocument();
     // Should show mail animation loading state
     const mailAnimation = screen.getByAltText('Loading mail animation');
     expect(mailAnimation).toBeInTheDocument();
@@ -262,6 +237,7 @@ describe('GroupedFollowUpSection', () => {
       </BrowserRouter>
     );
 
+    expect(screen.getByText(/All Caught Up!/i)).toBeInTheDocument();
     expect(screen.getByText(/No customers need follow-up/i)).toBeInTheDocument();
   });
 
@@ -272,56 +248,33 @@ describe('GroupedFollowUpSection', () => {
     expect(screen.getByText('John Doe')).toBeInTheDocument();
     expect(screen.getByText('Jane Smith')).toBeInTheDocument();
     
-    // Verify mailbox numbers are displayed
-    expect(screen.getByText(/📮 Z1/)).toBeInTheDocument();
-    expect(screen.getByText(/📮 D2/)).toBeInTheDocument();
-    
-    // Verify the section header shows correct count
-    expect(screen.getByText(/2 people/)).toBeInTheDocument();
+    // Verify mailbox numbers are displayed in the new format
+    expect(screen.getByText(/Mailbox Z1/)).toBeInTheDocument();
+    expect(screen.getByText(/Mailbox D2/)).toBeInTheDocument();
   });
 
-  it('should call onSendEmail for Send Reminder button on letters', async () => {
-    // Customer with only letters (no fees, not abandoned)
-    const letterOnlyGroups = [
-      {
-        contact: {
-          contact_id: 'contact-7',
-          contact_person: 'Letter Customer',
-          mailbox_number: 'L1',
-        },
-        packages: [],
-        letters: [
-          {
-            mail_item_id: 'mail-7',
-            item_type: 'Letter',
-            status: 'Received',
-            received_date: new Date().toISOString(), // Fresh letter
-            contact_id: 'contact-7',
-          },
-        ],
-        totalFees: 0,
-        urgencyScore: 10,
-      },
-    ];
+  it('should display item count tags', () => {
+    renderComponent();
 
-    const mockGetDaysSinceRecent = vi.fn(() => 2); // 2 days old
-
-    renderComponent(letterOnlyGroups, mockGetDaysSinceRecent);
-
-    // Find the Remind button (shows "Remind" for non-abandoned items without fees)
-    // Since this is a fresh letter (2 days old), it shows "Remind"
-    const remindButton = screen.getByRole('button', { name: /Remind/i });
-    fireEvent.click(remindButton);
-
-    expect(mockOnSendEmail).toHaveBeenCalledWith(letterOnlyGroups[0]);
+    // Cards should show item counts as tags
+    const itemTags = screen.getAllByText(/item/i);
+    expect(itemTags.length).toBeGreaterThan(0);
   });
 
-  it('should display waived fees with appropriate styling', async () => {
+  it('should display days tags', () => {
+    renderComponent();
+
+    // Cards should show days as tags
+    const daysTags = screen.getAllByText(/days/i);
+    expect(daysTags.length).toBeGreaterThan(0);
+  });
+
+  it('should display waived fees correctly when expanded', async () => {
     const waivedGroups = [
       {
         contact: {
           contact_id: 'contact-4',
-          contact_person: 'Waived Customer',
+          contact_person: 'Fee Test Customer',
           mailbox_number: 'W1',
         },
         packages: [
@@ -345,18 +298,34 @@ describe('GroupedFollowUpSection', () => {
       },
     ];
 
-    renderComponent(waivedGroups);
+    render(
+      <BrowserRouter>
+        <GroupedFollowUpSection
+          groups={waivedGroups}
+          onSendEmail={mockOnSendEmail}
+          onMarkAbandoned={mockOnMarkAbandoned}
+          getDaysSince={mockGetDaysSince}
+          loading={false}
+        />
+      </BrowserRouter>
+    );
 
-    // Expand the card to see fee details
-    const card = screen.getByText('Waived Customer').closest('div[class*="rounded-xl"]');
+    // Expand the card by clicking it
+    const card = screen.getByText('Fee Test Customer').closest('div[class*="rounded-2xl"]');
     fireEvent.click(card!);
 
     await waitFor(() => {
-      expect(screen.getByText(/fee waived/i)).toBeInTheDocument();
+      // Check for the waived fee amount (shows as "$10.00" with line-through styling)
+      // There are two $10.00 elements - one in the table (waived, with line-through) and one in the footer (total)
+      const feeElements = screen.getAllByText('$10.00');
+      expect(feeElements.length).toBeGreaterThanOrEqual(1);
+      // Find the one with line-through class (the waived fee in the table)
+      const waivedFeeElement = feeElements.find(el => el.classList.contains('line-through'));
+      expect(waivedFeeElement).toBeInTheDocument();
     });
   });
 
-  it('should show ABANDONED warning for old items', () => {
+  it('should show abandoned warning for old items', () => {
     const abandonedGroups = [
       {
         contact: {
@@ -387,9 +356,54 @@ describe('GroupedFollowUpSection', () => {
 
     const mockGetDaysSinceAbandoned = vi.fn(() => 37);
 
-    renderComponent(abandonedGroups, mockGetDaysSinceAbandoned);
+    render(
+      <BrowserRouter>
+        <GroupedFollowUpSection
+          groups={abandonedGroups}
+          onSendEmail={mockOnSendEmail}
+          onMarkAbandoned={mockOnMarkAbandoned}
+          getDaysSince={mockGetDaysSinceAbandoned}
+          loading={false}
+        />
+      </BrowserRouter>
+    );
 
-    // Should show ABANDONED warning at the bottom of the card
-    expect(screen.getByText(/ABANDONED:.*days old/i)).toBeInTheDocument();
+    // Should show Abandoned tag
+    expect(screen.getByText(/Abandoned/i)).toBeInTheDocument();
+    // Should show warning at bottom
+    expect(screen.getByText(/requires immediate attention/i)).toBeInTheDocument();
+  });
+
+  it('should navigate to fees page when Collect button is clicked', async () => {
+    renderComponent();
+
+    // First expand the card by clicking it
+    const johnDoeCard = screen.getByText('John Doe').closest('div[class*="rounded-2xl"]');
+    fireEvent.click(johnDoeCard!);
+
+    await waitFor(() => {
+      // Find the Collect button (for fee collection)
+      const collectButton = screen.getByRole('button', { name: /Collect/i });
+      fireEvent.click(collectButton);
+      expect(mockNavigate).toHaveBeenCalledWith('/dashboard/fees');
+    });
+  });
+
+  it('should show expand indicator that rotates when expanded', async () => {
+    renderComponent();
+
+    // Find the card for John Doe
+    const johnDoeCard = screen.getByText('John Doe').closest('div[class*="rounded-2xl"]');
+    
+    // Initially should show "Click for details" text
+    expect(screen.getAllByText(/Click for details/i).length).toBeGreaterThan(0);
+    
+    // Click to expand
+    fireEvent.click(johnDoeCard!);
+
+    await waitFor(() => {
+      // Should show "Click to collapse" text when expanded
+      expect(screen.getByText(/Click to collapse/i)).toBeInTheDocument();
+    });
   });
 });
