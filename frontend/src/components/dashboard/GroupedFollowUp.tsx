@@ -252,106 +252,115 @@ export default function GroupedFollowUpSection({
               )}
             </div>
 
-            {/* Expandable details */}
+            {/* Expandable details - Table View */}
             {isPersonExpanded && (
-              <div className="mb-4 p-3 bg-white/50 rounded-xl border border-gray-200/50 animate-fadeIn">
-                {/* Package details */}
-                {group.packages.length > 0 && (
-                  <div className="mb-3">
-                    <div className="flex items-center gap-2 text-sm mb-2">
-                      <Package className="w-4 h-4 text-gray-600" />
-                      <span className="font-semibold text-gray-900">
-                        {(() => {
-                          const totalQty = group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0);
-                          const recordCount = group.packages.length;
-                          if (totalQty > recordCount) {
-                            return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'} (${totalQty} total)`;
-                          }
-                          return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'}`;
-                        })()}
-                      </span>
-                    </div>
-                    <div className="ml-5 space-y-1.5">
-                      {group.packages.map(pkg => {
-                        const days = getDaysSince(pkg.received_date);
-                        const fee = pkg.packageFee?.fee_amount || 0;
-                        const feeStatus = pkg.packageFee?.fee_status;
-                        const isWaived = feeStatus === 'waived';
-                        const isPaid = feeStatus === 'paid';
-                        const receivedDateStr = format(new Date(pkg.received_date), 'MMM d');
-                        
-                        return (
-                          <div key={pkg.mail_item_id} className="text-sm">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-gray-700">
-                                {receivedDateStr}
-                                {pkg.quantity && pkg.quantity > 1 && (
-                                  <span className="text-blue-600 font-semibold"> ×{pkg.quantity}</span>
-                                )}
-                              </span>
-                              <span className="text-gray-400">•</span>
-                              <span className="text-gray-500">{days}d</span>
-                              {fee > 0 && (
-                                <>
-                                  <span className="text-gray-400">•</span>
-                                  <span className={
-                                    isWaived ? 'text-blue-600 line-through' :
-                                    isPaid ? 'text-green-600' :
-                                    'text-orange-600 font-medium'
-                                  }>
-                                    ${fee.toFixed(2)}{isPaid && ' ✓'}{isWaived && ' waived'}
-                                  </span>
-                                </>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+              <div className="mb-4 bg-white/70 rounded-xl border border-gray-200/50 animate-fadeIn overflow-hidden">
+                {/* Table Header */}
+                <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-gray-100/80 border-b border-gray-200/50 text-xs font-medium text-gray-500 uppercase tracking-wide">
+                  <div className="col-span-4">Item</div>
+                  <div className="col-span-3 text-center">Qty</div>
+                  <div className="col-span-2 text-center">Age</div>
+                  <div className="col-span-3 text-right">Fee</div>
+                </div>
                 
-                {/* Letter details */}
-                {group.letters.length > 0 && (
-                  <div>
-                    <div className="flex items-center gap-2 text-sm mb-2">
-                      <Mail className="w-4 h-4 text-gray-600" />
-                      <span className="font-semibold text-gray-900">
-                        {(() => {
-                          const totalQty = group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
-                          const recordCount = group.letters.length;
-                          if (totalQty > recordCount) {
-                            return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'} (${totalQty} total)`;
-                          }
-                          return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'}`;
-                        })()}
-                      </span>
+                {/* Package rows */}
+                {group.packages.map((pkg, index) => {
+                  const days = getDaysSince(pkg.received_date);
+                  const fee = pkg.packageFee?.fee_amount || 0;
+                  const feeStatus = pkg.packageFee?.fee_status;
+                  const isWaived = feeStatus === 'waived';
+                  const isPaid = feeStatus === 'paid';
+                  const receivedDateStr = format(new Date(pkg.received_date), 'MMM d');
+                  const qty = pkg.quantity || 1;
+                  
+                  return (
+                    <div 
+                      key={pkg.mail_item_id} 
+                      className={`grid grid-cols-12 gap-2 px-3 py-2.5 text-sm items-center ${
+                        index < group.packages.length - 1 || group.letters.length > 0 ? 'border-b border-gray-100' : ''
+                      }`}
+                    >
+                      <div className="col-span-4 flex items-center gap-2">
+                        <Package className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                        <span className="text-gray-700 truncate">{receivedDateStr}</span>
+                      </div>
+                      <div className="col-span-3 text-center text-gray-600">
+                        {qty > 1 ? <span className="text-blue-600 font-semibold">{qty}</span> : qty}
+                      </div>
+                      <div className={`col-span-2 text-center ${days >= 30 ? 'text-red-600 font-medium' : days >= 14 ? 'text-orange-600' : 'text-gray-500'}`}>
+                        {days}d
+                      </div>
+                      <div className="col-span-3 text-right">
+                        {fee > 0 ? (
+                          <span className={
+                            isWaived ? 'text-gray-400 line-through' :
+                            isPaid ? 'text-green-600' :
+                            'text-orange-600 font-semibold'
+                          }>
+                            ${fee.toFixed(2)}
+                            {isPaid && <span className="text-green-600 ml-1">✓</span>}
+                          </span>
+                        ) : (
+                          <span className="text-gray-400">—</span>
+                        )}
+                      </div>
                     </div>
-                    <div className="ml-5 space-y-1">
-                      {group.letters.map(letter => {
-                        const days = getDaysSince(letter.received_date);
-                        const receivedDateStr = format(new Date(letter.received_date), 'MMM d');
-                        return (
-                          <div key={letter.mail_item_id} className="text-sm text-gray-600">
-                            {receivedDateStr}
-                            {letter.quantity && letter.quantity > 1 && (
-                              <span className="text-blue-600 font-semibold"> ×{letter.quantity}</span>
-                            )}
-                            <span className="text-gray-400"> • {days}d</span>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
+                  );
+                })}
                 
-                {/* Last notified */}
-                {group.lastNotified && (
-                  <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
-                    <Clock className="w-3 h-3" />
-                    Last notified {getDaysSince(group.lastNotified)} days ago
-                  </p>
-                )}
+                {/* Letter rows */}
+                {group.letters.map((letter, index) => {
+                  const days = getDaysSince(letter.received_date);
+                  const receivedDateStr = format(new Date(letter.received_date), 'MMM d');
+                  const qty = letter.quantity || 1;
+                  
+                  return (
+                    <div 
+                      key={letter.mail_item_id} 
+                      className={`grid grid-cols-12 gap-2 px-3 py-2.5 text-sm items-center ${
+                        index < group.letters.length - 1 ? 'border-b border-gray-100' : ''
+                      }`}
+                    >
+                      <div className="col-span-4 flex items-center gap-2">
+                        <Mail className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                        <span className="text-gray-700 truncate">{receivedDateStr}</span>
+                      </div>
+                      <div className="col-span-3 text-center text-gray-600">
+                        {qty > 1 ? <span className="text-blue-600 font-semibold">{qty}</span> : qty}
+                      </div>
+                      <div className={`col-span-2 text-center ${days >= 30 ? 'text-red-600 font-medium' : days >= 14 ? 'text-orange-600' : 'text-gray-500'}`}>
+                        {days}d
+                      </div>
+                      <div className="col-span-3 text-right text-gray-400">—</div>
+                    </div>
+                  );
+                })}
+                
+                {/* Footer with totals and last notified */}
+                <div className="px-3 py-2.5 bg-gray-50/80 border-t border-gray-200/50">
+                  <div className="flex items-center justify-between text-xs">
+                    <div className="flex items-center gap-4 text-gray-500">
+                      {group.packages.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Package className="w-3 h-3" />
+                          {group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0)} pkg
+                        </span>
+                      )}
+                      {group.letters.length > 0 && (
+                        <span className="flex items-center gap-1">
+                          <Mail className="w-3 h-3" />
+                          {group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0)} letters
+                        </span>
+                      )}
+                    </div>
+                    {group.lastNotified && (
+                      <span className="text-gray-500 flex items-center gap-1">
+                        <Clock className="w-3 h-3" />
+                        Notified {getDaysSince(group.lastNotified)}d ago
+                      </span>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
 

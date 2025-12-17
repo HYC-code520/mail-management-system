@@ -112,8 +112,11 @@ describe('GroupedFollowUpSection', () => {
     fireEvent.click(johnDoeCard!);
 
     await waitFor(() => {
-      // John Doe has 1 package, so it shows "1 package" in expanded details
-      expect(screen.getByText(/1 package/i)).toBeInTheDocument();
+      // When expanded, should show table with Item, Qty, Age, Fee columns
+      expect(screen.getByText('Item')).toBeInTheDocument();
+      expect(screen.getByText('Qty')).toBeInTheDocument();
+      expect(screen.getByText('Age')).toBeInTheDocument();
+      expect(screen.getByText('Fee')).toBeInTheDocument();
     });
   });
 
@@ -312,8 +315,10 @@ describe('GroupedFollowUpSection', () => {
     fireEvent.click(card!);
 
     await waitFor(() => {
-      // Check for the waived fee text (shows as "$10.00 waived" with line-through)
-      expect(screen.getByText(/\$10\.00.*waived/i)).toBeInTheDocument();
+      // Check for the waived fee amount (shows as "$10.00" with line-through styling)
+      const feeElement = screen.getByText('$10.00');
+      expect(feeElement).toBeInTheDocument();
+      expect(feeElement).toHaveClass('line-through');
     });
   });
 
