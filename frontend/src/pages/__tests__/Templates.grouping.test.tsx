@@ -363,8 +363,10 @@ describe('Templates Page - Grouped View', () => {
 
       renderComponent();
 
-      // Should show skeleton/pulse animation (no "Loading" text)
-      expect(document.querySelector('.animate-pulse')).toBeInTheDocument();
+      // Should show mail animation loading state
+      const mailAnimation = screen.getByAltText('Loading mail animation');
+      expect(mailAnimation).toBeInTheDocument();
+      expect(screen.getByText('Loading templates...')).toBeInTheDocument();
     });
 
     it('should handle API errors', async () => {

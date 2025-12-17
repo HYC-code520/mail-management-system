@@ -235,8 +235,17 @@ export default function FeesPage() {
 
       {/* Fees List */}
       {loading ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-gray-400 animate-spin" />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 flex flex-col items-center justify-center">
+          <div className="w-24 h-24">
+            <img
+              src="/mail-moving-animation.gif"
+              alt="Loading mail animation"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <p className="mt-4 text-base font-medium text-gray-600 animate-pulse">
+            Loading fees...
+          </p>
         </div>
       ) : feesData.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">

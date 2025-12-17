@@ -243,9 +243,10 @@ describe('GroupedFollowUpSection', () => {
     );
 
     expect(screen.getByText('Need Follow-up')).toBeInTheDocument();
-    // Should show skeleton loaders
-    const skeletons = document.querySelectorAll('.animate-pulse');
-    expect(skeletons.length).toBeGreaterThan(0);
+    // Should show mail animation loading state
+    const mailAnimation = screen.getByAltText('Loading mail animation');
+    expect(mailAnimation).toBeInTheDocument();
+    expect(screen.getByText('Loading follow-ups...')).toBeInTheDocument();
   });
 
   it('should show empty state when no groups', () => {

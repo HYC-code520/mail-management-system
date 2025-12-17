@@ -96,16 +96,15 @@ export default function ActionHistorySection({ actions, loading }: ActionHistory
           <Clock className="w-5 h-5 text-purple-600" />
           Action History
         </h3>
-        <div className="space-y-6">
-          {[1, 2, 3].map((i) => (
-            <div key={i} className="flex gap-4 animate-pulse">
-              <div className="w-24 h-4 bg-gray-200 rounded"></div>
-              <div className="flex-1">
-                <div className="h-4 bg-gray-200 rounded w-48 mb-2"></div>
-                <div className="h-16 bg-gray-100 rounded-lg"></div>
-              </div>
-            </div>
-          ))}
+        <div className="flex flex-col items-center justify-center py-8">
+          <div className="w-20 h-20">
+            <img
+              src="/mail-moving-animation.gif"
+              alt="Loading action history"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <p className="mt-3 text-sm text-gray-500 animate-pulse">Loading history...</p>
         </div>
       </div>
     );

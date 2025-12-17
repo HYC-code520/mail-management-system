@@ -78,7 +78,19 @@ export default function MailItemsPage() {
   if (loading) {
     return (
       <div className="max-w-full mx-auto px-16 py-6">
-        <div className="animate-pulse space-y-6">
+        <div className="flex flex-col items-center justify-center min-h-[60vh]">
+          <div className="w-32 h-32">
+            <img
+              src="/mail-moving-animation.gif"
+              alt="Loading mail animation"
+              className="w-full h-full object-contain"
+            />
+          </div>
+          <p className="mt-4 text-lg font-medium text-gray-600 animate-pulse">
+            Loading mail items...
+          </p>
+        </div>
+        <div className="animate-pulse space-y-6 opacity-50 mt-8">
           <div className="h-8 bg-zinc-700 rounded w-48"></div>
           <div className="h-64 bg-zinc-900 rounded-lg"></div>
         </div>

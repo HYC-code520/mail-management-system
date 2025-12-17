@@ -140,6 +140,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const [loading, setLoading] = useState(true);
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [actionHistory, setActionHistory] = useState<Record<string, ActionHistory[]>>({});
+  const [loadingActionHistory, setLoadingActionHistory] = useState<Set<string>>(new Set()); // Track loading state per group
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null);
   const [highlightedGroupKeys, setHighlightedGroupKeys] = useState<Set<string>>(new Set()); // Changed to Set for multiple highlights
   
@@ -714,10 +715,22 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
 
   // Load action history for all items in a group
   const loadGroupActionHistory = async (group: GroupedMailItem) => {
-    for (const item of group.items) {
-      if (!actionHistory[item.mail_item_id]) {
-        await loadActionHistory(item.mail_item_id);
+    // Set loading state for this group
+    setLoadingActionHistory(prev => new Set(prev).add(group.groupKey));
+    
+    try {
+      for (const item of group.items) {
+        if (!actionHistory[item.mail_item_id]) {
+          await loadActionHistory(item.mail_item_id);
+        }
       }
+    } finally {
+      // Remove loading state for this group
+      setLoadingActionHistory(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(group.groupKey);
+        return newSet;
+      });
     }
   };
 
@@ -1132,10 +1145,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     return (
       <div className="max-w-full mx-auto px-16 py-6">
         <div className="flex flex-col items-center justify-center py-20">
-          {/* Spinner */}
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-gray-200 rounded-full"></div>
-            <div className="w-16 h-16 border-4 border-green-600 rounded-full border-t-transparent animate-spin absolute top-0 left-0"></div>
+          {/* Mail Animation */}
+          <div className="w-32 h-32">
+            <img
+              src="/mail-moving-animation.gif"
+              alt="Loading mail animation"
+              className="w-full h-full object-contain"
+            />
           </div>
           <p className="mt-4 text-lg font-medium text-gray-700">Loading mail log...</p>
           <p className="text-sm text-gray-500 mt-1">Please wait while we fetch your data</p>
@@ -1996,7 +2012,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                           <div>
                             <ActionHistorySection
                               actions={getGroupActionHistory(group)}
-                              loading={false}
+                              loading={loadingActionHistory.has(group.groupKey)}
                             />
                           </div>
 

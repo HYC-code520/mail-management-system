@@ -322,6 +322,7 @@ export default function ContactsPage() {
           <LoadingSpinner 
             message="Loading contacts..." 
             size="lg"
+            variant="mail"
           />
         </div>
         <div className="animate-pulse space-y-6 opacity-50 mt-8">
