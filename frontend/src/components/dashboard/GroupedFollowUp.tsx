@@ -2,18 +2,18 @@
  * Grouped Follow-Up Component
  * 
  * Displays mail items that need follow-up, grouped by person.
- * Shows urgency indicators based on fees, abandonment, and age.
+ * Modern card-based design inspired by job listing cards.
  * 
  * Urgency Priority:
- * 1. Packages with fees (orange border)
- * 2. Abandoned items 30+ days (red border)
- * 3. Regular items (gray border)
+ * 1. Packages with fees (orange/peach background)
+ * 2. Abandoned items 30+ days (red/pink background)
+ * 3. Regular items (gray/neutral background)
  */
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Package, Mail, ChevronDown, ChevronUp, Send, DollarSign } from 'lucide-react';
+import { AlertCircle, Package, Mail, ChevronDown, ChevronUp, Send, DollarSign, Clock, MapPin, Info } from 'lucide-react';
 
 interface PackageFee {
   fee_id: string;
@@ -25,7 +25,7 @@ interface PackageFee {
 
 interface MailItem {
   mail_item_id: string;
-  contact_id: string; // Added: needed for Dashboard compatibility
+  contact_id: string;
   item_type: string;
   status: string;
   received_date: string;
@@ -61,6 +61,48 @@ interface GroupedFollowUpProps {
   loading?: boolean;
 }
 
+// Get background color based on urgency
+const getCardColors = (isAbandoned: boolean, hasFees: boolean, oldestDays: number) => {
+  if (isAbandoned) {
+    return {
+      bg: 'bg-gradient-to-br from-red-50 to-pink-50',
+      border: 'border-red-200',
+      dateBg: 'bg-red-100 text-red-700',
+      accent: 'text-red-600'
+    };
+  }
+  if (hasFees) {
+    return {
+      bg: 'bg-gradient-to-br from-orange-50 to-amber-50',
+      border: 'border-orange-200',
+      dateBg: 'bg-orange-100 text-orange-700',
+      accent: 'text-orange-600'
+    };
+  }
+  if (oldestDays >= 14) {
+    return {
+      bg: 'bg-gradient-to-br from-amber-50 to-yellow-50',
+      border: 'border-amber-200',
+      dateBg: 'bg-amber-100 text-amber-700',
+      accent: 'text-amber-600'
+    };
+  }
+  if (oldestDays >= 7) {
+    return {
+      bg: 'bg-gradient-to-br from-blue-50 to-indigo-50',
+      border: 'border-blue-200',
+      dateBg: 'bg-blue-100 text-blue-700',
+      accent: 'text-blue-600'
+    };
+  }
+  return {
+    bg: 'bg-gradient-to-br from-gray-50 to-slate-50',
+    border: 'border-gray-200',
+    dateBg: 'bg-gray-100 text-gray-700',
+    accent: 'text-gray-600'
+  };
+};
+
 export default function GroupedFollowUpSection({ 
   groups, 
   onSendEmail, 
@@ -69,8 +111,7 @@ export default function GroupedFollowUpSection({
   loading 
 }: GroupedFollowUpProps) {
   const navigate = useNavigate();
-  const [isExpanded, setIsExpanded] = useState(true);
-  const [displayCount, setDisplayCount] = useState(10);
+  const [displayCount, setDisplayCount] = useState(12);
   const [expandedPersons, setExpandedPersons] = useState<Set<string>>(new Set());
 
   const togglePersonExpand = (contactId: string) => {
@@ -87,381 +128,346 @@ export default function GroupedFollowUpSection({
 
   if (loading) {
     return (
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center shadow-md">
-              <AlertCircle className="w-5 h-5 text-white" />
-            </div>
-            <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
-          </div>
+      <div className="flex flex-col items-center justify-center py-16">
+        <div className="w-24 h-24">
+          <img
+            src="/mail-moving-animation.gif"
+            alt="Loading mail animation"
+            className="w-full h-full object-contain"
+          />
         </div>
-        <div className="p-8 flex flex-col items-center justify-center">
-          <div className="w-24 h-24">
-            <img
-              src="/mail-moving-animation.gif"
-              alt="Loading mail animation"
-              className="w-full h-full object-contain"
-            />
-          </div>
-          <p className="mt-4 text-base font-medium text-gray-600 animate-pulse">
-            Loading follow-ups...
-          </p>
-        </div>
+        <p className="mt-4 text-base font-medium text-gray-600 animate-pulse">
+          Loading follow-ups...
+        </p>
       </div>
     );
   }
 
   if (!groups || groups.length === 0) {
     return (
-      <div className="bg-white rounded-xl shadow-lg border border-gray-100">
-        <div className="flex items-center justify-between p-5 border-b border-gray-200">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gray-200 rounded-lg flex items-center justify-center">
-            <AlertCircle className="w-5 h-5 text-gray-400" />
-            </div>
-            <div className="flex items-center gap-3">
-              <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
-              <span className="px-3 py-1 bg-gray-100 text-gray-600 text-sm rounded-full font-semibold">
-              0
-            </span>
-            </div>
-          </div>
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-12 text-center">
+        <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
         </div>
-        <div className="p-8 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3">
-            <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <p className="text-gray-700 font-medium">No customers need follow-up at this time</p>
-          <p className="text-sm text-gray-500 mt-1">Great job staying on top of things!</p>
-        </div>
+        <h3 className="text-xl font-bold text-gray-900 mb-2">All Caught Up!</h3>
+        <p className="text-gray-600">No customers need follow-up at this time.</p>
+        <p className="text-sm text-gray-500 mt-1">Great job staying on top of things! 🎉</p>
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-lg border border-gray-100 hover:shadow-xl transition-shadow">
-      <div className="flex items-center justify-between p-5 border-b border-gray-200">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-lg flex items-center justify-center shadow-md">
-            <AlertCircle className="w-5 h-5 text-white" />
-          </div>
-          <div className="flex items-center gap-3">
-            <h2 className="text-lg font-bold text-gray-900">Need Follow-up</h2>
-            <span className="px-3 py-1 bg-gradient-to-r from-orange-100 to-red-100 text-orange-800 text-sm rounded-full font-semibold shadow-sm">
-            {groups.length} {groups.length === 1 ? 'person' : 'people'}
-          </span>
-          </div>
-        </div>
-        <button
-          onClick={() => setIsExpanded(!isExpanded)}
-          className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-        >
-          {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-600" /> : <ChevronDown className="w-5 h-5 text-gray-600" />}
-        </button>
-      </div>
-      
-      {isExpanded && (
-        <div className="p-4 grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {groups.slice(0, displayCount).map((group) => {
-            const customerName = group.contact.contact_person || 
-                               group.contact.company_name || 
-                               'Unknown Customer';
-            const hasFees = group.totalFees > 0;
-            const totalItems =
-              group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0) +
-              group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
-            
-            // Calculate oldest item age
-            const allItems = [...group.packages, ...group.letters];
-            const oldestDays = Math.max(
-              ...allItems.map(item => getDaysSince(item.received_date))
-            );
-            const isAbandoned = oldestDays >= 30;
-            const isPersonExpanded = expandedPersons.has(group.contact.contact_id);
-            
-            return (
+    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      {groups.slice(0, displayCount).map((group) => {
+        const customerName = group.contact.contact_person || 
+                           group.contact.company_name || 
+                           'Unknown Customer';
+        const hasFees = group.totalFees > 0;
+        const totalItems =
+          group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0) +
+          group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
+        
+        // Calculate oldest item age
+        const allItems = [...group.packages, ...group.letters];
+        const oldestDays = Math.max(
+          ...allItems.map(item => getDaysSince(item.received_date))
+        );
+        const isAbandoned = oldestDays >= 30;
+        const isPersonExpanded = expandedPersons.has(group.contact.contact_id);
+        const colors = getCardColors(isAbandoned, hasFees, oldestDays);
+        
+        // Get oldest item date for display
+        const oldestItem = allItems.reduce((oldest, item) => {
+          const itemDate = new Date(item.received_date);
+          const oldestDate = new Date(oldest.received_date);
+          return itemDate < oldestDate ? item : oldest;
+        }, allItems[0]);
+        const oldestDateStr = format(new Date(oldestItem.received_date), 'MMM d, yyyy');
+        
+        return (
+          <div
+            key={group.contact.contact_id}
+            onClick={() => togglePersonExpand(group.contact.contact_id)}
+            className={`relative rounded-2xl ${colors.bg} ${colors.border} border p-5 transition-all duration-200 hover:shadow-lg hover:-translate-y-1 cursor-pointer`}
+          >
+            {/* Top row: Date badge and expand indicator */}
+            <div className="flex items-start justify-between mb-4">
+              <span className={`px-3 py-1.5 rounded-full text-xs font-semibold ${colors.dateBg}`}>
+                {oldestDateStr}
+              </span>
               <div
-                key={group.contact.contact_id}
-                onClick={() => togglePersonExpand(group.contact.contact_id)}
-                className="relative overflow-visible p-5 rounded-xl border-2 transition-all duration-200 bg-gradient-to-br from-white to-gray-50 cursor-pointer hover:shadow-xl hover:border-blue-400 hover:-translate-y-0.5 active:translate-y-0 ${
-                  isAbandoned ? 'border-red-300 hover:border-red-400' :
-                  hasFees ? 'border-orange-300 hover:border-orange-400' :
-                  'border-gray-200'
-                }"
-                title={isPersonExpanded ? "Click to collapse details" : "Click to expand and see full details"}
+                className={`p-1.5 rounded-lg transition-all duration-200 ${isPersonExpanded ? 'bg-gray-900 rotate-180' : 'bg-white/50'}`}
+                title={isPersonExpanded ? "Click to collapse" : "Click to expand"}
               >
-                {/* Gradient accent line */}
-                <div className={`absolute top-0 left-0 right-0 h-1 ${
-                  isAbandoned ? 'bg-gradient-to-r from-red-500 to-red-600' :
-                  hasFees ? 'bg-gradient-to-r from-orange-500 to-red-500' :
-                  'bg-gradient-to-r from-gray-400 to-gray-500'
-                }`} />
-                
-                {/* Header with customer name and fees */}
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3 flex-1">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md ${
-                      isAbandoned ? 'bg-gradient-to-br from-red-500 to-red-600' :
-                      hasFees ? 'bg-gradient-to-br from-orange-500 to-amber-600' :
-                      'bg-gradient-to-br from-gray-400 to-gray-500'
-                    }`}>
-                      <AlertCircle className="w-6 h-6 text-white" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-bold text-gray-900 text-lg">{customerName}</p>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation(); // Prevent triggering parent div's onClick
-                            togglePersonExpand(group.contact.contact_id);
-                          }}
-                          className="p-1 hover:bg-gray-200 rounded-lg transition-colors"
-                          title={isPersonExpanded ? "Collapse details" : "Expand details"}
-                        >
-                          {isPersonExpanded ? 
-                            <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                            <ChevronDown className="w-4 h-4 text-gray-600" />
+                <ChevronDown className={`w-4 h-4 transition-colors ${isPersonExpanded ? 'text-white' : 'text-gray-500'}`} />
+              </div>
+            </div>
+
+            {/* Customer info */}
+            <div className="mb-4">
+              <p className="text-sm text-gray-500 mb-1">
+                📮 Mailbox {group.contact.mailbox_number || 'N/A'}
+              </p>
+              <h3 className="text-xl font-bold text-gray-900 leading-tight">
+                {customerName}
+              </h3>
+            </div>
+
+            {/* Tags row */}
+            <div className="flex flex-wrap gap-2 mb-4">
+              {/* Item count tag */}
+              <span className="px-3 py-1 bg-white/70 border border-gray-200 rounded-full text-xs font-medium text-gray-700">
+                {totalItems} item{totalItems !== 1 ? 's' : ''}
+              </span>
+              
+              {/* Age tag */}
+              <span className={`px-3 py-1 bg-white/70 border rounded-full text-xs font-medium ${
+                oldestDays >= 30 ? 'border-red-300 text-red-700' :
+                oldestDays >= 14 ? 'border-orange-300 text-orange-700' :
+                oldestDays >= 7 ? 'border-amber-300 text-amber-700' :
+                'border-gray-200 text-gray-700'
+              }`}>
+                {oldestDays} days
+              </span>
+              
+              {/* Package/Letter breakdown */}
+              {group.packages.length > 0 && (
+                <span className="px-3 py-1 bg-white/70 border border-gray-200 rounded-full text-xs font-medium text-gray-700">
+                  📦 {group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0)}
+                </span>
+              )}
+              {group.letters.length > 0 && (
+                <span className="px-3 py-1 bg-white/70 border border-gray-200 rounded-full text-xs font-medium text-gray-700">
+                  ✉️ {group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0)}
+                </span>
+              )}
+              
+              {/* Status tags */}
+              {isAbandoned && (
+                <span className="px-3 py-1 bg-red-100 border border-red-300 rounded-full text-xs font-medium text-red-700">
+                  ⚠️ Abandoned
+                </span>
+              )}
+            </div>
+
+            {/* Expandable details */}
+            {isPersonExpanded && (
+              <div className="mb-4 p-3 bg-white/50 rounded-xl border border-gray-200/50 animate-fadeIn">
+                {/* Package details */}
+                {group.packages.length > 0 && (
+                  <div className="mb-3">
+                    <div className="flex items-center gap-2 text-sm mb-2">
+                      <Package className="w-4 h-4 text-gray-600" />
+                      <span className="font-semibold text-gray-900">
+                        {(() => {
+                          const totalQty = group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0);
+                          const recordCount = group.packages.length;
+                          if (totalQty > recordCount) {
+                            return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'} (${totalQty} total)`;
                           }
-                        </button>
-                      </div>
-                      <div className="flex items-center gap-2 mt-1">
-                        <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-md">
-                          📮 {group.contact.mailbox_number || 'No mailbox'}
-                        </span>
-                        <span className="text-sm text-gray-600">
-                          {totalItems} item{totalItems !== 1 ? 's' : ''}
-                        </span>
-                        {!isPersonExpanded && (
-                          <span className={`text-sm font-medium ${oldestDays >= 7 ? 'text-red-600' : 'text-gray-600'}`}>
-                            • {oldestDays} days old
-                          </span>
-                        )}
-                      </div>
+                          return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'}`;
+                        })()}
+                      </span>
                     </div>
-                  </div>
-                  
-                  {hasFees && (
-                    <div className="text-right bg-gradient-to-br from-orange-50 to-red-50 px-4 py-2 rounded-xl border border-orange-200">
-                      <p className="text-2xl font-bold text-orange-600">
-                        ${group.totalFees.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-orange-700 font-medium">storage fees</p>
-                    </div>
-                  )}
-                </div>
-                
-                {/* Expandable details */}
-                {isPersonExpanded && (
-                  <div className="animate-fadeIn">
-                    {/* Package details - Date-first format */}
-                    {group.packages.length > 0 && (
-                      <div className="mb-3">
-                        <div className="flex items-center gap-2 text-sm mb-2">
-                          <Package className="w-4 h-4 text-gray-600" />
-                          <span className="font-semibold text-gray-900">
-                            {(() => {
-                              const totalQty = group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0);
-                              const recordCount = group.packages.length;
-                              if (totalQty > recordCount) {
-                                return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'} (${totalQty} total) waiting`;
-                              }
-                              return `${recordCount} ${recordCount === 1 ? 'package' : 'packages'} waiting`;
-                            })()}
-                          </span>
-                        </div>
-                        <div className="ml-5 space-y-2">
-                          {group.packages.map(pkg => {
-                            const days = getDaysSince(pkg.received_date);
-                            const fee = pkg.packageFee?.fee_amount || 0;
-                            const feeStatus = pkg.packageFee?.fee_status;
-                            const isGracePeriod = days <= 1;
-                            const isWaived = feeStatus === 'waived';
-                            const isPaid = feeStatus === 'paid';
-                            const isApproachingAbandonment = days >= 28 && days < 30; // Only show for 28-29 days
-                            const isLongWait = days >= 14 && days < 28;
-                            
-                            // Format the date (e.g., "Nov 26")
-                            const receivedDateStr = format(new Date(pkg.received_date), 'MMM d');
-                            
-                              return (
-                              <div key={pkg.mail_item_id} className="text-sm">
-                                <div className="flex items-start gap-2">
-                                  <span className="text-gray-900 font-medium">
-                                    • Received {receivedDateStr}
-                                    {pkg.quantity && pkg.quantity > 1 && (
-                                      <span className="text-blue-600 font-semibold"> (×{pkg.quantity})</span>
-                                    )}
-                                  </span>
-                                  <span className="text-gray-500">({days} day{days !== 1 ? 's' : ''} ago)</span>
-                                </div>
-                                <div className="ml-5 text-gray-600">
-                                  {isGracePeriod ? (
-                                    days === 0 ? (
-                                      <span className="text-green-600 font-medium">Free (1 day included)</span>
-                                    ) : (
-                                      <span className="text-green-600 font-medium">Free (last day of included storage)</span>
-                                    )
-                                  ) : isWaived ? (
-                                    <span className="text-blue-600 line-through">
-                                      Storage fee: ${fee.toFixed(2)}
-                                    </span>
-                                  ) : isPaid ? (
-                                    <span className="text-green-600 font-medium">
-                                      Storage fee: ${fee.toFixed(2)} ✓ Paid
-                                    </span>
-                                  ) : (
-                                    <span className={fee > 0 ? 'text-orange-600 font-medium' : ''}>
-                                      Storage fee: ${fee.toFixed(2)}
-                                    </span>
-                                  )}
-                                  {isWaived && <span className="text-blue-600"> (fee waived)</span>}
-                                  {isApproachingAbandonment && !isWaived && !isPaid && (
-                                    <span className="text-red-600 font-medium"> • ⚠️ Approaching abandonment</span>
-                                  )}
-                                  {isLongWait && !isWaived && !isPaid && !isApproachingAbandonment && (
-                                    <span className="text-orange-600"> • Fee accumulating</span>
-                                  )}
-                                </div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Letter details */}
-                    {group.letters.length > 0 && (
-                      <div className="mb-3">
-                        <div className="flex items-center gap-2 text-sm mb-2">
-                          <Mail className="w-4 h-4 text-gray-600" />
-                          <span className="font-semibold text-gray-900">
-                            {(() => {
-                              const totalQty = group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
-                              const recordCount = group.letters.length;
-                              if (totalQty > recordCount) {
-                                return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'} (${totalQty} total) waiting`;
-                              }
-                              return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'} waiting`;
-                            })()}
-                          </span>
-                        </div>
-                        <div className="ml-5 space-y-1">
-                          {group.letters.map(letter => {
-                            const days = getDaysSince(letter.received_date);
-                            const receivedDateStr = format(new Date(letter.received_date), 'MMM d');
-                            return (
-                              <div key={letter.mail_item_id} className="text-sm text-gray-600">
-                                • Received {receivedDateStr}
-                                {letter.quantity && letter.quantity > 1 && (
-                                  <span className="text-blue-600 font-semibold"> (×{letter.quantity})</span>
+                    <div className="ml-5 space-y-1.5">
+                      {group.packages.map(pkg => {
+                        const days = getDaysSince(pkg.received_date);
+                        const fee = pkg.packageFee?.fee_amount || 0;
+                        const feeStatus = pkg.packageFee?.fee_status;
+                        const isWaived = feeStatus === 'waived';
+                        const isPaid = feeStatus === 'paid';
+                        const receivedDateStr = format(new Date(pkg.received_date), 'MMM d');
+                        
+                        return (
+                          <div key={pkg.mail_item_id} className="text-sm">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-gray-700">
+                                {receivedDateStr}
+                                {pkg.quantity && pkg.quantity > 1 && (
+                                  <span className="text-blue-600 font-semibold"> ×{pkg.quantity}</span>
                                 )}
-                                <span className="text-gray-500"> ({days} day{days !== 1 ? 's' : ''} ago)</span>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    )}
-                    
-                    {/* Last notified */}
-                    {group.lastNotified && (
-                      <p className="text-xs text-gray-500 mb-3 ml-5">
-                        📧 Last notified: {getDaysSince(group.lastNotified)} days ago
-                      </p>
-                    )}
+                              </span>
+                              <span className="text-gray-400">•</span>
+                              <span className="text-gray-500">{days}d</span>
+                              {fee > 0 && (
+                                <>
+                                  <span className="text-gray-400">•</span>
+                                  <span className={
+                                    isWaived ? 'text-blue-600 line-through' :
+                                    isPaid ? 'text-green-600' :
+                                    'text-orange-600 font-medium'
+                                  }>
+                                    ${fee.toFixed(2)}{isPaid && ' ✓'}{isWaived && ' waived'}
+                                  </span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
                   </div>
                 )}
                 
-                {/* Action buttons - all displayed inline */}
-                <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-gray-200" onClick={(e) => e.stopPropagation()}>
-                  {/* Fee button - if has fees */}
-                  {hasFees && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate('/dashboard/fees');
-                      }}
-                      className="px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors bg-green-100 hover:bg-green-200 text-green-700"
-                    >
-                      <DollarSign className="w-4 h-4" />
-                      ${group.totalFees >= 50 ? group.totalFees.toFixed(0) : group.totalFees.toFixed(2)}
-                    </button>
-                  )}
-                  
-                  {/* Send Email/Reminder button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSendEmail(group);
-                    }}
-                    className={`px-3 py-2 rounded-lg text-sm font-medium flex items-center gap-1.5 transition-colors ${
-                      isAbandoned 
-                        ? 'bg-red-100 hover:bg-red-200 text-red-700' 
-                        : hasFees 
-                          ? 'bg-orange-100 hover:bg-orange-200 text-orange-700'
-                          : 'bg-blue-50 hover:bg-blue-100 text-blue-600'
-                    }`}
-                  >
-                    <Send className="w-4 h-4" />
-                    {isAbandoned ? 'Final Notice' : 'Remind'}
-                  </button>
-                  
-                  {/* Mark Abandoned button - if 30+ days */}
-                  {isAbandoned && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMarkAbandoned(group);
-                      }}
-                      className="px-3 py-2 bg-gray-200 hover:bg-gray-300 text-gray-900 rounded-lg text-sm font-medium transition-colors"
-                      title="Mark items 30+ days old as abandoned"
-                    >
-                      Abandon
-                    </button>
-                  )}
-                  
-                  {/* View Profile button */}
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/dashboard/contacts/${group.contact.contact_id}`);
-                    }}
-                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-sm font-medium transition-colors"
-                  >
-                    Profile
-                  </button>
-                </div>
+                {/* Letter details */}
+                {group.letters.length > 0 && (
+                  <div>
+                    <div className="flex items-center gap-2 text-sm mb-2">
+                      <Mail className="w-4 h-4 text-gray-600" />
+                      <span className="font-semibold text-gray-900">
+                        {(() => {
+                          const totalQty = group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);
+                          const recordCount = group.letters.length;
+                          if (totalQty > recordCount) {
+                            return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'} (${totalQty} total)`;
+                          }
+                          return `${recordCount} ${recordCount === 1 ? 'letter' : 'letters'}`;
+                        })()}
+                      </span>
+                    </div>
+                    <div className="ml-5 space-y-1">
+                      {group.letters.map(letter => {
+                        const days = getDaysSince(letter.received_date);
+                        const receivedDateStr = format(new Date(letter.received_date), 'MMM d');
+                        return (
+                          <div key={letter.mail_item_id} className="text-sm text-gray-600">
+                            {receivedDateStr}
+                            {letter.quantity && letter.quantity > 1 && (
+                              <span className="text-blue-600 font-semibold"> ×{letter.quantity}</span>
+                            )}
+                            <span className="text-gray-400"> • {days}d</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
                 
-                {/* Urgency badge */}
-                {isAbandoned && (
-                  <div className="mt-3 pt-3 border-t border-red-200">
-                    <p className="text-xs text-red-700 font-medium flex items-center gap-1">
-                      <AlertCircle className="w-3 h-3" />
-                      ABANDONED: {oldestDays} days old - requires immediate attention
+                {/* Last notified */}
+                {group.lastNotified && (
+                  <p className="text-xs text-gray-500 mt-3 flex items-center gap-1">
+                    <Clock className="w-3 h-3" />
+                    Last notified {getDaysSince(group.lastNotified)} days ago
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* Bottom row: Fees and info */}
+            <div className="flex items-center justify-between pt-3 border-t border-gray-200/50">
+              <div>
+                {hasFees ? (
+                  <div>
+                    <p className={`text-2xl font-bold ${colors.accent}`}>
+                      ${group.totalFees.toFixed(2)}
                     </p>
+                    <p className="text-xs text-gray-500">storage fees</p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 text-gray-500">
+                    <MapPin className="w-4 h-4" />
+                    <span className="text-sm">Box {group.contact.mailbox_number}</span>
                   </div>
                 )}
               </div>
-            );
-          })}
-          
-          {/* Show more button */}
-          {groups.length > displayCount && (
-            <div className="lg:col-span-2">
-              <button
-                onClick={() => setDisplayCount(displayCount + 10)}
-                className="w-full py-2 px-4 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
-              >
-                Show {Math.min(10, groups.length - displayCount)} more
-              </button>
+              
+              <div className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                isPersonExpanded 
+                  ? 'bg-gray-200 text-gray-700' 
+                  : 'bg-gray-900 text-white'
+              }`}>
+                {isPersonExpanded ? 'Click to collapse' : 'Click for details'}
+              </div>
             </div>
-          )}
+
+            {/* Action buttons - shown when expanded */}
+            {isPersonExpanded && (
+              <div className="flex flex-wrap items-center gap-2 mt-4 pt-3 border-t border-gray-200/50">
+                {/* Fee button - if has fees */}
+                {hasFees && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/dashboard/fees');
+                    }}
+                    className="px-3 py-2 rounded-full text-xs font-medium flex items-center gap-1.5 transition-colors bg-green-100 hover:bg-green-200 text-green-700 border border-green-200"
+                  >
+                    <DollarSign className="w-3.5 h-3.5" />
+                    Collect
+                  </button>
+                )}
+                
+                {/* Send Email/Reminder button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSendEmail(group);
+                  }}
+                  className={`px-3 py-2 rounded-full text-xs font-medium flex items-center gap-1.5 transition-colors border ${
+                    isAbandoned 
+                      ? 'bg-red-100 hover:bg-red-200 text-red-700 border-red-200' 
+                      : hasFees 
+                        ? 'bg-orange-100 hover:bg-orange-200 text-orange-700 border-orange-200'
+                        : 'bg-blue-100 hover:bg-blue-200 text-blue-700 border-blue-200'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                  {isAbandoned ? 'Final Notice' : 'Remind'}
+                </button>
+                
+                {/* Mark Abandoned button - if 30+ days */}
+                {isAbandoned && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onMarkAbandoned(group);
+                    }}
+                    className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-medium transition-colors border border-gray-200"
+                    title="Mark items 30+ days old as abandoned"
+                  >
+                    Abandon
+                  </button>
+                )}
+                
+                {/* View Profile button */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/dashboard/contacts/${group.contact.contact_id}`);
+                  }}
+                  className="px-3 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-full text-xs font-medium transition-colors border border-gray-200"
+                >
+                  Profile
+                </button>
+              </div>
+            )}
+
+            {/* Urgency warning - always visible for abandoned */}
+            {isAbandoned && !isPersonExpanded && (
+              <div className="mt-3 pt-3 border-t border-red-200/50">
+                <p className="text-xs text-red-600 font-medium flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  {oldestDays}+ days - requires immediate attention
+                </p>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      
+      {/* Show more button */}
+      {groups.length > displayCount && (
+        <div className="md:col-span-2 xl:col-span-3">
+          <button
+            onClick={() => setDisplayCount(displayCount + 12)}
+            className="w-full py-3 px-4 bg-white hover:bg-gray-50 text-gray-700 rounded-2xl font-medium transition-colors border border-gray-200 shadow-sm"
+          >
+            Show {Math.min(12, groups.length - displayCount)} more customers
+          </button>
         </div>
       )}
     </div>
   );
 }
-

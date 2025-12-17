@@ -259,20 +259,58 @@ export default function FollowUpsPage() {
     );
   }
 
+  // Calculate summary stats
+  const totalCustomers = followUps.length;
+  const totalFees = followUps.reduce((sum, g) => sum + g.totalFees, 0);
+  const abandonedCount = followUps.filter(g => {
+    const allItems = [...g.packages, ...g.letters];
+    const oldestDays = Math.max(...allItems.map(item => getDaysSince(item.received_date)));
+    return oldestDays >= 30;
+  }).length;
+
   return (
     <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
       {/* Header */}
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-2 h-10 bg-gradient-to-b from-orange-500 to-red-600 rounded-full"></div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Needs Follow-up
-          </h1>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">
+              Needs Follow-up
+            </h1>
+            <p className="text-gray-600">Customers requiring attention for fees, notifications, or pickups</p>
+          </div>
+          
+          {/* Summary stats */}
+          {totalCustomers > 0 && (
+            <div className="flex items-center gap-6 text-sm text-gray-600">
+              <div className="flex items-center gap-2">
+                <span className="text-2xl font-semibold text-gray-900">{totalCustomers}</span>
+                <span>customers</span>
+              </div>
+              {totalFees > 0 && (
+                <>
+                  <div className="w-px h-6 bg-gray-300" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-semibold text-gray-900">${totalFees.toFixed(0)}</span>
+                    <span>in fees</span>
+                  </div>
+                </>
+              )}
+              {abandonedCount > 0 && (
+                <>
+                  <div className="w-px h-6 bg-gray-300" />
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-semibold text-red-600">{abandonedCount}</span>
+                    <span>abandoned</span>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
-        <p className="text-gray-600 ml-5">Customers requiring attention for fees, notifications, or pickups</p>
       </div>
 
-      {/* Follow-up List */}
+      {/* Follow-up Cards */}
       <GroupedFollowUpSection
         groups={followUps}
         onSendEmail={openSendEmailForGroup}
