@@ -749,14 +749,32 @@ IMPORTANT: Analyze each image separately. Handle name variations (order, abbrevi
     console.error('❌ Batch Gemini matching failed:', error);
 
     const errorMsg = error.message || '';
-    const isRateLimited = errorMsg.includes('429') ||
+    const statusCode = error.status || 0;
+    
+    const isRateLimited = statusCode === 429 ||
+                         errorMsg.includes('429') ||
                          errorMsg.includes('Too Many Requests') ||
                          errorMsg.includes('RESOURCE_EXHAUSTED');
+    
+    const isOverloaded = statusCode === 503 ||
+                        errorMsg.includes('503') ||
+                        errorMsg.includes('overloaded') ||
+                        errorMsg.includes('Service Unavailable');
 
     if (isRateLimited) {
       return res.status(429).json({
-        error: 'AI service is temporarily busy. Please try again.',
+        error: 'AI service is temporarily busy. Please try again in a few seconds.',
         results: [],
+        retryable: true,
+      });
+    }
+
+    if (isOverloaded) {
+      return res.status(503).json({
+        error: 'Google AI service is temporarily overloaded. Please try again in a minute.',
+        results: [],
+        retryable: true,
+        serviceOverloaded: true,
       });
     }
 
