@@ -62,7 +62,6 @@ export default function ScanSessionPage() {
   const BATCH_SIZE = 10;
 
   // Demo mode state (for smooth presentations without backend)
-  const [isDemoMode, setIsDemoMode] = useState(false);
   const [isDemoRunning, setIsDemoRunning] = useState(false);
 
   // Load contacts and check for existing session on mount

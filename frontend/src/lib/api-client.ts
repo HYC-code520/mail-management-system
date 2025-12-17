@@ -57,7 +57,7 @@ class ApiClient {
     try {
       await this.refreshPromise;
       return true;
-    } catch (error) {
+    } catch {
       return false;
     } finally {
       // Clear the promise after 1 second to allow new refreshes if needed
