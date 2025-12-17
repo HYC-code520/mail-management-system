@@ -51,6 +51,10 @@ export default function ScanSessionPage() {
   // Email preview modal state
   const [showEmailModal, setShowEmailModal] = useState(false);
 
+  // Celebration control state (for demos - manual trigger)
+  const [isReadyToCelebrate, setIsReadyToCelebrate] = useState(false);
+  const [celebrationData, setCelebrationData] = useState<{ scannedCount: number; customersNotified: number } | null>(null);
+
   // Batch mode state (for cost savings - 10 images in 1 API call)
   const [batchMode, setBatchMode] = useState(true); // Default ON for demos and efficiency
   const [batchQueue, setBatchQueue] = useState<Array<{ blob: Blob; previewUrl: string }>>([]);
@@ -213,28 +217,13 @@ export default function ScanSessionPage() {
     // Wait a moment after "selecting" Merlin
     await new Promise(resolve => setTimeout(resolve, 800));
     
-    // Trigger success celebration (skip actual backend call)
-    toast.success(`${demoItems.length} items logged, ${demoItems.length} customers notified!`, { duration: 3000 });
+    // Show the "Successfully Submitted" state with Celebrate button
+    // (Skip actual backend call in demo mode)
+    setCelebrationData({ scannedCount: demoItems.length, customersNotified: demoItems.length });
+    setIsReadyToCelebrate(true);
+    setIsDemoRunning(false);
     
-    // Confetti!
-    confetti({
-      particleCount: 150,
-      spread: 100,
-      origin: { y: 0.6 }
-    });
-
-    // Play sound
-    const audio = new Audio('/youve-got-mail-sound.mp3');
-    audio.play().catch(console.error);
-
-    // Clean up after celebration
-    setTimeout(() => {
-      setIsDemoRunning(false);
-      setShowReview(false);
-      setSession(null);
-      localStorage.removeItem('scanSession');
-      navigate('/dashboard');
-    }, 3000);
+    toast.success(`✨ Ready! Click "Celebrate" when ready for the big moment!`, { duration: 5000 });
   };
 
   const handleCameraClick = () => {
@@ -923,42 +912,53 @@ export default function ScanSessionPage() {
       const scannedCount = items.length;
       const customersNotified = response.notificationsSent || 0;
       
+      // Store data for celebration and show celebration button
+      setCelebrationData({ scannedCount, customersNotified });
+      setIsReadyToCelebrate(true);
+      
+      // Show success message without celebration yet
       if (skipNotification) {
-        toast.success(`${scannedCount} items logged (no notifications sent)`);
+        toast.success(`${scannedCount} items logged! Click "Celebrate" when ready 🎉`, { duration: 5000 });
       } else {
-        toast.success(`${scannedCount} items logged, ${customersNotified} customers notified!`);
+        toast.success(`${scannedCount} items logged, ${customersNotified} notified! Click "Celebrate" when ready 🎉`, { duration: 5000 });
       }
 
-      // Confetti animation
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-
-      // Play "You've Got Mail" sound
-      const audio = new Audio('/youve-got-mail-sound.mp3');
-      audio.play().catch(console.error);
-
-      // Clean up
-      session.items.forEach(item => {
-        if (item.photoPreviewUrl) {
-          URL.revokeObjectURL(item.photoPreviewUrl);
-        }
-      });
-      localStorage.removeItem('scanSession');
-      sessionStorage.removeItem('scanSessionResumedToast');
-
-      // Navigate back after delay
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
     } catch (error) {
       console.error('Bulk submit failed:', error);
       toast.error('Failed to submit items. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Trigger the celebration (confetti + sound) - manual control for demos
+  const triggerCelebration = () => {
+    // Confetti animation
+    confetti({
+      particleCount: 150,
+      spread: 100,
+      origin: { y: 0.6 }
+    });
+
+    // Play "You've Got Mail" sound
+    const audio = new Audio('/youve-got-mail-sound.mp3');
+    audio.play().catch(console.error);
+
+    // Clean up session
+    if (session) {
+      session.items.forEach(item => {
+        if (item.photoPreviewUrl) {
+          URL.revokeObjectURL(item.photoPreviewUrl);
+        }
+      });
+    }
+    localStorage.removeItem('scanSession');
+    sessionStorage.removeItem('scanSessionResumedToast');
+
+    // Navigate back after delay to enjoy the celebration
+    setTimeout(() => {
+      navigate('/dashboard');
+    }, 2500);
   };
 
   // Optional: Preview/Edit email before sending
@@ -1006,39 +1006,20 @@ export default function ScanSessionPage() {
       const scannedCount = items.length;
       const customersNotified = response.notificationsSent || 0;
       
-      if (skipNotification) {
-        toast.success(`${scannedCount} items logged (no notifications sent)`);
-      } else {
-        toast.success(`${scannedCount} items logged, ${customersNotified} customers notified!`);
-      }
-
-      // Confetti animation
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
-
-      // Play "You've Got Mail" sound
-      const audio = new Audio('/youve-got-mail-sound.mp3');
-      audio.play().catch(console.error);
-
-      // Clean up
-      session.items.forEach(item => {
-        if (item.photoPreviewUrl) {
-          URL.revokeObjectURL(item.photoPreviewUrl);
-        }
-      });
-      localStorage.removeItem('scanSession');
-      sessionStorage.removeItem('scanSessionResumedToast'); // Clear the toast flag
-
       // Close email modal
       setShowEmailModal(false);
+      
+      // Store data for celebration and show celebration button
+      setCelebrationData({ scannedCount, customersNotified });
+      setIsReadyToCelebrate(true);
+      
+      // Show success message without celebration yet
+      if (skipNotification) {
+        toast.success(`${scannedCount} items logged! Click "Celebrate" when ready 🎉`, { duration: 5000 });
+      } else {
+        toast.success(`${scannedCount} items logged, ${customersNotified} notified! Click "Celebrate" when ready 🎉`, { duration: 5000 });
+      }
 
-      // Navigate back after delay
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 2000);
     } catch (error) {
       console.error('Bulk submit failed:', error);
       toast.error('Failed to submit items. Please try again.');
@@ -1188,89 +1169,119 @@ export default function ScanSessionPage() {
 
             {/* Footer Actions */}
             <div className="p-6 md:p-8 border-t border-gray-200 bg-gray-50 space-y-5">
-              {/* Staff Selection */}
-              <div>
-                <label className="block text-sm font-semibold text-gray-900 mb-3">
-                  Who is scanning this mail? *
-                </label>
-                <div className="grid grid-cols-2 gap-3">
+              {/* Show Celebrate button after successful submission */}
+              {isReadyToCelebrate && celebrationData ? (
+                <div className="text-center space-y-4">
+                  <div className="bg-green-50 border border-green-200 rounded-xl p-6">
+                    <CheckCircle className="w-12 h-12 text-green-600 mx-auto mb-3" />
+                    <h3 className="text-xl font-bold text-green-900 mb-2">
+                      Successfully Submitted!
+                    </h3>
+                    <p className="text-green-700">
+                      {celebrationData.scannedCount} items logged
+                      {!skipNotification && `, ${celebrationData.customersNotified} customers notified`}
+                    </p>
+                  </div>
+                  
                   <button
-                    type="button"
-                    onClick={() => setScannedBy('Madison')}
-                    className={`px-5 py-4 rounded-xl border-2 font-semibold transition-all ${
-                      scannedBy === 'Madison'
-                        ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                    }`}
+                    onClick={triggerCelebration}
+                    className="w-full py-4 bg-gray-900 hover:bg-gray-800 text-white text-lg font-semibold rounded-xl transition-all flex items-center justify-center gap-2 shadow-sm"
                   >
-                    Madison
+                    <span>🎉</span>
+                    Celebrate
                   </button>
-                  <button
-                    type="button"
-                    onClick={() => setScannedBy('Merlin')}
-                    className={`px-5 py-4 rounded-xl border-2 font-semibold transition-all ${
-                      scannedBy === 'Merlin'
-                        ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
-                        : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                    }`}
-                  >
-                    Merlin
-                  </button>
-                </div>
-                {!scannedBy && (
-                  <p className="mt-2 text-sm text-red-600 font-medium">Please select who is scanning</p>
-                )}
-              </div>
-
-              {/* Skip Notification Option */}
-              <label className="flex items-start gap-3 p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={skipNotification}
-                  onChange={(e) => setSkipNotification(e.target.checked)}
-                  className="mt-0.5 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
-                />
-                <div className="flex-1">
-                  <span className="font-semibold text-gray-900 block">Skip customer notifications</span>
-                  <p className="text-sm text-gray-600 mt-1">
-                    Check this if customers don't use email or don't need to be notified. Items will still be logged.
+                  
+                  <p className="text-sm text-gray-400">
+                    Click when ready for confetti
                   </p>
                 </div>
-              </label>
-              
-              {/* Main Action: Quick Send */}
-              <button
-                onClick={handleBulkSubmit}
-                disabled={isSubmitting || grouped.length === 0 || !scannedBy}
-                className="w-full py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-lg font-semibold rounded-xl transition-all flex items-center justify-center gap-2.5 shadow-sm"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" />
-                    Submitting...
-                  </>
-                ) : skipNotification ? (
-                  <>
-                    <CheckCircle className="w-5 h-5" />
-                    Submit All (No Notifications)
-                  </>
-                ) : (
-                  <>
-                    <Send className="w-5 h-5" />
-                    Submit All & Send Notifications
-                  </>
-                )}
-              </button>
+              ) : (
+                <>
+                  {/* Staff Selection */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-900 mb-3">
+                      Who is scanning this mail? *
+                    </label>
+                    <div className="grid grid-cols-2 gap-3">
+                      <button
+                        type="button"
+                        onClick={() => setScannedBy('Madison')}
+                        className={`px-5 py-4 rounded-xl border-2 font-semibold transition-all ${
+                          scannedBy === 'Madison'
+                            ? 'border-purple-500 bg-purple-50 text-purple-700 shadow-sm'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                      >
+                        Madison
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setScannedBy('Merlin')}
+                        className={`px-5 py-4 rounded-xl border-2 font-semibold transition-all ${
+                          scannedBy === 'Merlin'
+                            ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-sm'
+                            : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                        }`}
+                      >
+                        Merlin
+                      </button>
+                    </div>
+                    {!scannedBy && (
+                      <p className="mt-2 text-sm text-red-600 font-medium">Please select who is scanning</p>
+                    )}
+                  </div>
 
-              {/* Optional: Preview/Edit Email */}
-              <button
-                onClick={handlePreviewEmail}
-                disabled={isSubmitting || grouped.length === 0 || !scannedBy}
-                className="w-full py-2 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition-colors flex items-center justify-center gap-2"
-              >
-                <Edit className="w-4 h-4" />
-                Preview/Edit Email First (Optional)
-              </button>
+                  {/* Skip Notification Option */}
+                  <label className="flex items-start gap-3 p-4 bg-white border border-gray-200 rounded-xl cursor-pointer hover:border-gray-300 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={skipNotification}
+                      onChange={(e) => setSkipNotification(e.target.checked)}
+                      className="mt-0.5 w-5 h-5 text-blue-600 border-gray-300 rounded focus:ring-blue-500 focus:ring-2"
+                    />
+                    <div className="flex-1">
+                      <span className="font-semibold text-gray-900 block">Skip customer notifications</span>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Check this if customers don't use email or don't need to be notified. Items will still be logged.
+                      </p>
+                    </div>
+                  </label>
+                  
+                  {/* Main Action: Quick Send */}
+                  <button
+                    onClick={handleBulkSubmit}
+                    disabled={isSubmitting || grouped.length === 0 || !scannedBy}
+                    className="w-full py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-lg font-semibold rounded-xl transition-all flex items-center justify-center gap-2.5 shadow-sm"
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader className="w-5 h-5 animate-spin" />
+                        Submitting...
+                      </>
+                    ) : skipNotification ? (
+                      <>
+                        <CheckCircle className="w-5 h-5" />
+                        Submit All (No Notifications)
+                      </>
+                    ) : (
+                      <>
+                        <Send className="w-5 h-5" />
+                        Submit All & Send Notifications
+                      </>
+                    )}
+                  </button>
+
+                  {/* Optional: Preview/Edit Email */}
+                  <button
+                    onClick={handlePreviewEmail}
+                    disabled={isSubmitting || grouped.length === 0 || !scannedBy}
+                    className="w-full py-2 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <Edit className="w-4 h-4" />
+                    Preview/Edit Email First (Optional)
+                  </button>
+                </>
+              )}
             </div>
           </div>
         </div>
