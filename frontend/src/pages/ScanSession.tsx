@@ -27,7 +27,7 @@ export default function ScanSessionPage() {
   // Session state
   const [session, setSession] = useState<ScanSession | null>(null);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [scannedBy, setScannedBy] = useState<string | null>(null); // NEW: Staff selection for scan session
+  const [scannedBy, setScannedBy] = useState<string | null>('Merlin'); // Default to Merlin for faster demos
   const [skipNotification, setSkipNotification] = useState(false); // NEW: Option to skip customer notifications
   
   // UI state
@@ -56,6 +56,10 @@ export default function ScanSessionPage() {
   const [batchQueue, setBatchQueue] = useState<Array<{ blob: Blob; previewUrl: string }>>([]);
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const BATCH_SIZE = 10;
+
+  // Demo mode state (for smooth presentations without backend)
+  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isDemoRunning, setIsDemoRunning] = useState(false);
 
   // Load contacts and check for existing session on mount
   useEffect(() => {
@@ -131,6 +135,106 @@ export default function ScanSessionPage() {
 
     setSession(newSession);
     toast.success('Scan session started!');
+  };
+
+  // Demo mode: Simulates a perfect scan session for presentations
+  const runDemoMode = async () => {
+    if (isDemoRunning || contacts.length === 0) return;
+    
+    setIsDemoRunning(true);
+    
+    // Start fresh session if needed
+    if (!session) {
+      startSession();
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+
+    // Pick 3 contacts for demo - always include Tim Asprec
+    const timAsprec = contacts.find(c => 
+      c.contact_person?.toLowerCase().includes('tim asprec') || 
+      c.contact_person?.toLowerCase().includes('tim') && c.contact_person?.toLowerCase().includes('asprec')
+    );
+    const otherContacts = contacts.filter(c => c.contact_id !== timAsprec?.contact_id);
+    const shuffledOthers = [...otherContacts].sort(() => Math.random() - 0.5);
+    
+    // Build demo contacts: Tim Asprec + 2 random others = 3 total
+    const demoContacts = timAsprec 
+      ? [timAsprec, ...shuffledOthers.slice(0, 2)]
+      : shuffledOthers.slice(0, 3);
+    
+    // Simulate batch processing with animation
+    setIsProcessingBatch(true);
+    await new Promise(resolve => setTimeout(resolve, 2500)); // Show cute animation
+    setIsProcessingBatch(false);
+
+    // Create fake scanned items
+    const demoItems: ScannedItem[] = demoContacts.map((contact, idx) => ({
+      id: `demo-${Date.now()}-${idx}`,
+      photoBlob: undefined,
+      photoPreviewUrl: undefined,
+      extractedText: contact.contact_person || contact.company_name || 'Customer',
+      matchedContact: contact,
+      confidence: 0.92 + Math.random() * 0.07, // 92-99% confidence
+      itemType: idx % 3 === 0 ? 'Package' : 'Letter',
+      status: 'matched',
+      scannedAt: new Date().toISOString(),
+    }));
+
+    // Add items to session with animation
+    setSession(prev => {
+      if (!prev) return prev;
+      return { ...prev, items: [...prev.items, ...demoItems] };
+    });
+
+    toast.success(`✨ ${demoItems.length} items matched!`, { duration: 2000 });
+
+    // Unselect Merlin before showing review (so it looks like staff needs to select)
+    setScannedBy(null);
+
+    // Auto-proceed to review after short delay
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    setShowReview(true);
+
+    // Wait for review screen to render, then smooth scroll down to show submit button
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Smooth scroll to bottom to simulate staff scrolling to submit button
+    window.scrollTo({
+      top: document.body.scrollHeight,
+      behavior: 'smooth'
+    });
+
+    // Wait for scroll to complete
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Simulate clicking Merlin button
+    setScannedBy('Merlin');
+    
+    // Wait a moment after "selecting" Merlin
+    await new Promise(resolve => setTimeout(resolve, 800));
+    
+    // Trigger success celebration (skip actual backend call)
+    toast.success(`${demoItems.length} items logged, ${demoItems.length} customers notified!`, { duration: 3000 });
+    
+    // Confetti!
+    confetti({
+      particleCount: 150,
+      spread: 100,
+      origin: { y: 0.6 }
+    });
+
+    // Play sound
+    const audio = new Audio('/youve-got-mail-sound.mp3');
+    audio.play().catch(console.error);
+
+    // Clean up after celebration
+    setTimeout(() => {
+      setIsDemoRunning(false);
+      setShowReview(false);
+      setSession(null);
+      localStorage.removeItem('scanSession');
+      navigate('/dashboard');
+    }, 3000);
   };
 
   const handleCameraClick = () => {
@@ -310,7 +414,26 @@ export default function ScanSessionPage() {
     } catch (error) {
       console.error('❌ Batch processing failed:', error);
       toast.dismiss('batch-processing');
-      toast.error('Batch processing failed. Try processing individually.');
+      
+      // Check for specific error types
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      const isOverloaded = errorMessage.includes('503') || 
+                          errorMessage.includes('overloaded') || 
+                          errorMessage.includes('Service Unavailable');
+      const isRateLimited = errorMessage.includes('429') || 
+                           errorMessage.includes('busy');
+      
+      if (isOverloaded) {
+        toast.error('Google AI service is temporarily overloaded. Please wait a minute and try again.', {
+          duration: 5000,
+        });
+      } else if (isRateLimited) {
+        toast.error('AI service is busy. Please wait a few seconds and try again.', {
+          duration: 4000,
+        });
+      } else {
+        toast.error('Batch processing failed. Try processing individually.');
+      }
     } finally {
       setIsProcessingBatch(false);
     }
@@ -796,11 +919,14 @@ export default function ScanSessionPage() {
       // Submit to backend with staff name (no template customization)
       const response = await api.scan.bulkSubmit(items, scannedBy, undefined, undefined, undefined, skipNotification);
 
-      // Success!
+      // Success! Use the count of items scanned (not DB records created, which are grouped)
+      const scannedCount = items.length;
+      const customersNotified = response.notificationsSent || 0;
+      
       if (skipNotification) {
-        toast.success(`${response.itemsCreated} items logged (no notifications sent)`);
+        toast.success(`${scannedCount} items logged (no notifications sent)`);
       } else {
-        toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
+        toast.success(`${scannedCount} items logged, ${customersNotified} customers notified!`);
       }
 
       // Confetti animation
@@ -876,11 +1002,14 @@ export default function ScanSessionPage() {
         skipNotification
       );
 
-      // Success!
+      // Success! Use the count of items scanned (not DB records created, which are grouped)
+      const scannedCount = items.length;
+      const customersNotified = response.notificationsSent || 0;
+      
       if (skipNotification) {
-        toast.success(`${response.itemsCreated} items logged (no notifications sent)`);
+        toast.success(`${scannedCount} items logged (no notifications sent)`);
       } else {
-        toast.success(`${response.itemsCreated} items logged, ${response.notificationsSent} customers notified!`);
+        toast.success(`${scannedCount} items logged, ${customersNotified} customers notified!`);
       }
 
       // Confetti animation
@@ -921,7 +1050,15 @@ export default function ScanSessionPage() {
   // Render: Start Screen
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 relative">
+        {/* Secret demo button - top right corner, very subtle, no hover effect */}
+        <button
+          onClick={runDemoMode}
+          disabled={isDemoRunning}
+          className="absolute top-6 right-6 w-2 h-2 rounded-full bg-gray-300 opacity-30"
+          aria-label="Demo"
+        />
+        
         <div className="max-w-md w-full text-center">
           <div className="bg-white rounded-2xl shadow-lg p-12 border border-gray-200">
             <div className="mb-8">
@@ -952,6 +1089,23 @@ export default function ScanSessionPage() {
             </button>
           </div>
         </div>
+        
+        {/* Batch Processing Overlay for Demo Mode */}
+        {isProcessingBatch && (
+          <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center">
+            <img 
+              src="/Untitled design.gif" 
+              alt="Processing..." 
+              className="w-64 h-64 object-contain mb-6"
+            />
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">Processing your mail...</h3>
+            <p className="text-gray-600 text-lg">AI is matching items to customers</p>
+            <div className="mt-6 flex items-center gap-2 text-blue-600">
+              <Loader className="w-5 h-5 animate-spin" />
+              <span className="text-sm font-medium">This may take a moment</span>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -1228,8 +1382,8 @@ export default function ScanSessionPage() {
             </div>
           </div>
 
-          {/* Batch Queue Status */}
-          {batchMode && (
+          {/* Batch Queue Status - hidden during demo */}
+          {batchMode && !isDemoRunning && (
             <div className="mt-4 p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -1238,20 +1392,12 @@ export default function ScanSessionPage() {
                     Batch Queue: {batchQueue.length} / {BATCH_SIZE}
                   </span>
                 </div>
-                {batchQueue.length > 0 && (
+                {batchQueue.length > 0 && !isProcessingBatch && (
                   <button
                     onClick={processBatchQueue}
-                    disabled={isProcessingBatch}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
                   >
-                    {isProcessingBatch ? (
-                      <>
-                        <Loader className="w-4 h-4 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      <>Process {batchQueue.length} Photos</>
-                    )}
+                    Process {batchQueue.length} Photos
                   </button>
                 )}
               </div>
@@ -1283,7 +1429,7 @@ export default function ScanSessionPage() {
       </div>
 
       {/* Camera Button - Fixed at bottom, aligned with main content */}
-      <div className="fixed bottom-0 left-0 lg:left-72 right-0 bg-white border-t border-gray-200 p-6 z-20">
+      <div className="fixed bottom-0 left-0 lg:left-72 right-0 p-6 z-20">
         <div className="max-w-4xl mx-auto">
           {/* Counter and Status - Cleaner Design */}
           {quickScanMode && (session.items.length > 0 || processingQueue > 0) && (
@@ -1304,7 +1450,7 @@ export default function ScanSessionPage() {
           )}
           
           {/* Camera Options - Simplified Design */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="relative grid grid-cols-2 gap-3">
             {/* Webcam Button */}
             <button
               onClick={handleWebcamClick}
@@ -1315,7 +1461,7 @@ export default function ScanSessionPage() {
               <Video className="w-5 h-5" />
               <span className="hidden sm:inline">Webcam</span>
             </button>
-            
+
             {/* Upload/Camera Button */}
             <button
               onClick={handleCameraClick}
@@ -1335,22 +1481,20 @@ export default function ScanSessionPage() {
                 </>
               )}
             </button>
+
+            {/* Secret demo button - absolute positioned outside, doesn't affect layout */}
+            <button
+              onClick={runDemoMode}
+              disabled={isDemoRunning}
+              className="absolute -right-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-gray-300 opacity-30"
+              aria-label="Demo"
+            />
           </div>
           
           {/* End Session Button - Prominent Design */}
           {session.items.length > 0 && (
             <button
-              onClick={() => {
-                if (confirm('End this scan session?')) {
-                  if (session.items.length === 0) {
-                    setSession(null);
-                    localStorage.removeItem('scanSession');
-                    sessionStorage.removeItem('scanSessionResumedToast');
-                  } else {
-                    endSession();
-                  }
-                }
-              }}
+              onClick={() => endSession()}
               className="w-full mt-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
               <XCircle className="w-5 h-5" />
@@ -1379,9 +1523,24 @@ export default function ScanSessionPage() {
       <div className="max-w-full mx-auto px-16 py-6">
         {session.items.length === 0 ? (
           <div className="text-center py-12 text-gray-500">
-            <Camera className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-            <p className="text-lg font-medium mb-2">No items scanned yet</p>
-            <p className="text-sm">Use "Webcam" or "Upload/Camera" below to start scanning</p>
+            <img
+              src="/assets/images/Scan-me.png"
+              alt="Scan me"
+              className="w-64 h-64 mx-auto mb-4"
+            />
+            {batchMode && batchQueue.length > 0 ? (
+              <>
+                <p className="text-lg font-medium mb-2 text-blue-600">
+                  {batchQueue.length} photo{batchQueue.length > 1 ? 's' : ''} ready to process
+                </p>
+                <p className="text-sm">Click "Process {batchQueue.length} Photos" above to match with customers</p>
+              </>
+            ) : (
+              <>
+                <p className="text-lg font-medium mb-2">No items scanned yet</p>
+                <p className="text-sm">Use "Webcam" or "Upload/Camera" below to start scanning</p>
+              </>
+            )}
           </div>
         ) : (
           <div className="space-y-3">
@@ -1501,6 +1660,23 @@ export default function ScanSessionPage() {
         onClose={() => setShowCameraModal(false)}
         onCapture={handleCameraCapture}
       />
+
+      {/* Batch Processing Overlay with Cute Animation */}
+      {isProcessingBatch && (
+        <div className="fixed inset-0 z-50 bg-white/95 backdrop-blur-sm flex flex-col items-center justify-center">
+          <img 
+            src="/Untitled design.gif" 
+            alt="Processing..." 
+            className="w-64 h-64 object-contain mb-6"
+          />
+          <h3 className="text-2xl font-bold text-gray-900 mb-2">Processing your mail...</h3>
+          <p className="text-gray-600 text-lg">AI is matching your mail to customers</p>
+          <div className="mt-6 flex items-center gap-2 text-blue-600">
+            <Loader className="w-5 h-5 animate-spin" />
+            <span className="text-sm font-medium">This may take a moment</span>
+          </div>
+        </div>
+      )}
 
       {showEmailModal && (
         <BulkScanEmailModal

@@ -3,6 +3,7 @@ import { X, Send, Loader2, Mail, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../lib/api-client';
 import toast from 'react-hot-toast';
+import { formatNYDateDisplay } from '../utils/timezone.ts';
 
 interface MailItem {
   mail_item_id: string;
@@ -88,7 +89,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, bulkMailItem
   const previewTemplate = useCallback((template: Template) => {
     const customerName = mailItem.contacts?.contact_person || mailItem.contacts?.company_name || 'Customer';
     const mailboxNumber = mailItem.contacts?.mailbox_number || 'N/A';
-    const receivedDate = new Date(mailItem.received_date).toLocaleDateString('en-US', {
+    const receivedDate = formatNYDateDisplay(mailItem.received_date, {
       year: 'numeric',
       month: 'long',
       day: 'numeric'
@@ -532,7 +533,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, bulkMailItem
                   <div className="mt-2 space-y-1 text-xs text-gray-600 pl-5">
                     <div>Mailbox: {mailItem.contacts?.mailbox_number || 'N/A'}</div>
                     <div>Type: {mailItem.item_type} (Qty: {mailItem.quantity || 1})</div>
-                    <div>Received: {new Date(mailItem.received_date).toLocaleDateString()}</div>
+                    <div>Received: {formatNYDateDisplay(mailItem.received_date)}</div>
                     {mailItem.tracking_number && <div>Tracking: {mailItem.tracking_number}</div>}
                   </div>
                 )}

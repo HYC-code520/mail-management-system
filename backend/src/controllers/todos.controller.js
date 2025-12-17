@@ -65,7 +65,7 @@ async function createTodo(req, res, next) {
       normalizedDate = date_header.split('T')[0]; // Remove any time component
     }
 
-    console.log('📝 Creating todo - staff_member received:', staff_member, 'fallback:', req.user.email.split('@')[0]);
+    console.log('📝 Creating todo - staff_member received:', staff_member);
 
     const todoData = {
       user_id: req.user.id,
@@ -75,9 +75,9 @@ async function createTodo(req, res, next) {
       priority: priority || 0,
       category: category?.trim() || null,
       is_completed: false,
-      created_by_name: staff_member || req.user.email.split('@')[0], // Use staff_member if provided
+      created_by_name: staff_member || 'Staff', // Use staff_member which should be "Merlin" or "Madison"
       created_by_email: req.user.email,
-      last_edited_by_name: staff_member || req.user.email.split('@')[0],
+      last_edited_by_name: staff_member || 'Staff',
       last_edited_by_email: req.user.email
     };
 
@@ -128,8 +128,8 @@ async function updateTodo(req, res, next) {
     if (category !== undefined) updateData.category = category?.trim() || null;
     if (sort_order !== undefined) updateData.sort_order = sort_order;
     
-    // Track who edited - use staff_member if provided
-    updateData.last_edited_by_name = staff_member || req.user.email.split('@')[0];
+    // Track who edited - use staff_member if provided (should be "Merlin" or "Madison")
+    updateData.last_edited_by_name = staff_member || 'Staff';
     updateData.last_edited_by_email = req.user.email;
 
     console.log('Updating todo', id, 'with date_header:', date_header, '→ normalized:', updateData.date_header);

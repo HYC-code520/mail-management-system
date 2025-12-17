@@ -4,6 +4,19 @@ const { supabase } = require('../services/supabase.service');
 const { sendEmail, sendTemplateEmail } = require('../services/email.service');
 const { getSupabaseClient } = require('../services/supabase.service');
 
+// Helper to create a chainable Supabase mock
+const createChainableMock = (resolvedValue = { data: null, error: null }) => ({
+  select: jest.fn().mockReturnThis(),
+  insert: jest.fn().mockReturnThis(),
+  update: jest.fn().mockReturnThis(),
+  delete: jest.fn().mockReturnThis(),
+  eq: jest.fn().mockReturnThis(),
+  in: jest.fn().mockReturnThis(),
+  single: jest.fn().mockResolvedValue(resolvedValue),
+  maybeSingle: jest.fn().mockResolvedValue(resolvedValue),
+  then: jest.fn((cb) => cb(resolvedValue))
+});
+
 // Mock Supabase
 jest.mock('../services/supabase.service', () => ({
   supabase: {
@@ -37,6 +50,12 @@ describe('Email API - Error Handling', () => {
       data: { user: { id: mockUserId, email: 'test@example.com' } },
       error: null
     });
+
+    // Set up default chainable mock for getSupabaseClient
+    const defaultMock = {
+      from: jest.fn(() => createChainableMock({ data: null, error: { message: 'Not found' } }))
+    };
+    getSupabaseClient.mockReturnValue(defaultMock);
   });
 
   describe('POST /api/emails/send-custom - Gmail Disconnection Errors', () => {

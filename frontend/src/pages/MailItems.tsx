@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { api } from '../lib/api-client.ts';
+import { formatNYDate } from '../utils/timezone.ts';
 
 export default function MailItemsPage() {
   const navigate = useNavigate();
@@ -65,8 +66,7 @@ export default function MailItemsPage() {
   };
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', { 
+    return formatNYDate(new Date(dateString), { 
       month: 'short', 
       day: 'numeric', 
       year: 'numeric',

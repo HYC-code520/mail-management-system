@@ -7,6 +7,7 @@
 
 import React from 'react';
 import { Clock } from 'lucide-react';
+import { formatNYDate } from '../utils/timezone.ts';
 
 interface ActionHistoryItem {
   action_id: string;
@@ -25,6 +26,12 @@ interface ActionHistorySectionProps {
 }
 
 export default function ActionHistorySection({ actions, loading }: ActionHistorySectionProps) {
+  // Get display name - should only be "Merlin", "Madison", or "Staff"
+  const getDisplayName = (performedBy: string): string => {
+    if (!performedBy) return 'Staff';
+    return performedBy; // Should already be "Merlin" or "Madison" from backend
+  };
+
   // Get dot color based on action type
   const getDotColor = (action: ActionHistoryItem) => {
     const desc = action.action_description?.toLowerCase() || '';
@@ -50,10 +57,9 @@ export default function ActionHistorySection({ actions, loading }: ActionHistory
 
   // Format date for timeline
   const formatDate = (timestamp: string) => {
-    const date = new Date(timestamp);
     return {
-      date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      time: date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
+      date: formatNYDate(new Date(timestamp), { month: 'short', day: 'numeric', year: 'numeric' }),
+      time: formatNYDate(new Date(timestamp), { hour: 'numeric', minute: '2-digit', hour12: true })
     };
   };
 
@@ -135,26 +141,26 @@ export default function ActionHistorySection({ actions, loading }: ActionHistory
                 {/* Content */}
                 <div className="flex-1 pb-2 -mt-0.5">
                   <div className="flex items-baseline gap-2 mb-2">
-                    <span className="font-semibold text-gray-900">{action.performed_by}</span>
+                    <span className="font-semibold text-gray-900">{getDisplayName(action.performed_by)}</span>
                     <span className="text-gray-600 text-sm">{getActionText(action)}</span>
                   </div>
 
-                  {/* Message box */}
-                  {(action.action_description || action.notes || (action.previous_value && action.new_value)) && (
+                  {/* Message box - Show change details OR notes, avoid redundancy */}
+                  {(action.notes || (action.previous_value && action.new_value)) && (
                     <div className="bg-gray-50 rounded-lg p-3 border border-gray-100">
-                      {action.action_description && (
+                      {/* If we have previous/new values, show them cleanly */}
+                      {action.previous_value && action.new_value ? (
                         <p className="text-sm text-gray-700">
-                          {action.action_description}
+                          <span className="line-through text-gray-500">{action.previous_value}</span>
+                          {' → '}
+                          <span className="font-medium">{action.new_value}</span>
                         </p>
-                      )}
+                      ) : null}
+                      
+                      {/* Show notes if available */}
                       {action.notes && (
                         <p className="text-sm text-gray-600 mt-1">
                           {action.notes}
-                        </p>
-                      )}
-                      {action.previous_value && action.new_value && (
-                        <p className="text-xs text-gray-500 mt-2">
-                          Changed: <span className="line-through">{action.previous_value}</span> → <span className="font-medium text-gray-700">{action.new_value}</span>
                         </p>
                       )}
                     </div>

@@ -8,6 +8,7 @@
 import React, { useState, useEffect } from 'react';
 import Modal from '../Modal.tsx';
 import { api } from '../../lib/api-client.ts';
+import { formatNYDateDisplay } from '../../utils/timezone.ts';
 import toast from 'react-hot-toast';
 import { Send, Edit2, Eye, Loader } from 'lucide-react';
 
@@ -161,8 +162,8 @@ export default function BulkScanEmailModal({
       .replace(/\{\{PackageText\}\}/g, previewData.packageCount === 1 ? 'package' : 'packages')
       .replace(/\{PackageText\}/g, previewData.packageCount === 1 ? 'package' : 'packages')
       // Date
-      .replace(/\{\{Date\}\}/g, new Date().toLocaleDateString())
-      .replace(/\{Date\}/g, new Date().toLocaleDateString());
+      .replace(/\{\{Date\}\}/g, formatNYDateDisplay(new Date()))
+      .replace(/\{Date\}/g, formatNYDateDisplay(new Date()));
   };
 
   const displaySubject = isEditing ? customSubject : (selectedTemplate?.subject_line || '');

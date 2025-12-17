@@ -702,7 +702,7 @@ export default function DashboardPage() {
                 <p className="text-xs text-gray-500">Current pending items by age</p>
               </div>
             </div>
-            <div className="flex-1 flex flex-col justify-center gap-2">
+            <div className="flex-1 flex flex-col justify-center gap-3">
               {[
                 { name: '0-3 days', value: stats.analytics.ageDistribution['0-3'], color: '#10B981' },
                 { name: '4-7 days', value: stats.analytics.ageDistribution['4-7'], color: '#FCD34D' },
@@ -763,7 +763,7 @@ export default function DashboardPage() {
               </button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              {stats.needsFollowUp.slice(0, 4).map((group) => (
+              {stats.needsFollowUp.slice(0, 8).map((group) => (
                 <div key={group.contact.contact_id} className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2.5 border border-orange-200 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-1">
                     <div className="flex-1 min-w-0">

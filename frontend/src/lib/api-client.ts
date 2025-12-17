@@ -6,6 +6,8 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
  * API Client for making authenticated requests to the Express backend
  */
 class ApiClient {
+  private refreshPromise: Promise<void> | null = null;
+
   /**
    * Get the current user's auth token
    */
@@ -15,9 +17,63 @@ class ApiClient {
   }
 
   /**
+   * Wait for any ongoing token refresh to complete
+   */
+  private async waitForTokenRefresh(): Promise<void> {
+    if (this.refreshPromise) {
+      console.log('⏳ Waiting for ongoing token refresh...');
+      await this.refreshPromise;
+    }
+  }
+
+  /**
+   * Refresh the authentication token
+   */
+  private async refreshToken(): Promise<boolean> {
+    // If a refresh is already in progress, wait for it
+    if (this.refreshPromise) {
+      await this.refreshPromise;
+      return true;
+    }
+
+    // Start a new refresh
+    this.refreshPromise = (async () => {
+      console.log('🔄 Token expired, refreshing session...');
+      
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        console.error('❌ Session refresh failed:', error);
+        // Redirect to sign-in page
+        window.location.href = '/signin';
+        throw new Error('Session expired. Please log in again.');
+      }
+      
+      if (session) {
+        console.log('✅ Session refreshed successfully');
+      }
+    })();
+
+    try {
+      await this.refreshPromise;
+      return true;
+    } catch (error) {
+      return false;
+    } finally {
+      // Clear the promise after 1 second to allow new refreshes if needed
+      setTimeout(() => {
+        this.refreshPromise = null;
+      }, 1000);
+    }
+  }
+
+  /**
    * Make an authenticated API request
    */
   private async request(endpoint: string, options: RequestInit = {}, retryCount = 0): Promise<any> {
+    // Wait for any ongoing token refresh before making the request
+    await this.waitForTokenRefresh();
+
     const token = await this.getAuthToken();
     
     if (!token) {
@@ -35,22 +91,12 @@ class ApiClient {
     const response = await fetch(url, { ...options, headers });
 
     // Handle 401 Unauthorized - token might be expired
-    if (response.status === 401 && retryCount === 0) {
-      console.log('🔄 Token expired, refreshing session...');
+    if (response.status === 401 && retryCount < 2) {
+      const refreshed = await this.refreshToken();
       
-      // Force refresh the session
-      const { data: { session }, error } = await supabase.auth.refreshSession();
-      
-      if (error) {
-        console.error('❌ Session refresh failed:', error);
-        // Redirect to sign-in page
-        window.location.href = '/signin';
-        throw new Error('Session expired. Please log in again.');
-      }
-      
-      if (session) {
-        console.log('✅ Session refreshed, retrying request...');
-        // Retry the request with the new token (only once)
+      if (refreshed) {
+        console.log('✅ Token refreshed, retrying request...');
+        // Retry the request with the new token (up to 2 times)
         return this.request(endpoint, options, retryCount + 1);
       }
     }

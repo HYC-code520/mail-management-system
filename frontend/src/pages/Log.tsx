@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Mail, Package, Search, ChevronRight, X, Calendar, Filter, ArrowUpDown, ArrowUp, ArrowDown, ChevronDown, ChevronUp, Edit, Trash2, CheckCircle, FileText, Send, AlertTriangle, Eye, MoreVertical, Loader2 } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
@@ -8,7 +8,7 @@ import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
 import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
 import ActionHistorySection from '../components/ActionHistorySection.tsx';
-import { getTodayNY } from '../utils/timezone.ts';
+import { getTodayNY, extractNYDate, formatNYDateDisplay } from '../utils/timezone.ts';
 
 interface MailItem {
   mail_item_id: string;
@@ -586,47 +586,25 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         
         // Get the group key for the updated item
         const updatedDate = updateData.received_date 
-          ? new Date(updateData.received_date).toISOString().split('T')[0]
-          : editingMailItem.received_date.split('T')[0];
+          ? extractNYDate(updateData.received_date)
+          : extractNYDate(editingMailItem.received_date);
         const updatedGroupKey = `${editingMailItem.contact_id}|${updatedDate}|${updateData.item_type || editingMailItem.item_type}`;
         
-        closeModal();
-        
-        // Clear action history cache for ALL items in the edited group
-        // This ensures we reload fresh history after the edit
-        const itemsInGroup = mailItems.filter(item => {
-          const itemDate = item.received_date.split('T')[0];
-          const itemGroupKey = `${item.contact_id}|${itemDate}|${item.item_type}`;
-          return itemGroupKey === updatedGroupKey;
-        });
-        
-        setActionHistory(prev => {
-          const newHistory = { ...prev };
-          // Clear history for all items in this group
-          itemsInGroup.forEach(item => {
-            delete newHistory[item.mail_item_id];
-          });
-          return newHistory;
-        });
-        
-        await loadMailItems(); // Ensure we wait for reload
-        
-        // Force reload action history for the group after items are loaded
-        setTimeout(async () => {
-          for (const item of itemsInGroup) {
-            await loadActionHistory(item.mail_item_id);
-          }
-        }, 300); // Small delay to ensure backend has committed the new action history
-        
-        // Show toast with "View" button to jump to the updated row
+        // Store customer info before reloading (editingMailItem will be cleared)
         const customerName = editingMailItem.contacts?.contact_person || 
                             editingMailItem.contacts?.company_name || 
                             'Customer';
         const itemTypeDisplay = updateData.item_type || editingMailItem.item_type;
-        const dateDisplay = new Date(updatedDate).toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: 'numeric' 
-        });
+        const dateDisplay = formatNYDateDisplay(updatedDate);
+        
+        closeModal();
+        
+        // Clear ALL action history cache to ensure fresh data on next expand
+        // This is simpler and more reliable than trying to track specific groups
+        setActionHistory({});
+        
+        // Reload mail items to get updated data
+        await loadMailItems();
         
         toast.success(
           (t) => (
@@ -842,6 +820,12 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
 
   // Group filtered items by contact + day + type
   const groupedItems = groupMailItems(filteredItems);
+  
+  // Keep a ref to always have the latest groupedItems (for async callbacks like toast buttons)
+  const groupedItemsRef = useRef(groupedItems);
+  useEffect(() => {
+    groupedItemsRef.current = groupedItems;
+  }, [groupedItems]);
 
   // Handle navigation from Dashboard with jumpToGroupKey or jumpToGroupKeys
   useEffect(() => {
@@ -952,14 +936,34 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
 
   // Jump to a specific row (scroll + highlight + expand + load history)
   // This is used by the edit toast to jump to the updated row
+  // Uses groupedItemsRef to always get the latest data (important for async toast button clicks)
   const jumpToRow = useCallback(async (groupKey: string) => {
-    // Find the group in groupedItems (for data)
-    const group = groupedItems.find(g => g.groupKey === groupKey);
-    if (!group) return;
+    console.log(`🔍 Attempting to jump to row with key: ${groupKey}`);
+    
+    // Use ref to get latest groupedItems (closure would have stale data)
+    // Retry a few times if not found (might be waiting for React to re-render after data update)
+    let group = groupedItemsRef.current.find(g => g.groupKey === groupKey);
+    let retries = 0;
+    while (!group && retries < 10) {
+      console.log(`⏳ Group not found, retrying... (attempt ${retries + 1}/10)`);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      // Re-read from ref to get latest data
+      group = groupedItemsRef.current.find(g => g.groupKey === groupKey);
+      retries++;
+    }
+    if (!group) {
+      console.warn(`❌ Could not find group with key: ${groupKey} after ${retries} retries`);
+      console.log(`Available groups:`, groupedItemsRef.current.map(g => g.groupKey));
+      return;
+    }
+    
+    console.log(`✅ Found group after ${retries} retries`);
+
+    // Get latest groupedItems from ref for sorting
+    const currentGroupedItems = groupedItemsRef.current;
 
     // Find the index of the group in sortedGroups (for pagination)
-    // We need to recalculate sortedGroups here since it's not in dependencies
-    const sorted = [...groupedItems].sort((a, b) => {
+    const sorted = [...currentGroupedItems].sort((a, b) => {
       let comparison = 0;
       switch (sortColumn) {
         case 'date':
@@ -987,16 +991,21 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     });
 
     const groupIndex = sorted.findIndex(g => g.groupKey === groupKey);
-    if (groupIndex === -1) return;
+    if (groupIndex === -1) {
+      console.warn(`❌ Group found but not in sorted list`);
+      return;
+    }
 
     // Calculate which page this group is on
     const targetPage = Math.floor(groupIndex / rowsPerPage) + 1;
+    console.log(`📄 Group is on page ${targetPage} (index ${groupIndex})`);
 
     // 1. Navigate to the correct page first
     if (targetPage !== currentPage) {
+      console.log(`📄 Navigating from page ${currentPage} to page ${targetPage}`);
       setCurrentPage(targetPage);
       // Wait for React to re-render the page
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     // 2. Scroll to the row (with retry since DOM might not be ready)
@@ -1004,6 +1013,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       const rowElement = document.getElementById(`row-${groupKey}`);
       if (rowElement) {
         rowElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        console.log(`📍 Scrolled to row`);
         return true;
       }
       return false;
@@ -1014,7 +1024,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
       await new Promise(resolve => setTimeout(resolve, 150));
       if (!scrollToRow()) {
         await new Promise(resolve => setTimeout(resolve, 200));
-        scrollToRow();
+        if (!scrollToRow()) {
+          await new Promise(resolve => setTimeout(resolve, 300));
+          scrollToRow();
+        }
       }
     }
 
@@ -1048,7 +1061,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     } catch (err) {
       console.error('Failed to load action history:', err);
     }
-  }, [groupedItems, sortColumn, sortDirection, rowsPerPage, currentPage]);
+  }, [sortColumn, sortDirection, rowsPerPage, currentPage]); // Removed groupedItems from deps - using ref instead
 
   // Sorting for grouped items
   const sortedGroups = [...groupedItems].sort((a, b) => {
@@ -1734,12 +1747,11 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                       </button>
                     </td>
                     <td className="py-3 px-4 text-gray-900">
-                      <span 
+                      <span
                         title={`${group.items.length} item${group.items.length > 1 ? 's' : ''} on this date`}
                         className="cursor-help border-b border-dotted border-gray-400"
                       >
-                        {new Date(group.date + 'T12:00:00').toLocaleDateString('en-US', {
-                          timeZone: 'America/New_York',
+                        {formatNYDateDisplay(group.date, {
                           year: 'numeric',
                           month: '2-digit',
                           day: '2-digit'
@@ -2143,7 +2155,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
               <label className="block text-sm font-medium text-gray-900 mb-1">Date *</label>
               {editingMailItem && (
                 <p className="text-xs text-gray-500 mb-2">
-                  Current: {new Date(editingMailItem.received_date).toLocaleDateString('en-US', { 
+                  Current: {formatNYDateDisplay(editingMailItem.received_date, { 
                     month: 'short', 
                     day: 'numeric', 
                     year: 'numeric' 

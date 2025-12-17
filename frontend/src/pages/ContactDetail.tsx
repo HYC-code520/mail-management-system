@@ -9,6 +9,7 @@ import Modal from '../components/Modal.tsx';
 import { validateContactForm } from '../utils/validation.ts';
 import toast from 'react-hot-toast';
 import { getCustomerAvatarUrl } from '../utils/customerAvatars.ts';
+import { formatNYDateDisplay } from '../utils/timezone.ts';
 
 // Helper function to generate avatar color based on name
 const getAvatarColor = (name: string): string => {
@@ -591,7 +592,7 @@ export default function ContactDetailPage() {
               <div>
                 <p className="text-xs sm:text-sm text-gray-600 mb-1">Customer Since</p>
                 <p className="text-sm sm:text-base text-gray-900 font-medium">
-                  {new Date(contact.created_at).toLocaleDateString('en-US', { 
+                  {formatNYDateDisplay(contact.created_at, { 
                     year: 'numeric', 
                     month: 'long', 
                     day: 'numeric' 
@@ -611,7 +612,7 @@ export default function ContactDetailPage() {
               <div className="space-y-2 sm:space-y-3">
                 {unpaidFees.map(fee => {
                   const receivedDate = fee.mail_items?.received_date 
-                    ? new Date(fee.mail_items.received_date).toLocaleDateString('en-US', {
+                    ? formatNYDateDisplay(fee.mail_items.received_date, {
                         month: 'short',
                         day: 'numeric'
                       })
@@ -729,8 +730,7 @@ export default function ContactDetailPage() {
                           </button>
                         </td>
                         <td className="py-3 sm:py-4 px-3 sm:px-6 text-xs sm:text-sm text-gray-900">
-                          {new Date(group.receivedDate + 'T12:00:00').toLocaleDateString('en-US', {
-                            timeZone: 'America/New_York',
+                          {formatNYDateDisplay(group.receivedDate, {
                             year: 'numeric',
                             month: '2-digit',
                             day: '2-digit'

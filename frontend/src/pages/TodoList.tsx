@@ -3,6 +3,7 @@ import { Plus, Check, Circle, Trash2, Calendar, Flag, Edit2, ChevronLeft, Chevro
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
+import { formatNYDate } from '../utils/timezone.ts';
 
 interface Todo {
   todo_id: string;
@@ -309,7 +310,7 @@ export default function TodoList() {
     if (date.toDateString() === today.toDateString()) return 'Today';
     if (date.toDateString() === yesterday.toDateString()) return 'Yesterday';
     
-    return date.toLocaleDateString('en-US', { 
+    return formatNYDate(date, { 
       month: 'short', 
       day: 'numeric', 
       year: date.getFullYear() !== today.getFullYear() ? 'numeric' : undefined 
@@ -482,7 +483,7 @@ export default function TodoList() {
                   <span className={`text-xs font-semibold uppercase mb-1 ${
                     isSelected ? 'text-amber-800' : 'text-gray-500'
                   }`}>
-                    {date.toLocaleDateString('en-US', { weekday: 'short' })}
+                    {formatNYDate(date, { weekday: 'short' })}
                   </span>
                   <span className={`text-xl md:text-2xl font-bold ${
                     isSelected ? 'text-gray-900' : isTodayDate ? 'text-blue-600' : 'text-gray-700'

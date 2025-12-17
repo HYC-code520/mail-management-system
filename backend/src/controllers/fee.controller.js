@@ -125,7 +125,7 @@ exports.waiveFee = async (req, res, next) => {
     
     // Log action to action_history (without contact_id - table doesn't have it)
     try {
-      const staffName = waived_by || req.user.email || 'Unknown';
+      const staffName = waived_by || req.user.email || 'Staff'; // Use waived_by which should be "Merlin" or "Madison", fallback to user email
       await require('../services/supabase.service').supabaseAdmin
         .from('action_history')
         .insert({
@@ -201,8 +201,8 @@ exports.markFeePaid = async (req, res, next) => {
     // Use collected amount if provided, otherwise use fee amount
     const actualAmount = collected_amount !== undefined ? collected_amount : fee.fee_amount;
     const discount = actualAmount < fee.fee_amount ? ` (discounted from $${fee.fee_amount.toFixed(2)})` : '';
-    const staffName = collected_by || req.user.email || 'Unknown';
-    
+    const staffName = collected_by || 'Staff'; // Use collected_by which should be "Merlin" or "Madison"
+
     // Log action to action_history
     try {
       await require('../services/supabase.service').supabaseAdmin

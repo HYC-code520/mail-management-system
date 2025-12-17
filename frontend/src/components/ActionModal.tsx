@@ -74,21 +74,14 @@ export default function ActionModal({
     setLoading(true);
 
     try {
-      // Update the mail item status
+      // Update the mail item status (backend automatically creates action history)
       await api.mailItems.update(mailItemId, {
-        status: config.statusValue
+        status: config.statusValue,
+        performed_by: performedBy, // Pass staff name to backend for action history
+        action_notes: notes.trim() || null // Pass notes to be included in action history
       });
 
-      // Log the action in action history
-      await api.actionHistory.create({
-        mail_item_id: mailItemId,
-        action_type: 'status_change',
-        action_description: config.description,
-        previous_value: mailItemDetails.currentStatus,
-        new_value: config.statusValue,
-        performed_by: performedBy,
-        notes: notes.trim() || null
-      });
+      // Note: Backend automatically logs action history, no need to create it manually here
 
       toast.success(`✓ ${mailItemDetails.customerName}'s ${mailItemDetails.itemType} ${config.successMessage}`);
       onSuccess();

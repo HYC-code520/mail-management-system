@@ -4,7 +4,7 @@ import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import GroupedFollowUpSection from '../components/dashboard/GroupedFollowUp.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
-import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
+import { getTodayNY, toNYDateString, extractNYDate } from '../utils/timezone.ts';
 
 interface PackageFee {
   fee_id: string;
@@ -109,7 +109,7 @@ export default function FollowUpsPage() {
       setSuggestedTemplateType(suggested);
       setEmailingBulkItems(allItems);
       
-      const groupKey = `${firstItem.contact_id}|${firstItem.received_date.split('T')[0]}|${firstItem.item_type}`;
+      const groupKey = `${firstItem.contact_id}|${extractNYDate(firstItem.received_date)}|${firstItem.item_type}`;
       setEmailingGroupKey(groupKey);
       
       setEmailingMailItem(firstItem);
@@ -130,7 +130,7 @@ export default function FollowUpsPage() {
       
       if (isBulk) {
         const groupKeys = emailingBulkItems.map(item => 
-          `${item.contact_id}|${item.received_date.split('T')[0]}|${item.item_type}`
+          `${item.contact_id}|${extractNYDate(item.received_date)}|${item.item_type}`
         );
         const uniqueGroupKeys = [...new Set(groupKeys)];
         
@@ -158,7 +158,7 @@ export default function FollowUpsPage() {
         );
       } else {
         const groupKey = emailingGroupKey || 
-          `${emailingMailItem.contact_id}|${emailingMailItem.received_date.split('T')[0]}|${emailingMailItem.item_type}`;
+          `${emailingMailItem.contact_id}|${extractNYDate(emailingMailItem.received_date)}|${emailingMailItem.item_type}`;
         
         toast.success(
           (t) => (

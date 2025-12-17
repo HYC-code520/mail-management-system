@@ -127,3 +127,59 @@ export function getNYTimestamp(): string {
   return `${year}-${month}-${day}T${hour}:${minute}:${second}.000${offsetStr}`;
 }
 
+/**
+ * Extract date portion (YYYY-MM-DD) from any date/timestamp string or Date object
+ * Always returns the date as it appears in NY timezone
+ * 
+ * IMPORTANT: This should be used instead of .toISOString().split('T')[0] to avoid timezone shifts
+ * 
+ * @param date - Date object, ISO timestamp, or YYYY-MM-DD string
+ * @returns YYYY-MM-DD string in NY timezone
+ */
+export function extractNYDate(date: Date | string): string {
+  // If it's already a date-only string (YYYY-MM-DD), return as-is
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return date;
+  }
+  
+  // If it's a timestamp string with 'T', extract the date portion
+  // assuming it's already stored correctly for NY timezone
+  if (typeof date === 'string' && date.includes('T')) {
+    return date.split('T')[0];
+  }
+  
+  // For Date objects, convert to NY timezone
+  return toNYDateString(date);
+}
+
+/**
+ * Format a date for display (e.g., "Dec 2" or "12/02/2025")
+ * Always uses NY timezone to avoid off-by-one date errors
+ * 
+ * @param date - Date object, ISO timestamp, or YYYY-MM-DD string
+ * @param options - Intl.DateTimeFormatOptions (defaults to { month: 'short', day: 'numeric' })
+ * @returns Formatted date string in NY timezone
+ */
+export function formatNYDateDisplay(date: Date | string, options?: Intl.DateTimeFormatOptions): string {
+  // Default options for short display
+  const defaultOptions: Intl.DateTimeFormatOptions = {
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'America/New_York'
+  };
+  
+  const finalOptions = options ? { ...options, timeZone: 'America/New_York' } : defaultOptions;
+  
+  // If it's a YYYY-MM-DD string, parse it as noon NY time to avoid timezone shifts
+  if (typeof date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    const [year, month, day] = date.split('-');
+    // Create date at noon to avoid any edge cases
+    const d = new Date(`${year}-${month}-${day}T12:00:00-05:00`);
+    return d.toLocaleDateString('en-US', finalOptions);
+  }
+  
+  // For timestamp strings or Date objects
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toLocaleDateString('en-US', finalOptions);
+}
+

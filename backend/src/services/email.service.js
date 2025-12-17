@@ -199,9 +199,9 @@ async function sendTemplateEmail({ to, templateSubject, templateBody, variables,
         <div class="footer">
           <div class="footer-address">
             <strong>Mei Way Mail Plus</strong><br>
-            📍 [Your Business Address Here]<br>
-            📞 [Your Phone Number Here]<br>
-            📧 [Your Business Email Here]
+            📍 37-02 Main St b1, Flushing, NY 11354<br>
+            📞 (646) 535-0363<br>
+            📧 mwmailplus@gmail.com
           </div>
           <p style="margin-top: 10px; font-size: 11px; color: #999;">
             This is an automated notification about your mail. Please do not reply to this email.

@@ -156,7 +156,7 @@ exports.createMailItem = async (req, res, next) => {
           mail_item_id: mailItem.mail_item_id,
           action_type: 'created',
           action_description: `${mailItem.item_type} logged (qty: ${mailItem.quantity || 1})${mailItem.description ? ` - ${mailItem.description}` : ''}`,
-          performed_by: logged_by || req.user.email || 'Staff',
+          performed_by: logged_by || req.user.email || 'Staff', // Use logged_by which should be "Merlin" or "Madison", fallback to user email
           action_timestamp: new Date().toISOString()
         });
       
@@ -180,7 +180,7 @@ exports.updateMailItemStatus = async (req, res, next) => {
   try {
     const supabase = getSupabaseClient(req.user.token);
     const { id } = req.params;
-    const { status, item_type, description, contact_id, received_date, quantity, performed_by } = req.body;
+    const { status, item_type, description, contact_id, received_date, quantity, performed_by, action_notes } = req.body;
 
     // Fetch existing mail item to detect item_type changes
     const { data: existingMailItem, error: fetchError } = await supabase
@@ -299,12 +299,23 @@ exports.updateMailItemStatus = async (req, res, next) => {
 
       // Received date change
       if (received_date !== undefined) {
-        const existingDateStr = existingMailItem.received_date ? new Date(existingMailItem.received_date).toISOString().split('T')[0] : null;
-        const newDateStr = new Date(received_date).toISOString().split('T')[0];
+        // Extract YYYY-MM-DD from both dates for comparison
+        const existingDateStr = existingMailItem.received_date ? existingMailItem.received_date.split('T')[0] : null;
+        const newDateStr = received_date.split('T')[0];
+        
+        console.log(`📅 Date comparison - Existing: ${existingDateStr}, New: ${newDateStr}, Changed: ${existingDateStr !== newDateStr}`);
+        
         if (existingDateStr !== newDateStr) {
           const formatDate = (dateStr) => {
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+            // Parse the date string as YYYY-MM-DD and format in NY timezone
+            const [year, month, day] = dateStr.split('T')[0].split('-');
+            const date = new Date(`${year}-${month}-${day}T12:00:00-05:00`);
+            return date.toLocaleDateString('en-US', { 
+              month: 'short', 
+              day: 'numeric', 
+              year: 'numeric',
+              timeZone: 'America/New_York'
+            });
           };
           actionDescriptions.push(`Date: ${formatDate(existingMailItem.received_date)} → ${formatDate(received_date)}`);
           if (!previousValue) {
@@ -316,11 +327,16 @@ exports.updateMailItemStatus = async (req, res, next) => {
       
       if (actionDescriptions.length > 0) {
         // Determine action type based on what changed
+        // Only use status-specific action types if status was actually changed
         let actionType = 'updated';
-        if (status === 'Picked Up') actionType = 'picked_up';
-        else if (status === 'Forward') actionType = 'forwarded';
-        else if (status === 'Scanned' || status === 'Scanned Document') actionType = 'scanned';
-        else if (status === 'Abandoned' || status === 'Abandoned Package') actionType = 'abandoned';
+        const statusChanged = status !== undefined && status !== existingMailItem.status;
+        
+        if (statusChanged) {
+          if (status === 'Picked Up') actionType = 'picked_up';
+          else if (status === 'Forward') actionType = 'forwarded';
+          else if (status === 'Scanned' || status === 'Scanned Document') actionType = 'scanned';
+          else if (status === 'Abandoned' || status === 'Abandoned Package') actionType = 'abandoned';
+        }
         
         await supabase
           .from('action_history')
@@ -330,7 +346,8 @@ exports.updateMailItemStatus = async (req, res, next) => {
             action_description: actionDescriptions.join('; '),
             previous_value: previousValue,
             new_value: newValue,
-            performed_by: performed_by || req.user.email || 'Staff', // Use performed_by from request, fallback to email
+            performed_by: performed_by || 'Staff', // Use performed_by from request (should be "Merlin" or "Madison")
+            notes: action_notes || null, // Include notes if provided
             action_timestamp: new Date().toISOString()
           });
         
