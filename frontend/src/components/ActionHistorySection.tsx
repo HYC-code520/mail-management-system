@@ -26,6 +26,41 @@ interface ActionHistorySectionProps {
 }
 
 export default function ActionHistorySection({ actions, loading }: ActionHistorySectionProps) {
+  // Deduplicate bulk notification entries
+  // When a bulk email is sent, each mail item gets its own action history entry
+  // We want to show only one entry per bulk action (same timestamp, performer, action type, and notes)
+  const deduplicateActions = (actions: ActionHistoryItem[]): ActionHistoryItem[] => {
+    const seen = new Map<string, ActionHistoryItem>();
+    
+    for (const action of actions) {
+      // Create a key based on timestamp (rounded to minute), performer, action type, and notes
+      // This groups bulk actions together
+      const timestamp = new Date(action.action_timestamp);
+      const roundedTimestamp = new Date(
+        timestamp.getFullYear(),
+        timestamp.getMonth(),
+        timestamp.getDate(),
+        timestamp.getHours(),
+        timestamp.getMinutes()
+      ).toISOString();
+      
+      const key = `${roundedTimestamp}|${action.performed_by}|${action.action_type}|${action.notes || ''}`;
+      
+      // Keep the first occurrence (or you could keep the one with most details)
+      if (!seen.has(key)) {
+        seen.set(key, action);
+      }
+    }
+    
+    // Convert back to array and sort by timestamp descending
+    return Array.from(seen.values()).sort(
+      (a, b) => new Date(b.action_timestamp).getTime() - new Date(a.action_timestamp).getTime()
+    );
+  };
+
+  // Apply deduplication
+  const deduplicatedActions = deduplicateActions(actions);
+
   // Get display name - should only be "Merlin", "Madison", or "Staff"
   const getDisplayName = (performedBy: string): string => {
     if (!performedBy) return 'Staff';
@@ -116,11 +151,11 @@ export default function ActionHistorySection({ actions, loading }: ActionHistory
         <Clock className="w-5 h-5 text-purple-600" />
         Action History
       </h3>
-      {actions.length > 0 ? (
+      {deduplicatedActions.length > 0 ? (
         <div className="relative">
-          {actions.map((action, index) => {
+          {deduplicatedActions.map((action, index) => {
             const { date, time } = formatDate(action.action_timestamp);
-            const isLast = index === actions.length - 1;
+            const isLast = index === deduplicatedActions.length - 1;
 
             return (
               <div key={action.action_id} className="flex gap-4 pb-6">
