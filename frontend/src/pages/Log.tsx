@@ -950,27 +950,58 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   // Jump to a specific row (scroll + highlight + expand + load history)
   // This is used by the edit toast to jump to the updated row
   // Uses groupedItemsRef to always get the latest data (important for async toast button clicks)
-  const jumpToRow = useCallback(async (groupKey: string) => {
+  const jumpToRow = useCallback(async (groupKey: string, clearFiltersIfNeeded = true) => {
     console.log(`🔍 Attempting to jump to row with key: ${groupKey}`);
     
     // Use ref to get latest groupedItems (closure would have stale data)
     // Retry a few times if not found (might be waiting for React to re-render after data update)
     let group = groupedItemsRef.current.find(g => g.groupKey === groupKey);
     let retries = 0;
-    while (!group && retries < 10) {
-      console.log(`⏳ Group not found, retrying... (attempt ${retries + 1}/10)`);
-      await new Promise(resolve => setTimeout(resolve, 300));
+    while (!group && retries < 5) {
+      console.log(`⏳ Group not found, retrying... (attempt ${retries + 1}/5)`);
+      await new Promise(resolve => setTimeout(resolve, 200));
       // Re-read from ref to get latest data
       group = groupedItemsRef.current.find(g => g.groupKey === groupKey);
       retries++;
     }
+    
+    // If not found and filters are active, clear them and retry
+    if (!group && clearFiltersIfNeeded) {
+      const hasFilters = searchTerm !== '' || statusFilter !== 'All Status' || 
+                         typeFilter !== 'All Types' || dateRangeFilter !== 'All Time' ||
+                         mailboxFilter !== 'All Mailboxes';
+      if (hasFilters) {
+        console.log(`🔄 Group not found with active filters - clearing filters and retrying`);
+        // Clear all filters
+        setSearchTerm('');
+        setStatusFilter('All Status');
+        setTypeFilter('All Types');
+        setDateRangeFilter('All Time');
+        setMailboxFilter('All Mailboxes');
+        
+        // Wait for React to re-render with cleared filters
+        await new Promise(resolve => setTimeout(resolve, 300));
+        
+        // Retry finding the group (max 10 more attempts)
+        let filterRetries = 0;
+        while (!group && filterRetries < 10) {
+          group = groupedItemsRef.current.find(g => g.groupKey === groupKey);
+          if (!group) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            filterRetries++;
+          }
+        }
+      }
+    }
+    
     if (!group) {
-      console.warn(`❌ Could not find group with key: ${groupKey} after ${retries} retries`);
+      console.warn(`❌ Could not find group with key: ${groupKey} after retries`);
       console.log(`Available groups:`, groupedItemsRef.current.map(g => g.groupKey));
+      toast.error('Could not find the updated item. Please refresh the page.');
       return;
     }
     
-    console.log(`✅ Found group after ${retries} retries`);
+    console.log(`✅ Found group after retries`);
 
     // Get latest groupedItems from ref for sorting
     const currentGroupedItems = groupedItemsRef.current;
@@ -1074,7 +1105,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     } catch (err) {
       console.error('Failed to load action history:', err);
     }
-  }, [sortColumn, sortDirection, rowsPerPage, currentPage]); // Removed groupedItems from deps - using ref instead
+  }, [sortColumn, sortDirection, rowsPerPage, currentPage, searchTerm, statusFilter, typeFilter, dateRangeFilter, mailboxFilter]); // Removed groupedItems from deps - using ref instead
 
   // Sorting for grouped items
   const sortedGroups = [...groupedItems].sort((a, b) => {

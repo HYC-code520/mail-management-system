@@ -6,7 +6,7 @@ import WaiveFeeModal from '../components/WaiveFeeModal.tsx';
 import CollectFeeModal from '../components/CollectFeeModal.tsx';
 import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 import { format } from 'date-fns';
-import { DollarSign, Package, ChevronDown, ChevronUp, Banknote, Loader2 } from 'lucide-react';
+import { Package, ChevronDown, ChevronUp, Banknote, Search, SlidersHorizontal } from 'lucide-react';
 
 interface PackageFee {
   fee_id: string;
@@ -178,59 +178,122 @@ export default function FeesPage() {
   };
 
   const handleCollectFeeSuccess = async (action: 'collected' | 'waived' | 'skipped') => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    
+    // Refresh data in background
     loadFees();
-    setIsCollectFeeModalOpen(false);
     
-    if (collectingGroup) {
-      const customerName = collectingGroup.contact.contact_person || 
-                          collectingGroup.contact.company_name || 
-                          'Customer';
+    // For 'collected' action, DON'T close the modal here - let the celebration overlay handle it
+    // The modal will close itself after the celebration is done
+    if (action !== 'collected') {
+      // For waive/skip, close modal normally after a short delay
+      await new Promise(resolve => setTimeout(resolve, 200));
+      setIsCollectFeeModalOpen(false);
       
-      if (action === 'collected') {
-        toast.success(`💰 Fee collected from ${customerName}`);
-      } else if (action === 'waived') {
-        toast.success(`✅ Fee waived for ${customerName}`);
+      if (collectingGroup) {
+        const customerName = collectingGroup.contact.contact_person || 
+                            collectingGroup.contact.company_name || 
+                            'Customer';
+        
+        if (action === 'waived') {
+          toast.success(`✅ Fee waived for ${customerName}`);
+        }
       }
+      
+      setCollectingGroup(null);
     }
-    
-    setCollectingGroup(null);
+    // Note: For 'collected', the modal's handleCelebrationComplete will call onClose
   };
 
   // Calculate total outstanding fees
   const totalOutstanding = feesData.reduce((sum, group) => sum + group.totalFees, 0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'urgent' | 'normal'>('all');
+
+  // Filter fees based on search and status
+  const filteredFees = feesData.filter(group => {
+    const customerName = group.contact.contact_person || group.contact.company_name || '';
+    const mailbox = group.contact.mailbox_number || '';
+    const matchesSearch = searchQuery === '' || 
+      customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      mailbox.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    if (statusFilter === 'all') return matchesSearch;
+    
+    const oldestDays = Math.max(...group.packages.map(pkg => getDaysSince(pkg.received_date)));
+    if (statusFilter === 'urgent') return matchesSearch && oldestDays >= 14;
+    if (statusFilter === 'normal') return matchesSearch && oldestDays < 14;
+    return matchesSearch;
+  });
+
+  // Count by status
+  const urgentCount = feesData.filter(g => Math.max(...g.packages.map(p => getDaysSince(p.received_date))) >= 14).length;
+  const normalCount = feesData.length - urgentCount;
 
   return (
     <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="w-2 h-10 bg-gradient-to-b from-green-500 to-emerald-600 rounded-full"></div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
-            Fee Collection
-          </h1>
+      {/* Header Row */}
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-semibold text-gray-900">Fee Collection</h1>
+          <span className="text-gray-400 text-lg">{feesData.length} customers</span>
         </div>
-        <p className="text-gray-600 ml-5">Manage and collect outstanding package storage fees</p>
+        
+        {/* Total Outstanding Badge */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-full">
+          <span className="text-sm text-green-700">Total Outstanding</span>
+          <span className="text-lg font-bold text-green-700">${totalOutstanding.toFixed(2)}</span>
+        </div>
       </div>
 
-      {/* Summary Card */}
-      <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border border-green-200 mb-8">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
-              <DollarSign className="w-7 h-7 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-medium text-green-700">Total Outstanding</p>
-              <p className="text-4xl font-bold text-gray-900">${totalOutstanding.toFixed(2)}</p>
-            </div>
-          </div>
-          <div className="text-right">
-            <p className="text-sm text-green-700 font-medium">{feesData.length} customers</p>
-            <p className="text-sm text-gray-600">with pending fees</p>
-          </div>
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 mb-6">
+        <button
+          onClick={() => setStatusFilter('all')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            statusFilter === 'all'
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          All <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${statusFilter === 'all' ? 'bg-white/20' : 'bg-gray-200'}`}>{feesData.length}</span>
+        </button>
+        <button
+          onClick={() => setStatusFilter('urgent')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            statusFilter === 'urgent'
+              ? 'bg-red-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Urgent <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${statusFilter === 'urgent' ? 'bg-white/20' : 'bg-gray-200'}`}>{urgentCount}</span>
+        </button>
+        <button
+          onClick={() => setStatusFilter('normal')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            statusFilter === 'normal'
+              ? 'bg-green-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Normal <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${statusFilter === 'normal' ? 'bg-white/20' : 'bg-gray-200'}`}>{normalCount}</span>
+        </button>
+      </div>
+
+      {/* Search Bar */}
+      <div className="flex items-center gap-4 mb-6">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search for customer, mailbox number..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-10 pr-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-transparent"
+          />
         </div>
+        <button className="flex items-center gap-2 px-4 py-3 bg-white border border-gray-200 rounded-xl text-gray-600 hover:bg-gray-50 transition-colors">
+          <SlidersHorizontal className="w-5 h-5" />
+          Filters
+        </button>
       </div>
 
       {/* Fees List */}
@@ -247,19 +310,23 @@ export default function FeesPage() {
             Loading fees...
           </p>
         </div>
-      ) : feesData.length === 0 ? (
+      ) : filteredFees.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-12 text-center">
           <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
             <svg className="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">All Caught Up!</h3>
-          <p className="text-gray-600">No outstanding fees to collect at this time.</p>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">
+            {searchQuery ? 'No Results Found' : 'All Caught Up!'}
+          </h3>
+          <p className="text-gray-600">
+            {searchQuery ? 'Try adjusting your search terms.' : 'No outstanding fees to collect at this time.'}
+          </p>
         </div>
       ) : (
-        <div className="space-y-4">
-          {feesData.map((group) => {
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {filteredFees.map((group) => {
             const customerName = group.contact.contact_person || 
                                group.contact.company_name || 
                                'Unknown Customer';
@@ -273,75 +340,67 @@ export default function FeesPage() {
               ...allItems.map(item => getDaysSince(item.received_date))
             );
             const isPersonExpanded = expandedPersons.has(group.contact.contact_id);
+            const isUrgent = oldestDays >= 14;
             
             return (
               <div
                 key={group.contact.contact_id}
-                className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
+                className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
               >
-                {/* Header */}
-                <div 
-                  className="p-5 cursor-pointer"
-                  onClick={() => togglePersonExpand(group.contact.contact_id)}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4 flex-1">
-                      <div className="w-12 h-12 bg-gradient-to-br from-orange-500 to-amber-600 rounded-xl flex items-center justify-center shadow-md">
-                        <Package className="w-6 h-6 text-white" />
+                {/* Card Content */}
+                <div className="flex">
+                  {/* Left Side - Info */}
+                  <div className="flex-1 p-5">
+                    {/* Status Badge */}
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`w-2 h-2 rounded-full ${isUrgent ? 'bg-red-500' : 'bg-green-500'}`} />
+                      <span className={`text-sm font-medium ${isUrgent ? 'text-red-600' : 'text-green-600'}`}>
+                        {isUrgent ? 'Urgent' : 'Pending'}
+                      </span>
+                    </div>
+                    
+                    {/* Customer ID/Name */}
+                    <h3 className="text-xl font-bold text-gray-900 mb-3">{customerName}</h3>
+                    
+                    {/* Stats Row */}
+                    <div className="space-y-2 mb-4">
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 text-sm">Mailbox</span>
+                        <span className="text-gray-900 font-medium">{group.contact.mailbox_number || 'N/A'}</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-gray-900 text-lg">{customerName}</p>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              togglePersonExpand(group.contact.contact_id);
-                            }}
-                            className="p-1 hover:bg-gray-100 rounded-lg transition-colors"
-                          >
-                            {isPersonExpanded ? 
-                              <ChevronUp className="w-4 h-4 text-gray-600" /> : 
-                              <ChevronDown className="w-4 h-4 text-gray-600" />
-                            }
-                          </button>
-                        </div>
-                        <div className="flex items-center gap-2 mt-1">
-                          <span className="inline-flex items-center px-2 py-1 bg-blue-100 text-blue-700 text-xs font-semibold rounded-md">
-                            📮 {group.contact.mailbox_number || 'No mailbox'}
-                          </span>
-                          <span className="text-sm text-gray-600">
-                            {totalItems} item{totalItems !== 1 ? 's' : ''}
-                          </span>
-                          <span className={`text-sm font-medium ${oldestDays >= 7 ? 'text-orange-600' : 'text-gray-600'}`}>
-                            • {oldestDays} days
-                          </span>
-                        </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 text-sm">Amount</span>
+                        <span className="text-gray-900 font-bold text-lg">${group.totalFees.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-gray-500 text-sm">Days Pending</span>
+                        <span className={`font-medium ${oldestDays >= 30 ? 'text-red-600' : oldestDays >= 14 ? 'text-orange-600' : 'text-gray-900'}`}>
+                          {oldestDays} days
+                        </span>
                       </div>
                     </div>
                     
-                    {/* Fee Amount */}
-                    <div className="text-right bg-gradient-to-br from-orange-50 to-amber-50 px-5 py-3 rounded-xl border border-orange-200">
-                      <p className="text-3xl font-bold text-orange-600">
-                        ${group.totalFees.toFixed(2)}
-                      </p>
-                      <p className="text-xs text-orange-700 font-medium">storage fees</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Expanded Details */}
-                {isPersonExpanded && (
-                  <div className="px-5 pb-5 border-t border-gray-100 pt-4">
-                    {/* Package details */}
-                    {group.packages.length > 0 && (
-                      <div className="mb-4">
-                        <div className="flex items-center gap-2 text-sm mb-2">
-                          <Package className="w-4 h-4 text-gray-600" />
-                          <span className="font-semibold text-gray-900">
-                            {group.packages.length} package{group.packages.length !== 1 ? 's' : ''}
+                    {/* Package Details - Expandable */}
+                    <div className="border-t border-gray-100 pt-3">
+                      <button
+                        onClick={() => togglePersonExpand(group.contact.contact_id)}
+                        className="flex items-center justify-between w-full text-left"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className={`w-2 h-2 rounded-full ${isUrgent ? 'bg-red-500' : 'bg-green-500'}`} />
+                          <span className="text-sm font-medium text-gray-700">
+                            {totalItems} package{totalItems !== 1 ? 's' : ''}
                           </span>
                         </div>
-                        <div className="ml-6 space-y-2">
+                        {isPersonExpanded ? 
+                          <ChevronUp className="w-4 h-4 text-gray-400" /> : 
+                          <ChevronDown className="w-4 h-4 text-gray-400" />
+                        }
+                      </button>
+                      
+                      {/* Expanded Package List */}
+                      {isPersonExpanded && (
+                        <div className="mt-3 space-y-2 pl-4 border-l-2 border-gray-200 ml-1">
                           {group.packages.map(pkg => {
                             const days = getDaysSince(pkg.received_date);
                             const fee = pkg.packageFee?.fee_amount || 0;
@@ -351,54 +410,59 @@ export default function FeesPage() {
                             const receivedDateStr = format(new Date(pkg.received_date), 'MMM d');
                             
                             return (
-                              <div key={pkg.mail_item_id} className="text-sm bg-gray-50 rounded-lg p-3">
-                                <div className="flex items-center justify-between">
-                                  <div>
-                                    <span className="text-gray-900 font-medium">
-                                      Received {receivedDateStr}
-                                    </span>
-                                    <span className="text-gray-500 ml-2">({days} days ago)</span>
-                                  </div>
-                                  <div className={`font-semibold ${
-                                    isWaived ? 'text-blue-600 line-through' :
-                                    isPaid ? 'text-green-600' :
-                                    'text-orange-600'
-                                  }`}>
-                                    ${fee.toFixed(2)}
-                                    {isPaid && ' ✓'}
-                                    {isWaived && ' (waived)'}
-                                  </div>
+                              <div key={pkg.mail_item_id} className="flex items-center justify-between py-1.5 text-sm">
+                                <div className="flex items-center gap-2">
+                                  <Package className="w-3.5 h-3.5 text-gray-400" />
+                                  <span className="text-gray-600">{receivedDateStr}</span>
+                                  <span className="text-gray-400 text-xs">({days}d)</span>
                                 </div>
+                                <span className={`font-medium ${
+                                  isWaived ? 'text-gray-400 line-through' :
+                                  isPaid ? 'text-green-600' :
+                                  'text-gray-900'
+                                }`}>
+                                  ${fee.toFixed(2)}
+                                  {isPaid && <span className="text-green-600 ml-1">✓</span>}
+                                </span>
                               </div>
                             );
                           })}
                         </div>
-                      </div>
-                    )}
+                      )}
+                    </div>
+                    
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-100">
+                      <button
+                        onClick={() => openCollectFeeModal(group)}
+                        className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                      >
+                        <Banknote className="w-4 h-4" />
+                        Collect
+                      </button>
+                      <button
+                        onClick={() => openWaiveFeeModal(group)}
+                        className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                      >
+                        Waive
+                      </button>
+                      <button
+                        onClick={() => navigate(`/dashboard/contacts/${group.contact.contact_id}`)}
+                        className="px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                      >
+                        Profile
+                      </button>
+                    </div>
                   </div>
-                )}
-
-                {/* Action Buttons */}
-                <div className="px-5 pb-5 flex items-center gap-3">
-                  <button
-                    onClick={() => openCollectFeeModal(group)}
-                    className="flex-1 px-5 py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2"
-                  >
-                    <Banknote className="w-5 h-5" />
-                    Collect ${group.totalFees >= 50 ? group.totalFees.toFixed(0) : group.totalFees.toFixed(2)}
-                  </button>
-                  <button
-                    onClick={() => openWaiveFeeModal(group)}
-                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-colors"
-                  >
-                    Waive
-                  </button>
-                  <button
-                    onClick={() => navigate(`/dashboard/contacts/${group.contact.contact_id}`)}
-                    className="px-5 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-semibold transition-colors"
-                  >
-                    Profile
-                  </button>
+                  
+                  {/* Right Side - Illustration */}
+                  <div className="w-40 flex-shrink-0 bg-gradient-to-br from-green-50 to-emerald-50 flex items-center justify-center p-4">
+                    <img 
+                      src="/money-illustration.png" 
+                      alt="Money illustration" 
+                      className="w-full h-auto object-contain opacity-90"
+                    />
+                  </div>
                 </div>
               </div>
             );

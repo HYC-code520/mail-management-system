@@ -84,3 +84,7 @@ Forward → Abandoned
 - Test bulk scanning operations
 - Verify all actions show staff names, not emails
 - Verify no redundant information is displayed
+
+
+
+

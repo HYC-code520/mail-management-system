@@ -179,3 +179,7 @@ The following were verified and already working correctly:
 ## Result
 
 🎉 **100% coverage** - All locations in the app now properly display staff names ("Merlin" or "Madison") instead of email addresses!
+
+
+
+

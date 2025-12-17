@@ -135,3 +135,7 @@ Picked Up → Forward
 - [ ] Mark mail as "Scanned" → Should show 1 entry with staff name
 - [ ] Add notes when changing status → Notes should appear in action history
 - [ ] Verify all entries show correct staff member ("Merlin" or "Madison")
+
+
+
+

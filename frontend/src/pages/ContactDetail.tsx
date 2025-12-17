@@ -844,9 +844,14 @@ export default function ContactDetailPage() {
             totalFees: unpaidFees.reduce((sum, f) => sum + f.fee_amount, 0),
             urgencyScore: 0
           }}
-          onSuccess={() => {
+          onSuccess={(action) => {
+            // Refresh data in background
             loadUnpaidFees();
             loadMailHistory();
+            // Only close for non-collected actions (celebration handles collected)
+            if (action !== 'collected') {
+              setIsCollectFeeModalOpen(false);
+            }
           }}
         />
       )}

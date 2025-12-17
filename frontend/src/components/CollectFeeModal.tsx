@@ -10,6 +10,7 @@ import Modal from './Modal.tsx';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import { CreditCard, Banknote, Smartphone, CheckCircle, XCircle, ArrowRight, PackageCheck, Mail, AlertTriangle } from 'lucide-react';
+import CelebrationOverlay from './CelebrationOverlay.tsx';
 
 interface PackageFee {
   fee_id: string;
@@ -83,6 +84,8 @@ export default function CollectFeeModal({
   const [collectedBy, setCollectedBy] = useState<'Madison' | 'Merlin' | ''>(''); // Staff selection
   const [fullUnpaidAmount, setFullUnpaidAmount] = useState<number | null>(null); // Total unpaid fees across ALL items
   const [loadingFullAmount, setLoadingFullAmount] = useState(false);
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationData, setCelebrationData] = useState({ amount: '', method: '' });
 
   // Fetch the customer's FULL unpaid fees (not just from Needs Follow-Up)
   useEffect(() => {
@@ -124,7 +127,14 @@ export default function CollectFeeModal({
 
   const handleCollect = async () => {
     if (!collectedBy) {
-      toast.error('Please select who collected the fee');
+      toast('Please select who collected the fee', {
+        icon: 'ℹ️',
+        style: {
+          background: '#EFF6FF',
+          color: '#1E40AF',
+          border: '1px solid #BFDBFE',
+        },
+      });
       return;
     }
     
@@ -157,20 +167,6 @@ export default function CollectFeeModal({
             await api.mailItems.updateStatus(letter.mail_item_id, 'Picked Up');
           }
         }
-        
-        // Show appropriate toast message
-        const itemsMarked = markLettersAsPickedUp && group.letters.length > 0 
-          ? 'all items' 
-          : 'packages';
-        toast.success(
-          `💵 Collected $${finalAmount.toFixed(2)} via ${paymentMethod} & marked ${itemsMarked} as Picked Up`,
-          { duration: 5000 }
-        );
-      } else {
-        toast.success(
-          `💵 Collected $${finalAmount.toFixed(2)} via ${paymentMethod} from ${customerName}`,
-          { duration: 5000 }
-        );
       }
 
       // If pickup flow callback provided, call it
@@ -178,9 +174,15 @@ export default function CollectFeeModal({
         await onMarkPickedUp();
       }
 
-      resetForm();
+      // Show celebration overlay in center of screen FIRST
+      setCelebrationData({ amount: finalAmount.toFixed(2), method: paymentMethod });
+      setShowCelebration(true);
+      
+      // Call onSuccess immediately so data refreshes
       onSuccess('collected');
-      onClose();
+      
+      // Note: Don't call onClose() here - wait for celebration to complete
+      // The celebration will auto-dismiss and then we close
     } catch (error) {
       console.error('Error collecting fees:', error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to collect fees';
@@ -323,7 +325,23 @@ export default function CollectFeeModal({
     onClose();
   };
 
+  // Handle celebration complete - close modal and reset
+  const handleCelebrationComplete = () => {
+    setShowCelebration(false);
+    resetForm();
+    onClose();
+  };
+
   return (
+    <>
+    {/* Celebration overlay - shows after successful fee collection */}
+    <CelebrationOverlay
+      isVisible={showCelebration}
+      amount={celebrationData.amount}
+      method={celebrationData.method}
+      onComplete={handleCelebrationComplete}
+    />
+    
     <Modal isOpen={isOpen} onClose={handleClose} title="💵 Package Fee Collection">
       <div className="space-y-4">
         {/* Customer Info */}
@@ -629,6 +647,7 @@ export default function CollectFeeModal({
         )}
       </div>
     </Modal>
+    </>
   );
 }
 

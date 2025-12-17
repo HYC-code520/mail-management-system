@@ -327,7 +327,10 @@ describe('CollectFeeModal', () => {
       fireEvent.click(collectButton);
 
       await waitFor(() => {
-        expect(toast.error).toHaveBeenCalledWith('Please select who collected the fee');
+        // Now uses informational toast instead of error toast
+        expect(toast).toHaveBeenCalledWith('Please select who collected the fee', expect.objectContaining({
+          icon: 'ℹ️'
+        }));
       });
     });
 
@@ -431,12 +434,7 @@ describe('CollectFeeModal', () => {
         expect(api.mailItems.updateStatus).toHaveBeenCalledWith('pkg-1', 'Picked Up');
       });
 
-      await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(
-          expect.stringContaining('marked packages as Picked Up'),
-          expect.anything()
-        );
-      });
+      // Celebration overlay will show instead of toast
     });
 
     it('should mark both packages and letters as picked up when letter checkbox is checked', async () => {
@@ -478,12 +476,7 @@ describe('CollectFeeModal', () => {
         expect(api.mailItems.updateStatus).toHaveBeenCalledWith('letter-2', 'Picked Up');
       });
 
-      await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(
-          expect.stringContaining('marked all items as Picked Up'),
-          expect.anything()
-        );
-      });
+      // Celebration overlay will show instead of toast
     });
 
     it('should NOT mark items as picked up when checkbox is unchecked', async () => {
@@ -515,12 +508,7 @@ describe('CollectFeeModal', () => {
         expect(api.mailItems.updateStatus).not.toHaveBeenCalled();
       });
 
-      await waitFor(() => {
-        expect(toast.success).toHaveBeenCalledWith(
-          expect.stringContaining('Collected $20.00 via cash from Jane Smith'),
-          expect.anything()
-        );
-      });
+      // Celebration overlay will show instead of toast
     });
   });
 
