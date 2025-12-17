@@ -391,7 +391,8 @@ export default function CollectFeeModal({
                 <button
                   onClick={() => {
                     setIsEditingAmount(true);
-                    setEditedAmount(group.totalFees.toFixed(2));
+                    // Remove trailing zeros (28.00 -> 28, 28.50 -> 28.5)
+                    setEditedAmount(parseFloat(group.totalFees.toFixed(2)).toString());
                   }}
                   disabled={saving}
                   className="px-2 py-1 text-xs bg-blue-100 hover:bg-blue-200 text-blue-700 rounded transition-colors"

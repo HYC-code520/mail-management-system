@@ -65,7 +65,7 @@ describe('Real-world scenarios', () => {
   it('should handle the reported bug: editing mail on 12/2 should show Nov 30', () => {
     // User edits a row dated 12/2 and changes to 12/1
     // The toast should show "Dec 1", not "Nov 30"
-    const originalDate = '2025-12-02T12:00:00-05:00';
+    // Note: originalDate would be used in real scenario but not needed for this test
     const newDate = '2025-12-01'; // User selects Dec 1 in date picker
     
     // Extract the date properly
@@ -89,6 +89,7 @@ describe('Real-world scenarios', () => {
     expect(displayed).toMatch(/Dec.*2/);
   });
 });
+
 
 
 

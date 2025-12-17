@@ -607,7 +607,8 @@ describe('CollectFeeModal', () => {
       fireEvent.click(editButton);
 
       // Find the amount input and change it
-      const amountInput = screen.getByDisplayValue('12.00');
+      // Note: trailing zeros are removed (12.00 -> 12) for cleaner UX
+      const amountInput = screen.getByDisplayValue('12');
       fireEvent.change(amountInput, { target: { value: '8.00' } });
 
       // Select staff

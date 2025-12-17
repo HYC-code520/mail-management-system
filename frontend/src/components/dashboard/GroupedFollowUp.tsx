@@ -13,7 +13,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
-import { AlertCircle, Package, Mail, ChevronDown, ChevronUp, Send, DollarSign, Clock, MapPin, Info } from 'lucide-react';
+import { AlertCircle, Package, Mail, ChevronDown, Send, DollarSign, Clock, MapPin } from 'lucide-react';
 
 interface PackageFee {
   fee_id: string;
