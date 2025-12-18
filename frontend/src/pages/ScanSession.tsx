@@ -152,25 +152,29 @@ export default function ScanSessionPage() {
       await new Promise(resolve => setTimeout(resolve, 500));
     }
 
-    // Pick 3 contacts for demo - always include Tim Asprec
+    // Pick exactly 3 specific contacts for demo: Tim Asprec, Chia Ming Yeh, John Doe
     const timAsprec = contacts.find(c => 
       c.contact_person?.toLowerCase().includes('tim asprec') || 
-      c.contact_person?.toLowerCase().includes('tim') && c.contact_person?.toLowerCase().includes('asprec')
+      (c.contact_person?.toLowerCase().includes('tim') && c.contact_person?.toLowerCase().includes('asprec'))
     );
-    const otherContacts = contacts.filter(c => c.contact_id !== timAsprec?.contact_id);
-    const shuffledOthers = [...otherContacts].sort(() => Math.random() - 0.5);
+    const chiaMingYeh = contacts.find(c => 
+      c.contact_person?.toLowerCase().includes('chia ming yeh') || 
+      c.contact_person?.toLowerCase().includes('chia-ming')
+    );
+    const johnDoe = contacts.find(c => 
+      c.contact_person?.toLowerCase().includes('john doe') || 
+      (c.contact_person?.toLowerCase().includes('john') && c.contact_person?.toLowerCase().includes('doe'))
+    );
     
-    // Build demo contacts: Tim Asprec + 2 random others = 3 total
-    const demoContacts = timAsprec 
-      ? [timAsprec, ...shuffledOthers.slice(0, 2)]
-      : shuffledOthers.slice(0, 3);
+    // Build demo contacts in order: Tim Asprec, Chia Ming Yeh, John Doe
+    const demoContacts = [timAsprec, chiaMingYeh, johnDoe].filter(Boolean) as typeof contacts;
     
     // Simulate batch processing with animation
     setIsProcessingBatch(true);
-    await new Promise(resolve => setTimeout(resolve, 2500)); // Show cute animation
+    await new Promise(resolve => setTimeout(resolve, 3500)); // Show cute animation (longer)
     setIsProcessingBatch(false);
 
-    // Create fake scanned items
+    // Create items - ALL are Letters
     const demoItems: ScannedItem[] = demoContacts.map((contact, idx) => ({
       id: `demo-${Date.now()}-${idx}`,
       photoBlob: undefined,
@@ -178,7 +182,7 @@ export default function ScanSessionPage() {
       extractedText: contact.contact_person || contact.company_name || 'Customer',
       matchedContact: contact,
       confidence: 0.92 + Math.random() * 0.07, // 92-99% confidence
-      itemType: idx % 3 === 0 ? 'Package' : 'Letter',
+      itemType: 'Letter',
       status: 'matched',
       scannedAt: new Date().toISOString(),
     }));
@@ -189,17 +193,17 @@ export default function ScanSessionPage() {
       return { ...prev, items: [...prev.items, ...demoItems] };
     });
 
-    toast.success(`✨ ${demoItems.length} items matched!`, { duration: 2000 });
+    toast.success(`✨ ${demoItems.length} items matched!`, { duration: 3000 });
 
     // Unselect Merlin before showing review (so it looks like staff needs to select)
     setScannedBy(null);
 
-    // Auto-proceed to review after short delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Auto-proceed to review after delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
     setShowReview(true);
 
-    // Wait for review screen to render, then smooth scroll down to show submit button
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Wait for review screen to render - give time to see the review before scrolling
+    await new Promise(resolve => setTimeout(resolve, 3000));
     
     // Smooth scroll to bottom to simulate staff scrolling to submit button
     window.scrollTo({
@@ -208,16 +212,15 @@ export default function ScanSessionPage() {
     });
 
     // Wait for scroll to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
     // Simulate clicking Merlin button
     setScannedBy('Merlin');
     
     // Wait a moment after "selecting" Merlin
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
     // Show the "Successfully Submitted" state with Celebrate button
-    // (Skip actual backend call in demo mode)
     setCelebrationData({ scannedCount: demoItems.length, customersNotified: demoItems.length });
     setIsReadyToCelebrate(true);
     setIsDemoRunning(false);
@@ -1031,12 +1034,12 @@ export default function ScanSessionPage() {
   if (!session) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 relative">
-        {/* Secret demo button - top right corner, very subtle, no hover effect */}
+        {/* Subtle button - top right corner */}
         <button
           onClick={runDemoMode}
           disabled={isDemoRunning}
-          className="absolute top-6 right-6 w-2 h-2 rounded-full bg-gray-300 opacity-30"
-          aria-label="Demo"
+          className="absolute top-6 right-6 w-2 h-12 rounded-full bg-gray-300 opacity-20"
+          aria-label="Action"
         />
         
         <div className="max-w-md w-full text-center">
@@ -1189,10 +1192,6 @@ export default function ScanSessionPage() {
                     <span>🎉</span>
                     Celebrate
                   </button>
-                  
-                  <p className="text-sm text-gray-400">
-                    Click when ready for confetti
-                  </p>
                 </div>
               ) : (
                 <>
@@ -1492,12 +1491,12 @@ export default function ScanSessionPage() {
               )}
             </button>
 
-            {/* Secret demo button - absolute positioned outside, doesn't affect layout */}
+            {/* Subtle button - positioned outside */}
             <button
               onClick={runDemoMode}
               disabled={isDemoRunning}
-              className="absolute -right-4 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full bg-gray-300 opacity-30"
-              aria-label="Demo"
+              className="absolute -right-4 top-1/2 -translate-y-1/2 w-2 h-12 rounded-full bg-gray-300 opacity-20"
+              aria-label="Action"
             />
           </div>
           

@@ -26,11 +26,13 @@ import FeesPage from './pages/Fees.tsx';
 import { AuthProvider } from './contexts/AuthContext.tsx';
 import ProtectedRoute from './components/ProtectedRoute.tsx';
 import DashboardLayout from './components/layouts/DashboardLayout.tsx';
+import ScrollToTop from './components/ScrollToTop.tsx';
 
 function App() {
   return (
     <AuthProvider>
       <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+        <ScrollToTop />
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<SignInPage />} />
