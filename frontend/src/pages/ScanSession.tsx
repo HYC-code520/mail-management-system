@@ -171,10 +171,10 @@ export default function ScanSessionPage() {
     
     // Simulate batch processing with animation
     setIsProcessingBatch(true);
-    await new Promise(resolve => setTimeout(resolve, 2500)); // Show cute animation
+    await new Promise(resolve => setTimeout(resolve, 3500)); // Show cute animation (longer)
     setIsProcessingBatch(false);
 
-    // Create demo items - ALL are Letters
+    // Create items - ALL are Letters
     const demoItems: ScannedItem[] = demoContacts.map((contact, idx) => ({
       id: `demo-${Date.now()}-${idx}`,
       photoBlob: undefined,
@@ -193,17 +193,17 @@ export default function ScanSessionPage() {
       return { ...prev, items: [...prev.items, ...demoItems] };
     });
 
-    toast.success(`✨ ${demoItems.length} items matched!`, { duration: 2000 });
+    toast.success(`✨ ${demoItems.length} items matched!`, { duration: 3000 });
 
     // Unselect Merlin before showing review (so it looks like staff needs to select)
     setScannedBy(null);
 
-    // Auto-proceed to review after short delay
-    await new Promise(resolve => setTimeout(resolve, 1500));
+    // Auto-proceed to review after delay
+    await new Promise(resolve => setTimeout(resolve, 2000));
     setShowReview(true);
 
-    // Wait for review screen to render, then smooth scroll down to show submit button
-    await new Promise(resolve => setTimeout(resolve, 800));
+    // Wait for review screen to render - give time to see the review before scrolling
+    await new Promise(resolve => setTimeout(resolve, 3000));
     
     // Smooth scroll to bottom to simulate staff scrolling to submit button
     window.scrollTo({
@@ -212,16 +212,15 @@ export default function ScanSessionPage() {
     });
 
     // Wait for scroll to complete
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
     // Simulate clicking Merlin button
     setScannedBy('Merlin');
     
     // Wait a moment after "selecting" Merlin
-    await new Promise(resolve => setTimeout(resolve, 800));
+    await new Promise(resolve => setTimeout(resolve, 1500));
     
     // Show the "Successfully Submitted" state with Celebrate button
-    // (Skip actual backend call in demo mode)
     setCelebrationData({ scannedCount: demoItems.length, customersNotified: demoItems.length });
     setIsReadyToCelebrate(true);
     setIsDemoRunning(false);
