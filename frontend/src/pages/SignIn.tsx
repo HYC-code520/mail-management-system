@@ -119,6 +119,17 @@ export default function SignInPage() {
             </button>
           </div>
         </div>
+
+        {/* Footer Links */}
+        <div className="mt-6 text-center text-sm text-gray-600">
+          <a href="/privacy-policy" className="text-brand hover:text-brand-hover transition-colors">
+            Privacy Policy
+          </a>
+          <span className="mx-2">·</span>
+          <a href="/terms-of-service" className="text-brand hover:text-brand-hover transition-colors">
+            Terms of Service
+          </a>
+        </div>
       </div>
     </div>
   );

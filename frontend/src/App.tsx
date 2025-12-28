@@ -21,6 +21,8 @@ import DesignSystemPage from './pages/DesignSystem.tsx';
 import SettingsPage from './pages/Settings.tsx';
 import FollowUpsPage from './pages/FollowUps.tsx';
 import FeesPage from './pages/Fees.tsx';
+import PrivacyPolicyPage from './pages/PrivacyPolicy.tsx';
+import TermsOfServicePage from './pages/TermsOfService.tsx';
 
 // Layout
 import { AuthProvider } from './contexts/AuthContext.tsx';
@@ -37,6 +39,8 @@ function App() {
           {/* Public Routes */}
           <Route path="/" element={<SignInPage />} />
           <Route path="/signin" element={<SignInPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+          <Route path="/terms-of-service" element={<TermsOfServicePage />} />
           
           {/* Protected Routes with Dashboard Layout */}
           <Route path="/dashboard" element={
