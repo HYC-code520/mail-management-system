@@ -40,8 +40,10 @@ describe('SignInPage', () => {
   it('renders sign in form', () => {
     render(<SignInPage />, { authValue: { user: null, loading: false } });
     
-    expect(screen.getByText('Mei Way')).toBeInTheDocument();
-    expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
+    expect(screen.getByText('Mei Way Mail Plus')).toBeInTheDocument();
+    expect(screen.getByText('Professional Mail & Package Management Services')).toBeInTheDocument();
+    expect(screen.getByText('Welcome to Mei Way Mail Plus')).toBeInTheDocument();
+    expect(screen.getByText('Staff Sign In')).toBeInTheDocument();
     expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
@@ -51,11 +53,11 @@ describe('SignInPage', () => {
     const user = userEvent.setup();
     render(<SignInPage />, { authValue: { user: null, loading: false } });
     
-    expect(screen.getByText('Sign in to your account')).toBeInTheDocument();
+    expect(screen.getByText('Staff Sign In')).toBeInTheDocument();
     
     await user.click(screen.getByText(/don't have an account\? sign up/i));
     
-    expect(screen.getByText('Create your account')).toBeInTheDocument();
+    expect(screen.getByText('Staff Registration')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /sign up/i })).toBeInTheDocument();
   });
 

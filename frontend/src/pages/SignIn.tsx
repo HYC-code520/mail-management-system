@@ -13,12 +13,6 @@ export default function SignInPage() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
-  // Redirect if already logged in
-  if (user) {
-    navigate('/dashboard');
-    return null;
-  }
-
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -52,21 +46,63 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6">
-      <div className="max-w-md w-full">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center px-6 py-12">
+      <div className="max-w-2xl w-full">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 text-4xl font-bold text-brand">
             <Mail className="w-10 h-10" />
-            <span>Mei Way</span>
+            <span>Mei Way Mail Plus</span>
           </div>
-          <p className="text-gray-600 mt-2">
-            {isSignUp ? 'Create your account' : 'Sign in to your account'}
+          <p className="text-gray-600 mt-2 text-lg">
+            Professional Mail & Package Management Services
           </p>
+        </div>
+
+        {/* App Description */}
+        <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm mb-6">
+          <h2 className="text-2xl font-bold text-gray-900 mb-4">Welcome to Mei Way Mail Plus</h2>
+          <p className="text-gray-700 mb-4">
+            Your trusted partner for comprehensive mail and business services in Flushing, NY.
+          </p>
+          
+          <div className="space-y-3 text-gray-700">
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-brand rounded-full mt-2 flex-shrink-0"></div>
+              <p><strong>Private Mailbox Services:</strong> Secure mail and package receiving, logging, storage, and pickup</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-brand rounded-full mt-2 flex-shrink-0"></div>
+              <p><strong>Virtual Mailbox:</strong> Mail scanning and forwarding services for remote access</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-brand rounded-full mt-2 flex-shrink-0"></div>
+              <p><strong>Shipping Services:</strong> Domestic and international shipping solutions</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-brand rounded-full mt-2 flex-shrink-0"></div>
+              <p><strong>Business Support:</strong> LLC formation assistance, eBay consignment, and document handling</p>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-2 h-2 bg-brand rounded-full mt-2 flex-shrink-0"></div>
+              <p><strong>Email Notifications:</strong> Stay informed about your mail, packages, and account activity</p>
+            </div>
+          </div>
+
+          <div className="mt-6 pt-6 border-t border-gray-200">
+            <p className="text-sm text-gray-600">
+              <strong>Location:</strong> 37-02 Main Street, Unit B1, Flushing, NY 11354<br/>
+              <strong>Phone:</strong> <a href="tel:646-535-0363" className="text-brand hover:text-brand-hover">646-535-0363</a><br/>
+              <strong>Email:</strong> <a href="mailto:info@meiwaymail.com" className="text-brand hover:text-brand-hover">info@meiwaymail.com</a>
+            </p>
+          </div>
         </div>
 
         {/* Sign In/Up Form */}
         <div className="bg-white border border-gray-200 rounded-lg p-8 shadow-sm">
+          <h3 className="text-xl font-semibold text-gray-900 mb-6 text-center">
+            {isSignUp ? 'Staff Registration' : 'Staff Sign In'}
+          </h3>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
