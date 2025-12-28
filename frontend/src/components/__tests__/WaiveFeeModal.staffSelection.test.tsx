@@ -244,7 +244,7 @@ describe('WaiveFeeModal - Staff Selection', () => {
       () => new Promise(resolve => setTimeout(() => resolve({ success: true }), 100))
     );
 
-    render(
+    const { unmount } = render(
       <BrowserRouter>
         <WaiveFeeModal
           isOpen={true}
@@ -271,6 +271,14 @@ describe('WaiveFeeModal - Staff Selection', () => {
       expect(madisonButton).toBeDisabled();
       expect(screen.getByRole('button', { name: 'Merlin' })).toBeDisabled();
     });
+
+    // Wait for the async operation to complete before unmounting
+    await waitFor(() => {
+      expect(mockOnSuccess).toHaveBeenCalled();
+    });
+
+    // Clean up
+    unmount();
   });
 });
 

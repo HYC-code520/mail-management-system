@@ -52,9 +52,11 @@ export default function BulkEmailModal({ isOpen, onClose, contacts }: BulkEmailM
   const loadTemplates = async () => {
     try {
       const data = await api.templates.getAll();
-      const templatesList = Array.isArray(data) ? data : [];
+      // Backend returns { templates: [...] }
+      const templatesList = data?.templates || data || [];
+      console.log('Templates loaded:', templatesList);
       // Show all templates for bulk email
-      setTemplates(templatesList);
+      setTemplates(Array.isArray(templatesList) ? templatesList : []);
     } catch (err) {
       console.error('Error loading templates:', err);
       toast.error('Failed to load templates');
