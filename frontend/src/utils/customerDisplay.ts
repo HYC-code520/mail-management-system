@@ -2,7 +2,7 @@ interface Contact {
   company_name?: string;
   contact_person?: string;
   mailbox_number?: string;
-  display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+  display_name_preference?: 'company' | 'person' | 'both';
 }
 
 /**
@@ -12,7 +12,7 @@ interface Contact {
 export function getCustomerDisplayName(contact: Contact): string {
   const companyName = contact.company_name?.trim() || '';
   const personName = contact.contact_person?.trim() || '';
-  const preference = contact.display_name_preference || 'auto';
+  const preference = contact.display_name_preference || 'both';
 
   // Handle explicit preferences
   if (preference === 'company' && companyName) {
@@ -23,12 +23,7 @@ export function getCustomerDisplayName(contact: Contact): string {
     return personName;
   }
 
-  if (preference === 'both' && companyName && personName) {
-    return `${companyName} - ${personName}`;
-  }
-
-  // Auto/fallback logic: Show what's available
-  // Prioritize showing both for better identification
+  // Default 'both': Show both names, or fallback to whichever is available
   if (companyName && personName) {
     return `${companyName} - ${personName}`;
   }
@@ -49,19 +44,19 @@ export function getCustomerDisplayName(contact: Contact): string {
  * Respects preference but returns single value
  */
 export function getCustomerPrimaryName(contact: Contact): string {
-  const preference = contact.display_name_preference || 'auto';
-  
+  const preference = contact.display_name_preference || 'both';
+
   if (preference === 'company' && contact.company_name) {
     return contact.company_name;
   }
-  
+
   if (preference === 'person' && contact.contact_person) {
     return contact.contact_person;
   }
-  
+
   // Default: prefer company, fallback to person
-  return contact.company_name?.trim() || 
-         contact.contact_person?.trim() || 
+  return contact.company_name?.trim() ||
+         contact.contact_person?.trim() ||
          'Unknown Customer';
 }
 

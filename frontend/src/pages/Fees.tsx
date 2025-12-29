@@ -35,7 +35,7 @@ interface MailItem {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
-    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+    display_name_preference?: 'company' | 'person' | 'both';
   };
 }
 
@@ -45,7 +45,7 @@ interface GroupedFee {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
-    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+    display_name_preference?: 'company' | 'person' | 'both';
   };
   packages: MailItem[];
   letters: MailItem[];
