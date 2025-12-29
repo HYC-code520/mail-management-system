@@ -57,6 +57,7 @@ const createMockFollowUpGroup = (overrides = {}) => ({
     contact_person: 'John Doe',
     company_name: 'Acme Corp',
     mailbox_number: 'A1',
+    display_name_preference: 'person' as const,
   },
   packages: [
     {
@@ -77,6 +78,7 @@ const createMockFollowUpGroup = (overrides = {}) => ({
         contact_person: 'John Doe',
         company_name: 'Acme Corp',
         mailbox_number: 'A1',
+        display_name_preference: 'person' as const,
       },
     },
   ],
@@ -196,6 +198,7 @@ describe('FollowUpsPage', () => {
         contact_person: 'Jane Smith',
         company_name: 'Smith Inc',
         mailbox_number: 'B2',
+        display_name_preference: 'person' as const,
       },
       totalFees: 25,
     });

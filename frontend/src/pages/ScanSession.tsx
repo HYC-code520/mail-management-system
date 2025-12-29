@@ -9,6 +9,7 @@ import { smartMatchWithGemini } from '../utils/smartMatch';
 import { matchContactByName } from '../utils/nameMatching';
 import CameraModal from '../components/scan/CameraModal';
 import BulkScanEmailModal from '../components/scan/BulkScanEmailModal';
+import { getCustomerDisplayName } from '../utils/customerDisplay';
 import type {
   ScannedItem,
   ScanSession,
@@ -1130,7 +1131,7 @@ export default function ScanSessionPage() {
                   <div className="flex items-center justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-gray-900 text-lg mb-1">
-                        {group.contact.contact_person || group.contact.company_name}
+                        {getCustomerDisplayName(group.contact)}
                       </h3>
                       <p className="text-sm text-gray-500">
                         Mailbox: <span className="font-medium text-gray-700">{group.contact.mailbox_number}</span>
@@ -1745,7 +1746,7 @@ function ConfirmModal({ item, contacts, onConfirm, onCancel, onPhotoClick }: Con
               <option value="">Select customer...</option>
               {contacts.map(contact => (
                 <option key={contact.contact_id} value={contact.contact_id}>
-                  {contact.contact_person || contact.company_name} - {contact.mailbox_number}
+                  {getCustomerDisplayName(contact)} - {contact.mailbox_number}
                 </option>
               ))}
             </select>
@@ -1842,7 +1843,7 @@ function EditModal({ item, contacts, onSave, onCancel }: EditModalProps) {
               <option value="">Select customer...</option>
               {contacts.map(contact => (
                 <option key={contact.contact_id} value={contact.contact_id}>
-                  {contact.contact_person || contact.company_name} - {contact.mailbox_number}
+                  {getCustomerDisplayName(contact)} - {contact.mailbox_number}
                 </option>
               ))}
             </select>

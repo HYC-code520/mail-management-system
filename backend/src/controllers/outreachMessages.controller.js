@@ -16,7 +16,8 @@ exports.getOutreachMessages = async (req, res, next) => {
         contacts (
           company_name,
           contact_person,
-          unit_number
+          unit_number,
+          display_name_preference
         )
       `)
       .order('sent_at', { ascending: false });

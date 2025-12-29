@@ -52,6 +52,7 @@ interface Contact {
   subscription_status?: string;
   notes?: string;
   created_at?: string;
+  display_name_preference?: 'company' | 'person' | 'both' | 'auto';
 }
 
 interface MailItem {
@@ -192,7 +193,8 @@ export default function ContactDetailPage() {
     phone_number: '',
     language_preference: 'English',
     service_tier: 1,
-    status: 'Pending'
+    status: 'Pending',
+    display_name_preference: 'auto'
   });
 
   const loadContactDetails = useCallback(async () => {
@@ -352,7 +354,8 @@ export default function ContactDetailPage() {
       phone_number: contact.phone_number || '',
       language_preference: contact.language_preference || 'English',
       service_tier: contact.service_tier || 1,
-      status: contact.status || 'Pending'
+      status: contact.status || 'Pending',
+      display_name_preference: contact.display_name_preference || 'auto'
     });
     setIsEditModalOpen(true);
   };
@@ -368,7 +371,8 @@ export default function ContactDetailPage() {
       phone_number: '',
       language_preference: 'English',
       service_tier: 1,
-      status: 'Pending'
+      status: 'Pending',
+      display_name_preference: 'auto'
     });
   };
 
@@ -1013,6 +1017,39 @@ export default function ContactDetailPage() {
                 <option value="Pending">Pending</option>
                 <option value="No">Archived</option>
               </select>
+            </div>
+
+            {/* Display Name Preference */}
+            <div className="col-span-2">
+              <label htmlFor="display_name_preference" className="block text-sm font-medium text-gray-700 mb-1">
+                Display Name Preference
+                <span className="text-xs text-gray-500 ml-2 font-normal">
+                  How should this customer appear in lists?
+                </span>
+              </label>
+              <select
+                id="display_name_preference"
+                name="display_name_preference"
+                value={formData.display_name_preference}
+                onChange={handleFormChange}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              >
+                <option value="auto">Auto (Smart - Show what's available)</option>
+                <option value="company">Company Name Only</option>
+                <option value="person">Person Name Only</option>
+                <option value="both">Both (Company - Person)</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">
+                {formData.display_name_preference === 'auto' && 'Will show both if available, or fallback gracefully'}
+                {formData.display_name_preference === 'company' && formData.company_name && `Will show: "${formData.company_name}"`}
+                {formData.display_name_preference === 'company' && !formData.company_name && 'Will show company name (enter company name above)'}
+                {formData.display_name_preference === 'person' && formData.contact_person && `Will show: "${formData.contact_person}"`}
+                {formData.display_name_preference === 'person' && !formData.contact_person && 'Will show person name (enter name above)'}
+                {formData.display_name_preference === 'both' && formData.company_name && formData.contact_person && 
+                  `Will show: "${formData.company_name} - ${formData.contact_person}"`}
+                {formData.display_name_preference === 'both' && (!formData.company_name || !formData.contact_person) && 
+                  'Will show both names (enter both above)'}
+              </p>
             </div>
           </div>
 

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
-import { Mail, CheckCircle, XCircle, Info, ChevronDown, AlertCircle } from 'lucide-react';
+import { Mail, CheckCircle, XCircle, Info, ChevronDown, AlertCircle, Lock, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import { api } from '../lib/api-client';
+import { supabase } from '../lib/supabase';
 
 interface GmailStatus {
   connected: boolean;
@@ -13,6 +14,13 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(false);
   const [showInstructions, setShowInstructions] = useState(false);
+
+  // Password change state
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Load Gmail connection status on mount
   useEffect(() => {
@@ -63,6 +71,50 @@ export default function SettingsPage() {
       toast.error(error.message || 'Failed to disconnect Gmail');
     } finally {
       setConnecting(false);
+    }
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    // Validation
+    if (!newPassword || !confirmPassword) {
+      toast.error('Please fill in all fields');
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      toast.error('Passwords do not match');
+      return;
+    }
+
+    try {
+      setChangingPassword(true);
+
+      // Use Supabase to update password
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+
+      toast.success('Password changed successfully!');
+      
+      // Clear form
+      setNewPassword('');
+      setConfirmPassword('');
+      setShowNewPassword(false);
+      setShowConfirmPassword(false);
+    } catch (error: any) {
+      console.error('Failed to change password:', error);
+      toast.error(error.message || 'Failed to change password');
+    } finally {
+      setChangingPassword(false);
     }
   };
 
@@ -298,6 +350,112 @@ export default function SettingsPage() {
               )}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Password Change Section */}
+      <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden mt-6">
+        {/* Card Header */}
+        <div className="px-6 py-5 border-b border-gray-200 bg-gradient-to-r from-purple-50 to-pink-50">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-purple-100 rounded-lg">
+              <Lock className="w-5 h-5 text-purple-600" />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Change Password
+              </h2>
+              <p className="text-sm text-gray-600 mt-0.5">
+                Update your account password
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Card Content */}
+        <div className="p-6">
+          <form onSubmit={handleChangePassword} className="max-w-md space-y-4">
+            {/* New Password */}
+            <div>
+              <label htmlFor="new-password" className="block text-sm font-medium text-gray-700 mb-1">
+                New Password
+              </label>
+              <div className="relative">
+                <input
+                  id="new-password"
+                  type={showNewPassword ? 'text' : 'password'}
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Enter new password (min 6 characters)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-10"
+                  disabled={changingPassword}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowNewPassword(!showNewPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showNewPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Confirm Password */}
+            <div>
+              <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700 mb-1">
+                Confirm New Password
+              </label>
+              <div className="relative">
+                <input
+                  id="confirm-password"
+                  type={showConfirmPassword ? 'text' : 'password'}
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Re-enter new password"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-10"
+                  disabled={changingPassword}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit Button */}
+            <div className="pt-2">
+              <button
+                type="submit"
+                disabled={changingPassword || !newPassword || !confirmPassword}
+                className="px-6 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2 shadow-sm"
+              >
+                <Lock className="w-5 h-5" />
+                {changingPassword ? 'Changing Password...' : 'Change Password'}
+              </button>
+            </div>
+
+            {/* Password Requirements */}
+            <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mt-4">
+              <p className="text-sm font-semibold text-gray-900 mb-2">Password Requirements:</p>
+              <ul className="text-sm text-gray-700 space-y-1">
+                <li className="flex items-start gap-2">
+                  <span className="text-gray-500 mt-0.5">•</span>
+                  <span>At least 6 characters long</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-gray-500 mt-0.5">•</span>
+                  <span>Use a strong, unique password</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-gray-500 mt-0.5">•</span>
+                  <span>Don't reuse passwords from other sites</span>
+                </li>
+              </ul>
+            </div>
+          </form>
         </div>
       </div>
 

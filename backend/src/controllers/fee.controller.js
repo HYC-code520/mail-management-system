@@ -28,7 +28,8 @@ exports.getFees = async (req, res, next) => {
           contact_id,
           contact_person,
           company_name,
-          mailbox_number
+          mailbox_number,
+          display_name_preference
         )
       `)
       .eq('user_id', userId)

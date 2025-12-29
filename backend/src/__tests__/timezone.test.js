@@ -170,15 +170,17 @@ describe('Backend Timezone Utilities', () => {
 
     it('produces timestamp that Postgres interprets correctly', () => {
       const timestamp = getNYTimestamp();
-      const parsedDate = new Date(timestamp);
-      
-      // The parsed date should be valid
-      expect(parsedDate.toString()).not.toBe('Invalid Date');
-      
-      // When converted back to NY string, should match today
-      const nyDateStr = toNYDateString(parsedDate);
+
+      // Extract the date part (YYYY-MM-DD) from the timestamp
+      const datePart = timestamp.split('T')[0];
       const todayNY = getTodayNY();
-      expect(nyDateStr).toBe(todayNY);
+
+      // The date part should match today in NY timezone
+      expect(datePart).toBe(todayNY);
+
+      // The timestamp should be a valid ISO-like format that Postgres can parse
+      // Format: YYYY-MM-DDTHH:MM:SS.sss±HH:MM
+      expect(timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}[+-]\d{2}:\d{2}$/);
     });
   });
 

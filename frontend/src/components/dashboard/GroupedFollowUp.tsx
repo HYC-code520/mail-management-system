@@ -14,6 +14,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { AlertCircle, Package, Mail, ChevronDown, Send, DollarSign, Clock, MapPin } from 'lucide-react';
+import { getCustomerDisplayName } from '../../utils/customerDisplay';
 
 interface PackageFee {
   fee_id: string;
@@ -36,6 +37,7 @@ interface MailItem {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
+    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
   };
 }
 
@@ -45,6 +47,7 @@ interface GroupedFollowUp {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
+    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
   };
   packages: MailItem[];
   letters: MailItem[];
@@ -161,9 +164,7 @@ export default function GroupedFollowUpSection({
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
       {groups.slice(0, displayCount).map((group) => {
-        const customerName = group.contact.contact_person || 
-                           group.contact.company_name || 
-                           'Unknown Customer';
+        const customerName = getCustomerDisplayName(group.contact);
         const hasFees = group.totalFees > 0;
         const totalItems =
           group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0) +

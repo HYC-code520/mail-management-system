@@ -38,7 +38,8 @@ describe('LogPage - Staff Selection Toggle Buttons in Edit Modal', () => {
     mailbox_number: 'A1',
     status: 'Active',
     service_tier: 2,
-    email: 'test@example.com'
+    email: 'test@example.com',
+    display_name_preference: 'person' as const
   };
 
   const mockMailItem = {

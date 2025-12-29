@@ -7,6 +7,7 @@ import CollectFeeModal from '../components/CollectFeeModal.tsx';
 import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
 import { format } from 'date-fns';
 import { Package, ChevronDown, ChevronUp, Banknote, Search, SlidersHorizontal } from 'lucide-react';
+import { getCustomerDisplayName } from '../utils/customerDisplay';
 
 interface PackageFee {
   fee_id: string;
@@ -34,6 +35,7 @@ interface MailItem {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
+    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
   };
 }
 
@@ -43,6 +45,7 @@ interface GroupedFee {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
+    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
   };
   packages: MailItem[];
   letters: MailItem[];
@@ -85,6 +88,7 @@ export default function FeesPage() {
               contact_person: fee.contacts?.contact_person,
               company_name: fee.contacts?.company_name,
               mailbox_number: fee.contacts?.mailbox_number,
+              display_name_preference: fee.contacts?.display_name_preference,
             },
             packages: [],
             letters: [],
@@ -327,9 +331,7 @@ export default function FeesPage() {
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           {filteredFees.map((group) => {
-            const customerName = group.contact.contact_person || 
-                               group.contact.company_name || 
-                               'Unknown Customer';
+            const customerName = getCustomerDisplayName(group.contact);
             const totalItems =
               group.packages.reduce((sum, pkg) => sum + (pkg.quantity || 1), 0) +
               group.letters.reduce((sum, letter) => sum + (letter.quantity || 1), 0);

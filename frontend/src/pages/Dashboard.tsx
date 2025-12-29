@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Package, AlertCircle, CheckCircle2, AlertTriangle, Clock, Users } from 'lucide-react';
+import { Mail, Package, AlertCircle, CheckCircle2, AlertTriangle, Clock, Users, Info } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import Modal from '../components/Modal.tsx';
 import QuickNotifyModal from '../components/QuickNotifyModal.tsx';
@@ -12,6 +12,7 @@ import ChartsSection from '../components/dashboard/ChartsSection.tsx';
 import AnalyticsSection from '../components/dashboard/AnalyticsSection.tsx';
 import toast from 'react-hot-toast';
 import { getTodayNY, toNYDateString } from '../utils/timezone.ts';
+import { getCustomerDisplayName } from '../utils/customerDisplay';
 
 interface PackageFee {
   fee_id: string;
@@ -39,6 +40,7 @@ interface MailItem {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
+    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
   };
 }
 
@@ -48,6 +50,7 @@ interface GroupedFollowUp {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
+    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
   };
   packages: MailItem[];
   letters: MailItem[];
@@ -502,8 +505,34 @@ export default function DashboardPage() {
 
         {/* Today's Overview - 1/2 width (single horizontal line) */}
         <div className="lg:col-span-2">
-          <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100 h-full flex flex-col justify-center overflow-hidden">
-            <h2 className="text-sm font-bold text-gray-900 mb-3">Today's Overview</h2>
+          <div className="bg-white rounded-xl p-4 shadow-md border border-gray-100 h-full flex flex-col justify-center">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-bold text-gray-900">Today's Overview</h2>
+              
+              {/* Info Icon with Tooltip */}
+              <div className="relative group">
+                <Info className="w-4 h-4 text-gray-400 hover:text-gray-600 cursor-help transition-colors" />
+                
+                {/* Tooltip - Positioned outside container */}
+                <div className="absolute right-0 top-full mt-2 px-4 py-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-opacity duration-200 w-80 z-[100] pointer-events-none">
+                  <div className="space-y-2">
+                    <div>
+                      <span className="font-semibold text-blue-300">Today's Mail:</span> Individual mail items logged today (by received date)
+                    </div>
+                    <div>
+                      <span className="font-semibold text-purple-300">Pending Pickups:</span> All items with status "Pending" (not picked up yet)
+                    </div>
+                    <div>
+                      <span className="font-semibold text-red-300">Overdue:</span> Pending items &gt;7 days old (need urgent follow-up)
+                    </div>
+                    <div>
+                      <span className="font-semibold text-green-300">Completed:</span> Items marked "Picked Up" today
+                    </div>
+                  </div>
+                  <div className="absolute bottom-full right-2 border-[6px] border-transparent border-b-gray-900"></div>
+                </div>
+              </div>
+            </div>
 
             <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
               {/* Today's Mail */}
@@ -768,7 +797,7 @@ export default function DashboardPage() {
                 <div key={group.contact.contact_id} className="bg-gradient-to-br from-orange-50 to-amber-50 rounded-lg p-2.5 border border-orange-200 hover:shadow-md transition-shadow">
                   <div className="flex items-start justify-between mb-1">
                     <div className="flex-1 min-w-0">
-                      <p className="font-bold text-gray-900 text-xs truncate">{group.contact.contact_person || group.contact.company_name || 'Unknown'}</p>
+                      <p className="font-bold text-gray-900 text-xs truncate">{getCustomerDisplayName(group.contact)}</p>
                       <p className="text-xs text-gray-600">Box #{group.contact.mailbox_number}</p>
                     </div>
                     {group.totalFees > 0 && (

@@ -324,6 +324,16 @@ function validateContactData(contactData) {
     }
   }
   
+  // Validate display_name_preference if provided
+  if (contactData.display_name_preference) {
+    const validPreferences = ['company', 'person', 'both', 'auto'];
+    if (!validPreferences.includes(contactData.display_name_preference)) {
+      errors.display_name_preference = 'Invalid display preference. Must be: company, person, both, or auto';
+    } else {
+      sanitized.display_name_preference = contactData.display_name_preference;
+    }
+  }
+  
   // Copy over non-validated fields (status, language_preference, service_tier, etc.)
   const passthrough = ['status', 'language_preference', 'service_tier', 'customer_type', 'subscription_status', 'options'];
   passthrough.forEach(field => {

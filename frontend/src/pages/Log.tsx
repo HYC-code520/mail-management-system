@@ -9,6 +9,7 @@ import ActionModal from '../components/ActionModal.tsx';
 import SendEmailModal from '../components/SendEmailModal.tsx';
 import ActionHistorySection from '../components/ActionHistorySection.tsx';
 import { getTodayNY, extractNYDate, formatNYDateDisplay } from '../utils/timezone.ts';
+import { getCustomerDisplayName } from '../utils/customerDisplay';
 
 interface MailItem {
   mail_item_id: string;
@@ -26,6 +27,7 @@ interface MailItem {
     company_name?: string;
     mailbox_number?: string;
     unit_number?: string;
+    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
   };
 }
 
@@ -34,6 +36,7 @@ interface Contact {
   contact_person?: string;
   company_name?: string;
   mailbox_number?: string;
+  display_name_preference?: 'company' | 'person' | 'both' | 'auto';
 }
 
 interface ActionHistory {
@@ -1017,8 +1020,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           comparison = a.displayStatus.localeCompare(b.displayStatus);
           break;
         case 'customer': {
-          const nameA = a.contact?.contact_person || a.contact?.company_name || '';
-          const nameB = b.contact?.contact_person || b.contact?.company_name || '';
+          const nameA = a.contact ? getCustomerDisplayName(a.contact) : '';
+          const nameB = b.contact ? getCustomerDisplayName(b.contact) : '';
           comparison = nameA.localeCompare(nameB);
           break;
         }
@@ -1119,8 +1122,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         comparison = a.displayStatus.localeCompare(b.displayStatus);
         break;
       case 'customer': {
-        const nameA = a.contact?.contact_person || a.contact?.company_name || '';
-        const nameB = b.contact?.contact_person || b.contact?.company_name || '';
+        const nameA = a.contact ? getCustomerDisplayName(a.contact) : '';
+        const nameB = b.contact ? getCustomerDisplayName(b.contact) : '';
         comparison = nameA.localeCompare(nameB);
         break;
       }
@@ -1344,7 +1347,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                   >
                     <div className="flex items-center justify-between">
                       <div className="font-medium text-gray-900">
-                        {contact.contact_person || contact.company_name}
+                        {getCustomerDisplayName(contact)}
                       </div>
                       {(contact as any).status && (
                         <span className={`px-2 py-0.5 text-xs font-medium rounded ${
@@ -1385,7 +1388,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                         ? 'text-gray-700'
                         : 'text-green-900'
                     }`}>
-                      {selectedContact.contact_person || selectedContact.company_name}
+                      {getCustomerDisplayName(selectedContact)}
                     </div>
                     {(selectedContact as any).status === 'Pending' && (
                       <span className="px-2 py-0.5 bg-amber-200 text-amber-800 text-xs font-medium rounded">
@@ -1826,7 +1829,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <span className="text-gray-900">
-                          {group.contact?.contact_person || group.contact?.company_name || 'Unknown'}
+                          {group.contact ? getCustomerDisplayName(group.contact) : 'Unknown'}
                         </span>
                         {group.contactId && (
                           <button
@@ -1912,7 +1915,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                             <MoreVertical className="w-4 h-4" />
                           </button>
                           
-                          {openDropdownId === group.groupKey && (
+                          {openDropdownId === group.groupKey && (() => {
+                            const buttonEl = document.getElementById(`more-btn-${group.groupKey}`);
+                            const buttonRect = buttonEl?.getBoundingClientRect();
+                            const menuHeight = 400; // Approximate max height with max-h-96
+                            const spaceBelow = window.innerHeight - (buttonRect?.bottom ?? 0);
+                            const shouldFlipUp = spaceBelow < menuHeight && (buttonRect?.top ?? 0) > menuHeight;
+                            
+                            return (
                             <>
                               <div 
                                 className="fixed inset-0 z-30" 
@@ -1922,8 +1932,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                               <div 
                                 className="fixed w-56 bg-white rounded-lg shadow-xl border border-gray-200 py-1 z-40 max-h-96 overflow-y-auto"
                                 style={{
-                                  top: `${(document.getElementById(`more-btn-${group.groupKey}`)?.getBoundingClientRect().bottom ?? 0) + 4}px`,
-                                  right: `${window.innerWidth - (document.getElementById(`more-btn-${group.groupKey}`)?.getBoundingClientRect().right ?? 0)}px`,
+                                  [shouldFlipUp ? 'bottom' : 'top']: shouldFlipUp 
+                                    ? `${window.innerHeight - (buttonRect?.top ?? 0) + 4}px`
+                                    : `${(buttonRect?.bottom ?? 0) + 4}px`,
+                                  right: `${window.innerWidth - (buttonRect?.right ?? 0)}px`,
                                 }}
                               >
                                 <button
@@ -2028,7 +2040,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                 </button>
                               </div>
                             </>
-                          )}
+                            );
+                          })()}
                         </div>
                       </div>
                     </td>
@@ -2188,7 +2201,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 .filter(contact => (contact as any).status !== 'No')
                 .map(contact => (
                   <option key={contact.contact_id} value={contact.contact_id}>
-                    {contact.contact_person || contact.company_name} - {contact.mailbox_number}
+                    {getCustomerDisplayName(contact)} - {contact.mailbox_number}
                   </option>
                 ))
               }
@@ -2386,7 +2399,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           }}
           mailItemId={notifyingMailItem.mail_item_id}
           contactId={notifyingMailItem.contact_id}
-          customerName={notifyingMailItem.contacts?.contact_person || notifyingMailItem.contacts?.company_name || 'Customer'}
+          customerName={notifyingMailItem.contacts ? getCustomerDisplayName(notifyingMailItem.contacts) : 'Customer'}
           onSuccess={handleQuickNotifySuccess}
         />
       )}
@@ -2414,7 +2427,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           }}
           mailItemId={actionMailItem.mail_item_id}
           mailItemDetails={{
-            customerName: actionMailItem.contacts?.contact_person || actionMailItem.contacts?.company_name || 'Customer',
+            customerName: actionMailItem.contacts ? getCustomerDisplayName(actionMailItem.contacts) : 'Customer',
             itemType: actionMailItem.item_type,
             currentStatus: actionMailItem.status
           }}

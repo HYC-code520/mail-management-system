@@ -193,7 +193,8 @@ exports.getDashboardStats = async (req, res, next) => {
             contact_person,
             company_name,
             unit_number,
-            mailbox_number
+            mailbox_number,
+            display_name_preference
           )
         `)
         .order('received_date', { ascending: false }),
@@ -251,30 +252,34 @@ exports.getDashboardStats = async (req, res, next) => {
     // Recent customers (last 5)
     const recentCustomers = activeContacts.slice(0, 5);
     
-    // Mail items received today (NY timezone)
-    const todaysMail = enrichedMailItems.filter(item => 
+    // Mail items received today (NY timezone) - SUM quantities, not count entries
+    const todaysMailItems = enrichedMailItems.filter(item => 
       item.received_date && toNYDateString(item.received_date) === todayString
-    ).length;
+    );
+    const todaysMail = todaysMailItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
     
-    // Pending pickups (not picked up, not abandoned)
-    const pendingPickups = enrichedMailItems.filter(item => 
+    // Pending pickups (not picked up, not abandoned) - SUM quantities
+    const pendingItems = enrichedMailItems.filter(item => 
       item.status !== 'Picked Up' && 
       !item.status.includes('Abandoned') && 
       item.status !== 'Scanned'
-    ).length;
+    );
+    const pendingPickups = pendingItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
     
-    // Overdue mail (7+ days old, not picked up) - using NY timezone
-    const overdueMail = enrichedMailItems.filter(item => {
+    // Overdue mail (7+ days old, not picked up) - SUM quantities - using NY timezone
+    const overdueItems = enrichedMailItems.filter(item => {
       if (item.status === 'Picked Up' || item.status.includes('Abandoned')) return false;
       return getDaysSinceNY(item.received_date) >= 7;
-    }).length;
+    });
+    const overdueMail = overdueItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
     
-    // Completed today (picked up today in NY timezone)
-    const completedToday = enrichedMailItems.filter(item => 
+    // Completed today (picked up today in NY timezone) - SUM quantities
+    const completedItems = enrichedMailItems.filter(item => 
       item.status === 'Picked Up' && 
       item.pickup_date && 
       toNYDateString(item.pickup_date) === todayString
-    ).length;
+    );
+    const completedToday = completedItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
     
     if (feesError) {
       console.error('Error fetching package fees:', feesError);
