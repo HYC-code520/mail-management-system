@@ -298,7 +298,7 @@ export default function FollowUpsPage() {
                   <div className="w-px h-6 bg-gray-300" />
                   <div className="flex items-center gap-2">
                     <span className="text-2xl font-semibold text-red-600">{abandonedCount}</span>
-                    <span>abandoned</span>
+                    <span>30+ days</span>
                   </div>
                 </>
               )}
