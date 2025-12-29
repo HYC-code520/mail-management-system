@@ -27,7 +27,7 @@ interface MailItem {
     company_name?: string;
     mailbox_number?: string;
     unit_number?: string;
-    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+    display_name_preference?: 'company' | 'person' | 'both';
   };
 }
 
@@ -36,7 +36,7 @@ interface Contact {
   contact_person?: string;
   company_name?: string;
   mailbox_number?: string;
-  display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+  display_name_preference?: 'company' | 'person' | 'both';
 }
 
 interface ActionHistory {

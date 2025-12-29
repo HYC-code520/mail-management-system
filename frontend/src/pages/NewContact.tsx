@@ -16,7 +16,7 @@ export default function NewContactPage() {
     language_preference: 'English',
     customer_type: 'Tenant',
     status: 'Pending',
-    display_name_preference: 'auto'
+    display_name_preference: 'both'
   });
 
   // Format phone number as user types: 917-822-5751
@@ -272,21 +272,19 @@ export default function NewContactPage() {
               onChange={handleChange}
               className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="auto">Auto (Smart - Show what's available)</option>
+              <option value="both">Both (Company - Person)</option>
               <option value="company">Company Name Only</option>
               <option value="person">Person Name Only</option>
-              <option value="both">Both (Company - Person)</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              {formData.display_name_preference === 'auto' && 'Will show both if available, or fallback gracefully'}
               {formData.display_name_preference === 'company' && formData.company_name && `Will show: "${formData.company_name}"`}
               {formData.display_name_preference === 'company' && !formData.company_name && 'Will show company name (enter company name above)'}
               {formData.display_name_preference === 'person' && formData.contact_person && `Will show: "${formData.contact_person}"`}
               {formData.display_name_preference === 'person' && !formData.contact_person && 'Will show person name (enter name above)'}
-              {formData.display_name_preference === 'both' && formData.company_name && formData.contact_person && 
+              {(formData.display_name_preference === 'both' || !formData.display_name_preference) && formData.company_name && formData.contact_person &&
                 `Will show: "${formData.company_name} - ${formData.contact_person}"`}
-              {formData.display_name_preference === 'both' && (!formData.company_name || !formData.contact_person) && 
-                'Will show both names (enter both above)'}
+              {(formData.display_name_preference === 'both' || !formData.display_name_preference) && (!formData.company_name || !formData.contact_person) &&
+                'Shows both names, or whichever is available'}
             </p>
           </div>
 

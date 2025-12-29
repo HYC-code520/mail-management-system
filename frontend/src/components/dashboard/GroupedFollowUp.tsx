@@ -37,7 +37,7 @@ interface MailItem {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
-    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+    display_name_preference?: 'company' | 'person' | 'both';
   };
 }
 
@@ -47,7 +47,7 @@ interface GroupedFollowUp {
     contact_person?: string;
     company_name?: string;
     mailbox_number?: string;
-    display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+    display_name_preference?: 'company' | 'person' | 'both';
   };
   packages: MailItem[];
   letters: MailItem[];
@@ -248,7 +248,7 @@ export default function GroupedFollowUpSection({
               {/* Status tags */}
               {isAbandoned && (
                 <span className="px-3 py-1 bg-red-100 border border-red-300 rounded-full text-xs font-medium text-red-700">
-                  ⚠️ Abandoned
+                  ⚠️ 30+ Days
                 </span>
               )}
             </div>
@@ -263,67 +263,100 @@ export default function GroupedFollowUpSection({
                   <div className="col-span-2 text-center">Age</div>
                   <div className="col-span-3 text-right">Fee</div>
                 </div>
-                
-                {/* Package rows */}
-                {group.packages.map((pkg) => {
-                  const days = getDaysSince(pkg.received_date);
-                  const fee = pkg.packageFee?.fee_amount || 0;
-                  const feeStatus = pkg.packageFee?.fee_status;
-                  const isWaived = feeStatus === 'waived';
-                  const isPaid = feeStatus === 'paid';
-                  const receivedDateStr = format(new Date(pkg.received_date), 'MMM d');
-                  const qty = pkg.quantity || 1;
-                  
-                  return (
-                    <div 
-                      key={pkg.mail_item_id} 
-                      className="grid grid-cols-12 gap-2 px-2 py-1.5 text-sm items-center"
-                    >
-                      <div className="col-span-4 flex items-center gap-2">
-                        <Package className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
-                        <span className="text-gray-700 truncate">{receivedDateStr}</span>
+
+                {/* Aggregate packages by date */}
+                {(() => {
+                  // Group packages by date
+                  const packagesByDate: Record<string, { items: typeof group.packages; totalQty: number; totalFee: number; hasWaived: boolean; hasPaid: boolean }> = {};
+                  group.packages.forEach(pkg => {
+                    const dateKey = format(new Date(pkg.received_date), 'yyyy-MM-dd');
+                    if (!packagesByDate[dateKey]) {
+                      packagesByDate[dateKey] = { items: [], totalQty: 0, totalFee: 0, hasWaived: false, hasPaid: false };
+                    }
+                    packagesByDate[dateKey].items.push(pkg);
+                    packagesByDate[dateKey].totalQty += pkg.quantity || 1;
+                    if (pkg.packageFee?.fee_amount) {
+                      packagesByDate[dateKey].totalFee += pkg.packageFee.fee_amount;
+                    }
+                    if (pkg.packageFee?.fee_status === 'waived') packagesByDate[dateKey].hasWaived = true;
+                    if (pkg.packageFee?.fee_status === 'paid') packagesByDate[dateKey].hasPaid = true;
+                  });
+
+                  // Sort by date (newest first)
+                  const sortedDates = Object.keys(packagesByDate).sort((a, b) => b.localeCompare(a));
+
+                  return sortedDates.map(dateKey => {
+                    const data = packagesByDate[dateKey];
+                    const days = getDaysSince(data.items[0].received_date);
+                    const receivedDateStr = format(new Date(dateKey), 'MMM d');
+
+                    return (
+                      <div
+                        key={`pkg-${dateKey}`}
+                        className="grid grid-cols-12 gap-2 px-2 py-1.5 text-sm items-center"
+                      >
+                        <div className="col-span-4 flex items-center gap-2">
+                          <Package className="w-3.5 h-3.5 text-amber-600 flex-shrink-0" />
+                          <span className="text-gray-700 truncate">{receivedDateStr}</span>
+                        </div>
+                        <div className="col-span-3 text-center text-gray-600">{data.totalQty}</div>
+                        <div className="col-span-2 text-center text-gray-600">
+                          {days}d
+                        </div>
+                        <div className="col-span-3 text-right">
+                          {data.totalFee > 0 ? (
+                            <span className={data.hasWaived ? 'text-gray-400 line-through' : 'text-gray-600'}>
+                              ${data.totalFee.toFixed(2)}
+                              {data.hasPaid && <span className="text-green-600 ml-1">✓</span>}
+                            </span>
+                          ) : (
+                            <span className="text-gray-300">—</span>
+                          )}
+                        </div>
                       </div>
-                      <div className="col-span-3 text-center text-gray-600">{qty}</div>
-                      <div className="col-span-2 text-center text-gray-600">
-                        {days}d
+                    );
+                  });
+                })()}
+
+                {/* Aggregate letters by date */}
+                {(() => {
+                  // Group letters by date
+                  const lettersByDate: Record<string, { items: typeof group.letters; totalQty: number }> = {};
+                  group.letters.forEach(letter => {
+                    const dateKey = format(new Date(letter.received_date), 'yyyy-MM-dd');
+                    if (!lettersByDate[dateKey]) {
+                      lettersByDate[dateKey] = { items: [], totalQty: 0 };
+                    }
+                    lettersByDate[dateKey].items.push(letter);
+                    lettersByDate[dateKey].totalQty += letter.quantity || 1;
+                  });
+
+                  // Sort by date (newest first)
+                  const sortedDates = Object.keys(lettersByDate).sort((a, b) => b.localeCompare(a));
+
+                  return sortedDates.map(dateKey => {
+                    const data = lettersByDate[dateKey];
+                    const days = getDaysSince(data.items[0].received_date);
+                    const receivedDateStr = format(new Date(dateKey), 'MMM d');
+
+                    return (
+                      <div
+                        key={`letter-${dateKey}`}
+                        className="grid grid-cols-12 gap-2 px-2 py-1.5 text-sm items-center"
+                      >
+                        <div className="col-span-4 flex items-center gap-2">
+                          <Mail className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
+                          <span className="text-gray-700 truncate">{receivedDateStr}</span>
+                        </div>
+                        <div className="col-span-3 text-center text-gray-600">{data.totalQty}</div>
+                        <div className="col-span-2 text-center text-gray-600">
+                          {days}d
+                        </div>
+                        <div className="col-span-3 text-right text-gray-300">—</div>
                       </div>
-                      <div className="col-span-3 text-right">
-                        {fee > 0 ? (
-                          <span className={isWaived ? 'text-gray-400 line-through' : 'text-gray-600'}>
-                            ${fee.toFixed(2)}
-                            {isPaid && <span className="text-green-600 ml-1">✓</span>}
-                          </span>
-                        ) : (
-                          <span className="text-gray-300">—</span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-                
-                {/* Letter rows */}
-                {group.letters.map((letter) => {
-                  const days = getDaysSince(letter.received_date);
-                  const receivedDateStr = format(new Date(letter.received_date), 'MMM d');
-                  const qty = letter.quantity || 1;
-                  
-                  return (
-                    <div 
-                      key={letter.mail_item_id} 
-                      className="grid grid-cols-12 gap-2 px-2 py-1.5 text-sm items-center"
-                    >
-                      <div className="col-span-4 flex items-center gap-2">
-                        <Mail className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" />
-                        <span className="text-gray-700 truncate">{receivedDateStr}</span>
-                      </div>
-                      <div className="col-span-3 text-center text-gray-600">{qty}</div>
-                      <div className="col-span-2 text-center text-gray-600">
-                        {days}d
-                      </div>
-                      <div className="col-span-3 text-right text-gray-300">—</div>
-                    </div>
-                  );
-                })}
+                    );
+                  });
+                })()}
                 
                 {/* Footer with totals and last notified */}
                 <div className="flex items-center justify-between text-xs text-gray-400 mt-2 pt-2">

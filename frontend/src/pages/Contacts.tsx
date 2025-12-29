@@ -45,7 +45,7 @@ interface Contact {
   status?: string;
   language_preference?: string;
   service_tier?: number;
-  display_name_preference?: 'company' | 'person' | 'both' | 'auto';
+  display_name_preference?: 'company' | 'person' | 'both';
 }
 
 export default function ContactsPage() {
@@ -76,7 +76,7 @@ export default function ContactsPage() {
     language_preference: 'English',
     service_tier: 1,
     status: 'Pending',
-    display_name_preference: 'auto' as 'company' | 'person' | 'both' | 'auto'
+    display_name_preference: 'both' as 'company' | 'person' | 'both'
   });
 
   const loadContacts = useCallback(async () => {
@@ -154,7 +154,7 @@ export default function ContactsPage() {
       language_preference: contact.language_preference || 'English',
       service_tier: contact.service_tier || 1,
       status: contact.status || 'Pending',
-      display_name_preference: contact.display_name_preference || 'auto'
+      display_name_preference: contact.display_name_preference || 'both'
     });
     setIsModalOpen(true);
   };
@@ -172,7 +172,7 @@ export default function ContactsPage() {
       language_preference: 'English',
       service_tier: 1,
       status: 'Pending',
-      display_name_preference: 'auto'
+      display_name_preference: 'both'
     });
   };
 
@@ -767,21 +767,19 @@ export default function ContactsPage() {
               onChange={handleChange}
               className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
             >
-              <option value="auto">Auto (Smart - Show what's available)</option>
+              <option value="both">Both (Company - Person)</option>
               <option value="company">Company Name Only</option>
               <option value="person">Person Name Only</option>
-              <option value="both">Both (Company - Person)</option>
             </select>
             <p className="text-xs text-gray-500 mt-1">
-              {formData.display_name_preference === 'auto' && 'Will show both if available, or fallback gracefully'}
               {formData.display_name_preference === 'company' && formData.company_name && `Will show: "${formData.company_name}"`}
               {formData.display_name_preference === 'company' && !formData.company_name && 'Will show company name (enter company name above)'}
               {formData.display_name_preference === 'person' && formData.contact_person && `Will show: "${formData.contact_person}"`}
               {formData.display_name_preference === 'person' && !formData.contact_person && 'Will show person name (enter name above)'}
-              {formData.display_name_preference === 'both' && formData.company_name && formData.contact_person &&
+              {(formData.display_name_preference === 'both' || !formData.display_name_preference) && formData.company_name && formData.contact_person &&
                 `Will show: "${formData.company_name} - ${formData.contact_person}"`}
-              {formData.display_name_preference === 'both' && (!formData.company_name || !formData.contact_person) &&
-                'Will show both names (enter both above)'}
+              {(formData.display_name_preference === 'both' || !formData.display_name_preference) && (!formData.company_name || !formData.contact_person) &&
+                'Shows both names, or whichever is available'}
             </p>
           </div>
 

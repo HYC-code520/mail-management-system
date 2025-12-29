@@ -368,8 +368,8 @@ describe('GroupedFollowUpSection', () => {
       </BrowserRouter>
     );
 
-    // Should show Abandoned tag
-    expect(screen.getByText(/Abandoned/i)).toBeInTheDocument();
+    // Should show 30+ Days warning tag
+    expect(screen.getByText(/30\+ Days/i)).toBeInTheDocument();
     // Should show warning at bottom
     expect(screen.getByText(/requires immediate attention/i)).toBeInTheDocument();
   });

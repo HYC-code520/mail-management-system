@@ -297,30 +297,73 @@ exports.getDashboardStats = async (req, res, next) => {
     // Get ALL non-completed mail items (we'll filter by contact later)
     const allActiveItems = enrichedMailItems.filter(item => {
       // Exclude completed/handled statuses
-      if (item.status === 'Picked Up' || 
-          item.status === 'Forwarded' || 
+      if (item.status === 'Picked Up' ||
+          item.status === 'Forwarded' ||
           item.status === 'Scanned' ||
           item.status.includes('Abandoned')) {
         return false;
       }
       return true;
     });
-    
+
     // Build a Set of contact_ids that should appear in Needs Follow-Up
-    // Criteria: Has pending fees OR has items needing notification follow-up
+    // COOLDOWN LOGIC: If a contact was notified within the last 3 days,
+    // hide them from the list (even if they have pending fees).
+    // They reappear after 3 days if items are still not picked up.
     const contactIdsToShow = new Set();
-    
+
+    // First, group items by contact and find most recent notification for each
+    const contactNotificationMap = {};
     allActiveItems.forEach(item => {
+      const contactId = item.contact_id;
+      if (!contactNotificationMap[contactId]) {
+        contactNotificationMap[contactId] = {
+          hasPendingFees: false,
+          hasUnnotifiedItems: false,
+          mostRecentNotification: null
+        };
+      }
+
       // Check if this item has pending fees
       if (pendingFeeLookup[item.mail_item_id]) {
-        contactIdsToShow.add(item.contact_id);
+        contactNotificationMap[contactId].hasPendingFees = true;
       }
-      
-      // Check if this item needs notification follow-up
-      // (never notified OR notified 3+ days ago)
-      if (!item.last_notified || getDaysSinceNY(item.last_notified) >= 3) {
-        contactIdsToShow.add(item.contact_id);
+
+      // Check if this item has never been notified
+      if (!item.last_notified) {
+        contactNotificationMap[contactId].hasUnnotifiedItems = true;
       }
+
+      // Track most recent notification date for this contact
+      if (item.last_notified) {
+        const notifDate = new Date(item.last_notified);
+        if (!contactNotificationMap[contactId].mostRecentNotification ||
+            notifDate > contactNotificationMap[contactId].mostRecentNotification) {
+          contactNotificationMap[contactId].mostRecentNotification = notifDate;
+        }
+      }
+    });
+
+    // Now decide which contacts to show based on cooldown period
+    Object.entries(contactNotificationMap).forEach(([contactId, info]) => {
+      // If contact has unnotified items, always show them
+      if (info.hasUnnotifiedItems) {
+        contactIdsToShow.add(contactId);
+        return;
+      }
+
+      // If contact was notified within last 3 days, apply cooldown (hide)
+      if (info.mostRecentNotification) {
+        const daysSinceNotification = getDaysSinceNY(info.mostRecentNotification);
+        if (daysSinceNotification < 3) {
+          // Still in cooldown period - don't show
+          return;
+        }
+      }
+
+      // Contact hasn't been notified in 3+ days - show them
+      // (this includes contacts with pending fees after cooldown expires)
+      contactIdsToShow.add(contactId);
     });
     
     // Now get ALL active items for contacts that should appear

@@ -134,9 +134,26 @@ export default function BulkScanEmailModal({
     packageCount: groups[0].packageCount || 0,
   } : null;
 
+  // Build Type string (e.g., "3 Letters", "2 Packages", "1 Letter, 2 Packages")
+  const buildTypeString = (letterCount: number, packageCount: number): string => {
+    const parts: string[] = [];
+
+    if (letterCount > 0) {
+      parts.push(`${letterCount} ${letterCount === 1 ? 'Letter' : 'Letters'}`);
+    }
+
+    if (packageCount > 0) {
+      parts.push(`${packageCount} ${packageCount === 1 ? 'Package' : 'Packages'}`);
+    }
+
+    return parts.length > 0 ? parts.join(', ') : 'Mail';
+  };
+
   // Replace template variables with preview data
   const getPreviewText = (text: string) => {
     if (!previewData) return text;
+
+    const typeString = buildTypeString(previewData.letterCount, previewData.packageCount);
 
     // Replace both {{VAR}} and {VAR} formats (matching backend behavior)
     return text
@@ -146,6 +163,9 @@ export default function BulkScanEmailModal({
       // BoxNumber
       .replace(/\{\{BoxNumber\}\}/g, previewData.mailboxNumber)
       .replace(/\{BoxNumber\}/g, previewData.mailboxNumber)
+      // Type (e.g., "3 Letters", "2 Packages", "1 Letter, 2 Packages")
+      .replace(/\{\{Type\}\}/g, typeString)
+      .replace(/\{Type\}/g, typeString)
       // LetterCount
       .replace(/\{\{LetterCount\}\}/g, previewData.letterCount.toString())
       .replace(/\{LetterCount\}/g, previewData.letterCount.toString())
@@ -297,6 +317,7 @@ export default function BulkScanEmailModal({
                     <ul className="text-xs text-amber-800 mt-1 space-y-0.5">
                       <li>• <code className="bg-amber-100 px-1 rounded">{'{{Name}}'}</code> or <code className="bg-amber-100 px-1 rounded">{'{Name}'}</code> - Customer name</li>
                       <li>• <code className="bg-amber-100 px-1 rounded">{'{{BoxNumber}}'}</code> or <code className="bg-amber-100 px-1 rounded">{'{BoxNumber}'}</code> - Mailbox number</li>
+                      <li>• <code className="bg-amber-100 px-1 rounded">{'{{Type}}'}</code> or <code className="bg-amber-100 px-1 rounded">{'{Type}'}</code> - Mail type (e.g., "3 Letters", "2 Packages")</li>
                       <li>• <code className="bg-amber-100 px-1 rounded">{'{{LetterCount}}'}</code> or <code className="bg-amber-100 px-1 rounded">{'{LetterCount}'}</code> - Number of letters</li>
                       <li>• <code className="bg-amber-100 px-1 rounded">{'{{PackageCount}}'}</code> or <code className="bg-amber-100 px-1 rounded">{'{PackageCount}'}</code> - Number of packages</li>
                       <li>• <code className="bg-amber-100 px-1 rounded">{'{{TotalCount}}'}</code> - Total items (letters + packages)</li>
