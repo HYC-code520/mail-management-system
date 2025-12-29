@@ -62,9 +62,6 @@ export default function ScanSessionPage() {
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
   const BATCH_SIZE = 10;
 
-  // Demo mode state (for smooth presentations without backend)
-  const [isDemoRunning, setIsDemoRunning] = useState(false);
-
   // Load contacts and check for existing session on mount
   useEffect(() => {
     loadContacts();
@@ -139,94 +136,6 @@ export default function ScanSessionPage() {
 
     setSession(newSession);
     toast.success('Scan session started!');
-  };
-
-  // Demo mode: Simulates a perfect scan session for presentations
-  const runDemoMode = async () => {
-    if (isDemoRunning || contacts.length === 0) return;
-    
-    setIsDemoRunning(true);
-    
-    // Start fresh session if needed
-    if (!session) {
-      startSession();
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    // Pick exactly 3 specific contacts for demo: Tim Asprec, Chia Ming Yeh, John Doe
-    const timAsprec = contacts.find(c => 
-      c.contact_person?.toLowerCase().includes('tim asprec') || 
-      (c.contact_person?.toLowerCase().includes('tim') && c.contact_person?.toLowerCase().includes('asprec'))
-    );
-    const chiaMingYeh = contacts.find(c => 
-      c.contact_person?.toLowerCase().includes('chia ming yeh') || 
-      c.contact_person?.toLowerCase().includes('chia-ming')
-    );
-    const johnDoe = contacts.find(c => 
-      c.contact_person?.toLowerCase().includes('john doe') || 
-      (c.contact_person?.toLowerCase().includes('john') && c.contact_person?.toLowerCase().includes('doe'))
-    );
-    
-    // Build demo contacts in order: Tim Asprec, Chia Ming Yeh, John Doe
-    const demoContacts = [timAsprec, chiaMingYeh, johnDoe].filter(Boolean) as typeof contacts;
-    
-    // Simulate batch processing with animation
-    setIsProcessingBatch(true);
-    await new Promise(resolve => setTimeout(resolve, 3500)); // Show cute animation (longer)
-    setIsProcessingBatch(false);
-
-    // Create items - ALL are Letters
-    const demoItems: ScannedItem[] = demoContacts.map((contact, idx) => ({
-      id: `demo-${Date.now()}-${idx}`,
-      photoBlob: undefined,
-      photoPreviewUrl: undefined,
-      extractedText: contact.contact_person || contact.company_name || 'Customer',
-      matchedContact: contact,
-      confidence: 0.92 + Math.random() * 0.07, // 92-99% confidence
-      itemType: 'Letter',
-      status: 'matched',
-      scannedAt: new Date().toISOString(),
-    }));
-
-    // Add items to session with animation
-    setSession(prev => {
-      if (!prev) return prev;
-      return { ...prev, items: [...prev.items, ...demoItems] };
-    });
-
-    toast.success(`✨ ${demoItems.length} items matched!`, { duration: 3000 });
-
-    // Unselect Merlin before showing review (so it looks like staff needs to select)
-    setScannedBy(null);
-
-    // Auto-proceed to review after delay
-    await new Promise(resolve => setTimeout(resolve, 2000));
-    setShowReview(true);
-
-    // Wait for review screen to render - give time to see the review before scrolling
-    await new Promise(resolve => setTimeout(resolve, 3000));
-    
-    // Smooth scroll to bottom to simulate staff scrolling to submit button
-    window.scrollTo({
-      top: document.body.scrollHeight,
-      behavior: 'smooth'
-    });
-
-    // Wait for scroll to complete
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Simulate clicking Merlin button
-    setScannedBy('Merlin');
-    
-    // Wait a moment after "selecting" Merlin
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
-    // Show the "Successfully Submitted" state with Celebrate button
-    setCelebrationData({ scannedCount: demoItems.length, customersNotified: demoItems.length });
-    setIsReadyToCelebrate(true);
-    setIsDemoRunning(false);
-    
-    toast.success(`✨ Ready! Click "Celebrate" when ready for the big moment!`, { duration: 5000 });
   };
 
   const handleCameraClick = () => {
@@ -1034,15 +943,7 @@ export default function ScanSessionPage() {
   // Render: Start Screen
   if (!session) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6 relative">
-        {/* Subtle button - top right corner */}
-        <button
-          onClick={runDemoMode}
-          disabled={isDemoRunning}
-          className="absolute top-6 right-6 w-2 h-12 rounded-full bg-gray-300 opacity-20"
-          aria-label="Action"
-        />
-        
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <div className="max-w-md w-full text-center">
           <div className="bg-white rounded-2xl shadow-lg p-12 border border-gray-200">
             <div className="mb-8">
@@ -1392,8 +1293,8 @@ export default function ScanSessionPage() {
             </div>
           </div>
 
-          {/* Batch Queue Status - hidden during demo */}
-          {batchMode && !isDemoRunning && (
+          {/* Batch Queue Status */}
+          {batchMode && (
             <div className="mt-4 p-4">
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
@@ -1491,16 +1392,8 @@ export default function ScanSessionPage() {
                 </>
               )}
             </button>
-
-            {/* Subtle button - positioned outside */}
-            <button
-              onClick={runDemoMode}
-              disabled={isDemoRunning}
-              className="absolute -right-4 top-1/2 -translate-y-1/2 w-2 h-12 rounded-full bg-gray-300 opacity-20"
-              aria-label="Action"
-            />
           </div>
-          
+
           {/* End Session Button - Prominent Design */}
           {session.items.length > 0 && (
             <button
