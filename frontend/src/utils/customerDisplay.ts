@@ -10,37 +10,37 @@ interface Contact {
  * This is used throughout the app to ensure consistent customer name display
  */
 export function getCustomerDisplayName(contact: Contact): string {
-  const hasCompany = contact.company_name?.trim();
-  const hasPerson = contact.contact_person?.trim();
+  const companyName = contact.company_name?.trim() || '';
+  const personName = contact.contact_person?.trim() || '';
   const preference = contact.display_name_preference || 'auto';
-  
+
   // Handle explicit preferences
-  if (preference === 'company' && hasCompany) {
-    return contact.company_name;
+  if (preference === 'company' && companyName) {
+    return companyName;
   }
-  
-  if (preference === 'person' && hasPerson) {
-    return contact.contact_person;
+
+  if (preference === 'person' && personName) {
+    return personName;
   }
-  
-  if (preference === 'both' && hasCompany && hasPerson) {
-    return `${contact.company_name} - ${contact.contact_person}`;
+
+  if (preference === 'both' && companyName && personName) {
+    return `${companyName} - ${personName}`;
   }
-  
+
   // Auto/fallback logic: Show what's available
   // Prioritize showing both for better identification
-  if (hasCompany && hasPerson) {
-    return `${contact.company_name} - ${contact.contact_person}`;
+  if (companyName && personName) {
+    return `${companyName} - ${personName}`;
   }
-  
-  if (hasCompany) {
-    return contact.company_name;
+
+  if (companyName) {
+    return companyName;
   }
-  
-  if (hasPerson) {
-    return contact.contact_person;
+
+  if (personName) {
+    return personName;
   }
-  
+
   return 'Unknown Customer';
 }
 
