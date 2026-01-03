@@ -1,9 +1,21 @@
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LogOut, Languages, Mail, AlertCircle, Menu, X, User, Settings, LayoutDashboard, Inbox, Users, FileText, CheckSquare, Camera, ChevronLeft, ChevronRight, Bell, DollarSign, Search, UserPlus, Zap } from 'lucide-react';
+import { LogOut, Languages, Mail, AlertCircle, Menu, X, User, Settings, LayoutDashboard, Inbox, Users, FileText, CheckSquare, Camera, ChevronLeft, ChevronRight, Bell, DollarSign, Search, UserPlus, Zap, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext.tsx';
 import toast from 'react-hot-toast';
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '../../lib/api-client.ts';
+import Modal from '../Modal.tsx';
+import LoadingSpinner from '../LoadingSpinner.tsx';
+import { getTodayNY, toNYDateString } from '../../utils/timezone.ts';
+
+interface Contact {
+  contact_id: string;
+  contact_person?: string;
+  company_name?: string;
+  mailbox_number?: string;
+  status?: string;
+  service_tier?: number;
+}
 
 export default function DashboardLayout() {
   const { user, signOut } = useAuth();
@@ -18,6 +30,46 @@ export default function DashboardLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [hasNewTodos, setHasNewTodos] = useState(false);
   const [quickActionsOpen, setQuickActionsOpen] = useState(false);
+
+  // Quick Action Modal states
+  const [isLogMailModalOpen, setIsLogMailModalOpen] = useState(false);
+  const [isAddCustomerModalOpen, setIsAddCustomerModalOpen] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  // Contacts for Log Mail dropdown
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
+
+  // Log Mail form data
+  const [logMailFormData, setLogMailFormData] = useState<{
+    contact_id: string;
+    item_type: string;
+    description: string;
+    status: string;
+    received_date: string;
+    quantity: number | '';
+  }>({
+    contact_id: '',
+    item_type: 'Letter',
+    description: '',
+    status: 'Received',
+    received_date: toNYDateString(getTodayNY()),
+    quantity: 1
+  });
+
+  // Add Customer form data (all fields matching NewContact page)
+  const [customerFormData, setCustomerFormData] = useState({
+    contact_person: '',
+    company_name: '',
+    mailbox_number: '',
+    unit_number: '',
+    email: '',
+    phone_number: '',
+    language_preference: 'English',
+    service_tier: 1,
+    status: 'Pending',
+    display_name_preference: 'both'
+  });
 
   // Gmail status check function - defined before useEffect
   const checkGmailStatus = useCallback(async () => {
@@ -80,6 +132,167 @@ export default function DashboardLayout() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Load contacts when Log Mail modal opens
+  useEffect(() => {
+    if (isLogMailModalOpen && contacts.length === 0 && !contactsLoading) {
+      const loadContacts = async () => {
+        setContactsLoading(true);
+        try {
+          const data = await api.contacts.getAll();
+          const activeContacts = data.filter((c: Contact) => c.status === 'Active');
+          setContacts(activeContacts);
+        } catch (err) {
+          console.error('Error loading contacts:', err);
+          toast.error('Failed to load customers');
+        } finally {
+          setContactsLoading(false);
+        }
+      };
+      void loadContacts();
+    }
+  }, [isLogMailModalOpen, contacts.length, contactsLoading]);
+
+  // Format phone number as user types: 917-822-5751
+  const formatPhoneNumber = (value: string) => {
+    const digits = value.replace(/\D/g, '');
+    const limitedDigits = digits.slice(0, 10);
+    if (limitedDigits.length <= 3) {
+      return limitedDigits;
+    } else if (limitedDigits.length <= 6) {
+      return `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3)}`;
+    } else {
+      return `${limitedDigits.slice(0, 3)}-${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`;
+    }
+  };
+
+  // Close modal handlers
+  const closeLogMailModal = () => {
+    setIsLogMailModalOpen(false);
+    setLogMailFormData({
+      contact_id: '',
+      item_type: 'Letter',
+      description: '',
+      status: 'Received',
+      received_date: toNYDateString(getTodayNY()),
+      quantity: 1
+    });
+  };
+
+  const closeAddCustomerModal = () => {
+    setIsAddCustomerModalOpen(false);
+    setCustomerFormData({
+      contact_person: '',
+      company_name: '',
+      mailbox_number: '',
+      unit_number: '',
+      email: '',
+      phone_number: '',
+      language_preference: 'English',
+      service_tier: 1,
+      status: 'Pending',
+      display_name_preference: 'both'
+    });
+  };
+
+  // Log Mail form handlers
+  const handleLogMailFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+
+    if (name === 'item_type' && (value === 'Package' || value === 'Large Package')) {
+      const selectedContact = contacts.find(c => c.contact_id === logMailFormData.contact_id);
+      if (selectedContact && selectedContact.service_tier === 1) {
+        if (!window.confirm('Warning: This customer is on Service Tier 1, which typically does not include package handling. Are you sure you want to log a package for this customer?')) {
+          return;
+        }
+      }
+    }
+
+    if (name === 'quantity') {
+      const numValue = value === '' ? '' : parseInt(value, 10);
+      if (value === '' || (!isNaN(numValue as number) && (numValue as number) >= 0)) {
+        setLogMailFormData(prev => ({ ...prev, [name]: numValue }));
+      }
+    } else {
+      setLogMailFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleLogMailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!logMailFormData.contact_id) {
+      toast.error('Please select a customer');
+      return;
+    }
+    setSaving(true);
+    try {
+      const dateObj = new Date(logMailFormData.received_date + 'T12:00:00');
+      const nyYear = dateObj.getFullYear();
+      const nyMonth = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const nyDay = String(dateObj.getDate()).padStart(2, '0');
+      const receivedDateNY = `${nyYear}-${nyMonth}-${nyDay}T12:00:00-05:00`;
+
+      const quantity = typeof logMailFormData.quantity === 'number' && logMailFormData.quantity > 0
+        ? Math.floor(logMailFormData.quantity)
+        : 1;
+
+      await api.mailItems.create({
+        ...logMailFormData,
+        received_date: receivedDateNY,
+        quantity
+      });
+      toast.success('Mail logged successfully!');
+      closeLogMailModal();
+    } catch (err) {
+      console.error('Failed to log mail:', err);
+      toast.error(`Failed to log mail: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  // Add Customer form handlers
+  const handleCustomerFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    if (name === 'phone_number') {
+      const formatted = formatPhoneNumber(value);
+      setCustomerFormData(prev => ({ ...prev, [name]: formatted }));
+    } else {
+      setCustomerFormData(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const handleAddCustomerSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!customerFormData.contact_person && !customerFormData.company_name) {
+      toast.error('Please enter either a name or company name');
+      return;
+    }
+    if (!customerFormData.mailbox_number) {
+      toast.error('Mailbox number is required');
+      return;
+    }
+    if (customerFormData.phone_number) {
+      const digitsOnly = customerFormData.phone_number.replace(/\D/g, '');
+      if (digitsOnly.length > 0 && digitsOnly.length !== 10) {
+        toast.error('Phone number must be exactly 10 digits');
+        return;
+      }
+    }
+    setSaving(true);
+    try {
+      await api.contacts.create(customerFormData);
+      toast.success('Customer added successfully!');
+      closeAddCustomerModal();
+      // Refresh contacts list for Log Mail modal
+      setContacts([]);
+    } catch (err) {
+      console.error('Failed to create contact:', err);
+      toast.error(`Failed to add customer: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -669,7 +882,7 @@ export default function DashboardLayout() {
                 <button
                   onClick={() => {
                     setQuickActionsOpen(false);
-                    navigate('/dashboard/log');
+                    setIsLogMailModalOpen(true);
                   }}
                   className="w-full flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group"
                 >
@@ -686,7 +899,7 @@ export default function DashboardLayout() {
                 <button
                   onClick={() => {
                     setQuickActionsOpen(false);
-                    navigate('/dashboard/contacts');
+                    setIsAddCustomerModalOpen(true);
                   }}
                   className="w-full flex items-center gap-4 px-4 py-3 rounded-lg hover:bg-gray-50 transition-colors group"
                 >
@@ -703,6 +916,335 @@ export default function DashboardLayout() {
           </div>
         </div>
       )}
+
+      {/* Log Mail Modal */}
+      <Modal
+        isOpen={isLogMailModalOpen}
+        onClose={closeLogMailModal}
+        title="Log New Mail"
+      >
+        <form onSubmit={handleLogMailSubmit} className="space-y-6">
+          {/* Customer Selection */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Customer <span className="text-red-500">*</span>
+            </label>
+            <select
+              name="contact_id"
+              value={logMailFormData.contact_id}
+              onChange={handleLogMailFormChange}
+              required
+              disabled={contactsLoading}
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-wait"
+            >
+              <option value="">{contactsLoading ? 'Loading customers...' : 'Select a customer'}</option>
+              {contacts
+                .sort((a, b) => (a.mailbox_number || '').localeCompare(b.mailbox_number || ''))
+                .map(contact => (
+                  <option key={contact.contact_id} value={contact.contact_id}>
+                    {contact.mailbox_number} - {contact.contact_person || contact.company_name}
+                  </option>
+                ))
+              }
+            </select>
+          </div>
+
+          {/* Item Type & Status */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Item Type <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="item_type"
+                value={logMailFormData.item_type}
+                onChange={handleLogMailFormChange}
+                required
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="Letter">Letter</option>
+                <option value="Package">Package</option>
+                <option value="Large Package">Large Package</option>
+                <option value="Certified Mail">Certified Mail</option>
+              </select>
+              {(logMailFormData.item_type === 'Package' || logMailFormData.item_type === 'Large Package') &&
+               logMailFormData.contact_id &&
+               contacts.find(c => c.contact_id === logMailFormData.contact_id)?.service_tier === 1 && (
+                <p className="mt-2 text-sm text-amber-600 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  Tier 1 customers typically don't receive packages
+                </p>
+              )}
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Status <span className="text-red-500">*</span>
+              </label>
+              <select
+                name="status"
+                value={logMailFormData.status}
+                onChange={handleLogMailFormChange}
+                required
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="Received">Received</option>
+                <option value="Notified">Notified</option>
+                <option value="Ready for Pickup">Ready for Pickup</option>
+                <option value="Picked Up">Picked Up</option>
+                <option value="Forward">Forward</option>
+                <option value="Scanned">Scanned</option>
+                <option value="Abandoned">Abandoned</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Quantity & Received Date */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Quantity
+              </label>
+              <input
+                type="number"
+                name="quantity"
+                value={logMailFormData.quantity}
+                onChange={handleLogMailFormChange}
+                min="1"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Received Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                name="received_date"
+                value={logMailFormData.received_date}
+                onChange={handleLogMailFormChange}
+                required
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Description (Optional)
+            </label>
+            <textarea
+              name="description"
+              value={logMailFormData.description}
+              onChange={handleLogMailFormChange}
+              rows={3}
+              placeholder="Add any notes about this mail item..."
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 resize-none"
+            />
+          </div>
+
+          {/* Action Buttons */}
+          <div className="flex justify-end gap-3 pt-4">
+            <button
+              type="button"
+              onClick={closeLogMailModal}
+              className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed flex items-center gap-2"
+              disabled={saving}
+            >
+              {saving ? (
+                <>
+                  <LoadingSpinner size="sm" />
+                  <span>Logging...</span>
+                </>
+              ) : (
+                'Log Mail'
+              )}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Add Customer Modal */}
+      <Modal
+        isOpen={isAddCustomerModalOpen}
+        onClose={closeAddCustomerModal}
+        title="Add New Customer"
+      >
+        <form onSubmit={handleAddCustomerSubmit} className="space-y-6">
+          {/* Name & Company */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="contact_person"
+                value={customerFormData.contact_person}
+                onChange={handleCustomerFormChange}
+                placeholder="Full name"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Company</label>
+              <input
+                type="text"
+                name="company_name"
+                value={customerFormData.company_name}
+                onChange={handleCustomerFormChange}
+                placeholder="Company name"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          {/* Mailbox & Language */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">
+                Mailbox # <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                name="mailbox_number"
+                value={customerFormData.mailbox_number}
+                onChange={handleCustomerFormChange}
+                placeholder="e.g., A1"
+                required
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Preferred Language</label>
+              <select
+                name="language_preference"
+                value={customerFormData.language_preference}
+                onChange={handleCustomerFormChange}
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="English">English</option>
+                <option value="Chinese">Chinese</option>
+                <option value="Both">Both</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Email & Phone */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Email</label>
+              <input
+                type="email"
+                name="email"
+                value={customerFormData.email}
+                onChange={handleCustomerFormChange}
+                placeholder="email@example.com"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Phone</label>
+              <input
+                type="tel"
+                name="phone_number"
+                value={customerFormData.phone_number}
+                onChange={handleCustomerFormChange}
+                placeholder="917-822-5751"
+                maxLength={12}
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          {/* Unit & Service Tier */}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Unit #</label>
+              <input
+                type="text"
+                name="unit_number"
+                value={customerFormData.unit_number}
+                onChange={handleCustomerFormChange}
+                placeholder="e.g., 101"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-900 mb-2">Service Tier</label>
+              <select
+                name="service_tier"
+                value={customerFormData.service_tier}
+                onChange={handleCustomerFormChange}
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="1">1</option>
+                <option value="2">2</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Customer Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">Customer Status</label>
+            <select
+              name="status"
+              value={customerFormData.status}
+              onChange={handleCustomerFormChange}
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="Pending">Pending</option>
+              <option value="Active">Active</option>
+              <option value="No">Archived</option>
+            </select>
+          </div>
+
+          {/* Display Name Preference */}
+          <div>
+            <label className="block text-sm font-medium text-gray-900 mb-2">
+              Display Name Preference
+              <span className="text-xs text-gray-500 ml-2 font-normal">How should this customer appear in lists?</span>
+            </label>
+            <select
+              name="display_name_preference"
+              value={customerFormData.display_name_preference}
+              onChange={handleCustomerFormChange}
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="both">Both (Company - Person)</option>
+              <option value="company">Company Name Only</option>
+              <option value="person">Person Name Only</option>
+            </select>
+            <p className="text-xs text-gray-500 mt-1">Shows both names, or whichever is available</p>
+          </div>
+
+          {/* Buttons */}
+          <div className="flex gap-4 pt-4">
+            <button
+              type="button"
+              onClick={closeAddCustomerModal}
+              className="flex-1 px-6 py-3 bg-white hover:bg-gray-50 text-gray-700 border border-gray-300 rounded-lg font-medium transition-colors"
+              disabled={saving}
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              className="flex-1 px-6 py-3 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              disabled={saving}
+            >
+              {saving ? 'Saving...' : 'Save Customer'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

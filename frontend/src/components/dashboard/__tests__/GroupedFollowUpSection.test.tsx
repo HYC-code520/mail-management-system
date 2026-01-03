@@ -14,7 +14,15 @@ vi.mock('react-router-dom', async () => {
   };
 });
 
+// Helper to create dates relative to today
+const daysAgo = (days: number) => {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString();
+};
+
 describe('GroupedFollowUpSection', () => {
+  // Use dynamic dates to prevent test staleness
   const mockGroups = [
     {
       contact: {
@@ -27,7 +35,7 @@ describe('GroupedFollowUpSection', () => {
           mail_item_id: 'mail-1',
           item_type: 'Package',
           status: 'Received',
-          received_date: '2025-12-03T10:00:00Z',
+          received_date: daysAgo(10), // 10 days ago - not abandoned
           contact_id: 'contact-1',
           packageFee: {
             fee_id: 'fee-1',
@@ -40,7 +48,7 @@ describe('GroupedFollowUpSection', () => {
       letters: [],
       totalFees: 12.00,
       urgencyScore: 50,
-      lastNotified: '2025-12-05T10:00:00Z',
+      lastNotified: daysAgo(5),
     },
     {
       contact: {
@@ -54,7 +62,7 @@ describe('GroupedFollowUpSection', () => {
           mail_item_id: 'mail-2',
           item_type: 'Letter',
           status: 'Received',
-          received_date: '2025-11-10T10:00:00Z',
+          received_date: daysAgo(20), // 20 days ago - not abandoned
           contact_id: 'contact-2',
         },
       ],
@@ -163,7 +171,7 @@ describe('GroupedFollowUpSection', () => {
             mail_item_id: 'mail-3',
             item_type: 'Package',
             status: 'Received',
-            received_date: '2025-10-10T10:00:00Z',
+            received_date: daysAgo(35), // 35 days ago - abandoned
             contact_id: 'contact-3',
             packageFee: {
               fee_id: 'fee-3',
@@ -282,7 +290,7 @@ describe('GroupedFollowUpSection', () => {
             mail_item_id: 'mail-4',
             item_type: 'Package',
             status: 'Received',
-            received_date: '2025-12-01T10:00:00Z',
+            received_date: daysAgo(10), // 10 days ago
             contact_id: 'contact-4',
             packageFee: {
               fee_id: 'fee-4',

@@ -164,6 +164,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   // Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingMailItem, setEditingMailItem] = useState<MailItem | null>(null);
+  const [editingGroupItems, setEditingGroupItems] = useState<MailItem[]>([]); // All items in the editing group
   const [saving, setSaving] = useState(false);
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
   
@@ -174,11 +175,13 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   // Send Email Modal states
   const [isSendEmailModalOpen, setIsSendEmailModalOpen] = useState(false);
   const [emailingMailItem, setEmailingMailItem] = useState<MailItem | null>(null);
+  const [emailGroupItems, setEmailGroupItems] = useState<MailItem[]>([]); // All items for bulk email
   
   // Action Modal states
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
   const [actionModalType, setActionModalType] = useState<'picked_up' | 'forward' | 'scanned' | 'abandoned'>('picked_up');
   const [actionMailItem, setActionMailItem] = useState<MailItem | null>(null);
+  const [actionGroupItems, setActionGroupItems] = useState<MailItem[]>([]); // All items for bulk action
   
   // Form data
   const [formData, setFormData] = useState<{
@@ -478,21 +481,22 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
-  const openEditModal = (mailItem: MailItem) => {
+  const openEditModal = (mailItem: MailItem, groupItems: MailItem[], groupTotalQuantity: number) => {
     setEditingMailItem(mailItem);
-    
+    setEditingGroupItems(groupItems);
+
     // Migrate old status names to new short names
     let status = mailItem.status || 'Received';
     if (status === 'Scanned Document') status = 'Scanned';
     if (status === 'Abandoned Package') status = 'Abandoned';
-    
+
     setFormData({
       contact_id: mailItem.contact_id || '',
       item_type: mailItem.item_type || 'Package',
       description: mailItem.description || '',
       status: status,
       received_date: mailItem.received_date?.split('T')[0] || getTodayNY(),
-      quantity: (mailItem as any).quantity || 1,
+      quantity: groupTotalQuantity,
       performed_by: '',
       edit_notes: ''
     });
@@ -502,6 +506,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
   const closeModal = () => {
     setIsEditModalOpen(false);
     setEditingMailItem(null);
+    setEditingGroupItems([]);
     setFormData({
       contact_id: '',
       item_type: 'Package',
@@ -543,50 +548,60 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
         
         const normalizedOldStatus = normalizeStatus(editingMailItem.status);
         const normalizedNewStatus = normalizeStatus(formData.status);
-        
+
         // Only consider it a "real" status change if normalized values differ
         const statusActuallyChanged = normalizedOldStatus !== normalizedNewStatus;
-        
-        // Check if quantity changed
-        const oldQuantity = editingMailItem.quantity || 1;
+
+        // Check if quantity changed - compare against group total, not individual item
+        const oldTotalQuantity = editingGroupItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
         const newQuantity = formData.quantity;
-        const quantityChanged = oldQuantity !== newQuantity;
-        
+        const quantityChanged = oldTotalQuantity !== newQuantity;
+
         // If status changed, require staff name
         if (statusActuallyChanged && !formData.performed_by.trim()) {
           toast.error('Please select who made this status change');
           setSaving(false);
           return;
         }
-        
+
         // If quantity changed, require staff name
         if (quantityChanged && !formData.performed_by.trim()) {
           toast.error('Please select who made this quantity change');
           setSaving(false);
           return;
         }
-        
+
         // Update the mail item (exclude performed_by and edit_notes from the update payload)
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { performed_by, edit_notes: _edit_notes, ...updateData } = formData;
-        
+
         // Ensure quantity is a number (convert empty string to 1)
         updateData.quantity = typeof updateData.quantity === 'string' && updateData.quantity === '' ? 1 : Number(updateData.quantity);
-        
+
         // If received_date is being updated and it's a date-only string, add timezone
         if (updateData.received_date && /^\d{4}-\d{2}-\d{2}$/.test(updateData.received_date)) {
           updateData.received_date = `${updateData.received_date}T12:00:00-05:00`;
         }
-        
+
+        // If there are multiple items in the group, consolidate them:
+        // Update the first item with the new total quantity, delete the rest
+        if (editingGroupItems.length > 1) {
+          // Delete extra items (all except the first one)
+          for (let i = 1; i < editingGroupItems.length; i++) {
+            await api.mailItems.delete(editingGroupItems[i].mail_item_id);
+          }
+        }
+
         // Pass performed_by to backend for action history logging
         await api.mailItems.update(editingMailItem.mail_item_id, {
           ...updateData,
           performed_by: performed_by || 'Staff' // Include performed_by in the update
         });
-        
+
         // Backend automatically logs action history, so no need to manually create it here
-        
-        toast.success('Mail item updated successfully!');
+
+        const itemsConsolidated = editingGroupItems.length > 1 ? ` (consolidated ${editingGroupItems.length} entries)` : '';
+        toast.success(`Mail item updated successfully!${itemsConsolidated}`);
         
         // Get the group key for the updated item
         const updatedDate = updateData.received_date 
@@ -638,16 +653,30 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
-  const handleDelete = async (mailItemId: string) => {
-    if (!confirm('Are you sure you want to delete this mail item? This action cannot be undone.')) {
+  const handleDelete = async (groupItems: MailItem[]) => {
+    const itemCount = groupItems.length;
+    const totalQty = groupItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+
+    const confirmMessage = itemCount > 1
+      ? `Are you sure you want to delete all ${itemCount} entries (${totalQty} total items)? This action cannot be undone.`
+      : 'Are you sure you want to delete this mail item? This action cannot be undone.';
+
+    if (!confirm(confirmMessage)) {
       return;
     }
 
-    setDeletingItemId(mailItemId);
+    setDeletingItemId(groupItems[0].mail_item_id);
 
     try {
-      await api.mailItems.delete(mailItemId);
-      toast.success('Mail item deleted successfully!');
+      // Delete all items in the group
+      for (const item of groupItems) {
+        await api.mailItems.delete(item.mail_item_id);
+      }
+
+      const successMessage = itemCount > 1
+        ? `${itemCount} mail entries deleted successfully!`
+        : 'Mail item deleted successfully!';
+      toast.success(successMessage);
       loadMailItems();
     } catch (err) {
       console.error('Failed to delete mail item:', err);
@@ -657,8 +686,9 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
     }
   };
 
-  const openSendEmailModal = (item: MailItem) => {
+  const openSendEmailModal = (item: MailItem, groupItems?: MailItem[]) => {
     setEmailingMailItem(item);
+    setEmailGroupItems(groupItems || [item]);
     setIsSendEmailModalOpen(true);
   };
 
@@ -1895,7 +1925,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                       <div className="flex items-center justify-end gap-2 text-sm" onClick={(e) => e.stopPropagation()}>
                         {/* Edit button - always visible for quick access */}
                           <button
-                          onClick={() => openEditModal(group.items[0])}
+                          onClick={() => openEditModal(group.items[0], group.items, group.totalQuantity)}
                           className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                             title="Edit"
                           >
@@ -1940,7 +1970,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                               >
                                 <button
                                   onClick={() => {
-                                    openSendEmailModal(group.items[0]);
+                                    openSendEmailModal(group.items[0], group.items);
                                     setOpenDropdownId(null);
                                   }}
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3"
@@ -1953,6 +1983,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                 <button
                                   onClick={() => {
                                     setActionMailItem(group.items[0]);
+                                    setActionGroupItems(group.items);
                                     setActionModalType('scanned');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -1960,13 +1991,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-cyan-50 flex items-center gap-3"
                                 >
                                   <FileText className="w-4 h-4 text-cyan-600" />
-                                  Mark as Scanned
+                                  {group.items.length > 1 ? 'Mark All as Scanned' : 'Mark as Scanned'}
                                 </button>
-                                
+
                                 {/* Mark as Picked Up */}
                                 <button
                                   onClick={() => {
                                     setActionMailItem(group.items[0]);
+                                    setActionGroupItems(group.items);
                                     setActionModalType('picked_up');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -1974,13 +2006,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-green-50 flex items-center gap-3"
                                 >
                                   <CheckCircle className="w-4 h-4 text-green-600" />
-                                  Mark as Picked Up
+                                  {group.items.length > 1 ? 'Mark All as Picked Up' : 'Mark as Picked Up'}
                                 </button>
-                                
+
                                 {/* Mark as Forward */}
                                 <button
                                   onClick={() => {
                                     setActionMailItem(group.items[0]);
+                                    setActionGroupItems(group.items);
                                     setActionModalType('forward');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -1988,13 +2021,14 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-orange-50 flex items-center gap-3"
                                 >
                                   <Send className="w-4 h-4 text-orange-600" />
-                                  Mark as Forward
+                                  {group.items.length > 1 ? 'Mark All as Forward' : 'Mark as Forward'}
                                 </button>
-                                
+
                                 {/* Mark as Abandoned */}
                                 <button
                                   onClick={() => {
                                     setActionMailItem(group.items[0]);
+                                    setActionGroupItems(group.items);
                                     setActionModalType('abandoned');
                                     setIsActionModalOpen(true);
                                     setOpenDropdownId(null);
@@ -2002,7 +2036,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-red-50 flex items-center gap-3"
                                 >
                                   <AlertTriangle className="w-4 h-4 text-red-600" />
-                                  Mark as Abandoned
+                                  {group.items.length > 1 ? 'Mark All as Abandoned' : 'Mark as Abandoned'}
                                 </button>
                                 
                                 <div className="border-t border-gray-200 my-1"></div>
@@ -2025,7 +2059,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                 {/* Delete - destructive action at bottom */}
                                 <button
                                   onClick={() => {
-                                    handleDelete(group.items[0].mail_item_id);
+                                    handleDelete(group.items);
                                     setOpenDropdownId(null);
                                   }}
                                   disabled={deletingItemId === group.items[0].mail_item_id}
@@ -2036,7 +2070,7 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                                   ) : (
                                     <Trash2 className="w-4 h-4" />
                                   )}
-                                  Delete
+                                  {group.items.length > 1 ? `Delete All (${group.items.length} entries)` : 'Delete'}
                                 </button>
                               </div>
                             </>
@@ -2236,9 +2270,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
             {/* Quantity */}
             <div>
               <label className="block text-sm font-medium text-gray-900 mb-1">Quantity *</label>
-              {editingMailItem && (
+              {editingGroupItems.length > 0 && (
                 <p className="text-xs text-gray-500 mb-2">
-                  Current: {(editingMailItem as any).quantity || 1} item(s)
+                  Current: {editingGroupItems.reduce((sum, item) => sum + (item.quantity || 1), 0)} item(s)
+                  {editingGroupItems.length > 1 && ` (${editingGroupItems.length} entries will be consolidated)`}
                 </p>
               )}
               <input
@@ -2290,17 +2325,21 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           </div>
 
           {/* Show staff and notes fields if status or quantity changed */}
-          {editingMailItem && (formData.status !== editingMailItem.status || formData.quantity !== (editingMailItem.quantity || 1)) && (
+          {editingMailItem && (() => {
+            const groupTotalQty = editingGroupItems.reduce((sum, item) => sum + (item.quantity || 1), 0);
+            const statusChanged = formData.status !== editingMailItem.status;
+            const quantityChanged = formData.quantity !== groupTotalQty;
+            return (statusChanged || quantityChanged) && (
             <>
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                {formData.status !== editingMailItem.status && (
+                {statusChanged && (
                 <p className="text-sm text-blue-800 font-medium mb-3">
                   Status is being changed from "{editingMailItem.status}" to "{formData.status}"
                 </p>
                 )}
-                {formData.quantity !== (editingMailItem.quantity || 1) && (
+                {quantityChanged && (
                   <p className="text-sm text-blue-800 font-medium mb-3">
-                    Quantity is being changed from {editingMailItem.quantity || 1} to {formData.quantity}
+                    Quantity is being changed from {groupTotalQty} to {formData.quantity}
                   </p>
                 )}
                 
@@ -2354,7 +2393,8 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
                 </div>
               </div>
             </>
-          )}
+          );
+          })()}
 
           {/* Description */}
           <div>
@@ -2411,8 +2451,10 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           onClose={() => {
             setIsSendEmailModalOpen(false);
             setEmailingMailItem(null);
+            setEmailGroupItems([]);
           }}
           mailItem={emailingMailItem}
+          bulkMailItems={emailGroupItems.length > 1 ? emailGroupItems : undefined}
           onSuccess={handleSendEmailSuccess}
         />
       )}
@@ -2424,12 +2466,15 @@ export default function LogPage({ embedded = false, showAddForm = false }: LogPa
           onClose={() => {
             setIsActionModalOpen(false);
             setActionMailItem(null);
+            setActionGroupItems([]);
           }}
           mailItemId={actionMailItem.mail_item_id}
+          mailItemIds={actionGroupItems.map(item => item.mail_item_id)}
           mailItemDetails={{
             customerName: actionMailItem.contacts ? getCustomerDisplayName(actionMailItem.contacts) : 'Customer',
             itemType: actionMailItem.item_type,
-            currentStatus: actionMailItem.status
+            currentStatus: actionMailItem.status,
+            totalQuantity: actionGroupItems.reduce((sum, item) => sum + (item.quantity || 1), 0)
           }}
           actionType={actionModalType}
           onSuccess={handleActionSuccess}

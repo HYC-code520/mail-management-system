@@ -49,9 +49,14 @@ interface SendEmailModalProps {
 export default function SendEmailModal({ isOpen, onClose, mailItem, bulkMailItems = [], onSuccess, suggestedTemplateType }: SendEmailModalProps) {
   // Determine if we're in bulk mode (multiple items)
   const isBulkMode = bulkMailItems.length > 1;
-  const totalItems = isBulkMode ? bulkMailItems.length : 1;
+  // Sum up quantities instead of counting entries
+  const totalItems = isBulkMode
+    ? bulkMailItems.reduce((sum, i) => sum + (i.quantity || 1), 0)
+    : (mailItem?.quantity || 1);
   const packages = isBulkMode ? bulkMailItems.filter(i => i.item_type === 'Package' || i.item_type === 'Large Package') : [];
   const letters = isBulkMode ? bulkMailItems.filter(i => i.item_type === 'Letter' || i.item_type === 'Certified Mail') : [];
+  const packageCount = packages.reduce((sum, i) => sum + (i.quantity || 1), 0);
+  const letterCount = letters.reduce((sum, i) => sum + (i.quantity || 1), 0);
   const navigate = useNavigate();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
@@ -98,11 +103,11 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, bulkMailItem
     let subjectPreview = template.subject_line || 'Mail Notification';
     let messagePreview = template.message_body || '';
 
-    // Calculate bulk item statistics if we have bulk items
+    // Calculate bulk item statistics if we have bulk items (sum quantities, not entries)
     const itemsToUse = bulkMailItems.length > 0 ? bulkMailItems : [mailItem];
-    const pkgCount = itemsToUse.filter(i => i.item_type === 'Package' || i.item_type === 'Large Package').length;
-    const letterCount = itemsToUse.filter(i => i.item_type === 'Letter' || i.item_type === 'Certified Mail').length;
-    const totalCount = itemsToUse.length;
+    const pkgCount = itemsToUse.filter(i => i.item_type === 'Package' || i.item_type === 'Large Package').reduce((sum, i) => sum + (i.quantity || 1), 0);
+    const letterCountPreview = itemsToUse.filter(i => i.item_type === 'Letter' || i.item_type === 'Certified Mail').reduce((sum, i) => sum + (i.quantity || 1), 0);
+    const totalCount = itemsToUse.reduce((sum, i) => sum + (i.quantity || 1), 0);
     
     // Calculate oldest item in days
     const now = new Date();
@@ -132,9 +137,9 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, bulkMailItem
       itemSummary += '\n';
       itemSummaryChinese += '\n';
     }
-    if (letterCount > 0) {
-      itemSummary += `• ${letterCount} letter${letterCount > 1 ? 's' : ''}`;
-      itemSummaryChinese += `• ${letterCount} 封信件`;
+    if (letterCountPreview > 0) {
+      itemSummary += `• ${letterCountPreview} letter${letterCountPreview > 1 ? 's' : ''}`;
+      itemSummaryChinese += `• ${letterCountPreview} 封信件`;
     }
 
     // Build fee summary
@@ -161,7 +166,7 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, bulkMailItem
       // Bulk notification variables
       '{TotalItems}': `${totalCount} ${totalCount === 1 ? 'item' : 'items'}`,
       '{TotalPackages}': `${pkgCount} ${pkgCount === 1 ? 'package' : 'packages'}`,
-      '{TotalLetters}': `${letterCount} ${letterCount === 1 ? 'letter' : 'letters'}`,
+      '{TotalLetters}': `${letterCountPreview} ${letterCountPreview === 1 ? 'letter' : 'letters'}`,
       '{OldestDays}': oldestDays.toString(),
       '{ItemSummary}': itemSummary.trim(),
       '{ItemSummaryChinese}': itemSummaryChinese.trim(),
@@ -356,18 +361,18 @@ export default function SendEmailModal({ isOpen, onClose, mailItem, bulkMailItem
                   Bulk Notification - {totalItems} Items
                 </h4>
                 <div className="flex items-center gap-4 text-sm mb-3">
-                  {packages.length > 0 && (
+                  {packageCount > 0 && (
                     <div className="flex items-center gap-1.5 text-gray-700">
                       <span className="text-base">📦</span>
-                      <span className="font-medium">{packages.length}</span>
-                      <span className="text-gray-600">package{packages.length !== 1 ? 's' : ''}</span>
+                      <span className="font-medium">{packageCount}</span>
+                      <span className="text-gray-600">package{packageCount !== 1 ? 's' : ''}</span>
                     </div>
                   )}
-                  {letters.length > 0 && (
+                  {letterCount > 0 && (
                     <div className="flex items-center gap-1.5 text-gray-700">
                       <span className="text-base">📧</span>
-                      <span className="font-medium">{letters.length}</span>
-                      <span className="text-gray-600">letter{letters.length !== 1 ? 's' : ''}</span>
+                      <span className="font-medium">{letterCount}</span>
+                      <span className="text-gray-600">letter{letterCount !== 1 ? 's' : ''}</span>
                     </div>
                   )}
                   {(() => {

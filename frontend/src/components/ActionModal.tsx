@@ -7,10 +7,12 @@ interface ActionModalProps {
   isOpen: boolean;
   onClose: () => void;
   mailItemId: string;
+  mailItemIds?: string[]; // Optional: all item IDs in the group for bulk update
   mailItemDetails: {
     customerName: string;
     itemType: string;
     currentStatus: string;
+    totalQuantity?: number; // Optional: total quantity for display
   };
   actionType: 'picked_up' | 'forward' | 'scanned' | 'abandoned';
   onSuccess: () => void;
@@ -51,6 +53,7 @@ export default function ActionModal({
   isOpen,
   onClose,
   mailItemId,
+  mailItemIds,
   mailItemDetails,
   actionType,
   onSuccess
@@ -74,16 +77,28 @@ export default function ActionModal({
     setLoading(true);
 
     try {
-      // Update the mail item status (backend automatically creates action history)
-      await api.mailItems.update(mailItemId, {
-        status: config.statusValue,
-        performed_by: performedBy, // Pass staff name to backend for action history
-        action_notes: notes.trim() || null // Pass notes to be included in action history
-      });
+      // Get all IDs to update (use mailItemIds if provided, otherwise just mailItemId)
+      const idsToUpdate = mailItemIds && mailItemIds.length > 0 ? mailItemIds : [mailItemId];
+
+      // Update all mail items in the group
+      for (const id of idsToUpdate) {
+        await api.mailItems.update(id, {
+          status: config.statusValue,
+          performed_by: performedBy, // Pass staff name to backend for action history
+          action_notes: notes.trim() || null // Pass notes to be included in action history
+        });
+      }
 
       // Note: Backend automatically logs action history, no need to create it manually here
 
-      toast.success(`✓ ${mailItemDetails.customerName}'s ${mailItemDetails.itemType} ${config.successMessage}`);
+      const itemCount = idsToUpdate.length;
+      const quantityDisplay = mailItemDetails.totalQuantity && mailItemDetails.totalQuantity > 1
+        ? ` (${mailItemDetails.totalQuantity} items)`
+        : '';
+      const successMsg = itemCount > 1
+        ? `✓ ${itemCount} entries for ${mailItemDetails.customerName}${quantityDisplay} ${config.successMessage}`
+        : `✓ ${mailItemDetails.customerName}'s ${mailItemDetails.itemType} ${config.successMessage}`;
+      toast.success(successMsg);
       onSuccess();
       handleClose();
     } catch (err) {

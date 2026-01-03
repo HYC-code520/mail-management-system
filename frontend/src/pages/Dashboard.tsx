@@ -143,7 +143,8 @@ export default function DashboardPage() {
     received_date: toNYDateString(getTodayNY()),
     quantity: 1
   });
-  const [contacts] = useState<Contact[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactsLoading, setContactsLoading] = useState(false);
   
   // Action Modal states (for picked up, forward, abandoned actions)
   const [isActionModalOpen, setIsActionModalOpen] = useState(false);
@@ -205,6 +206,27 @@ export default function DashboardPage() {
       void loadDashboardData(false);
     }
   }, [chartTimeRange]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Load contacts when Log Mail modal opens
+  useEffect(() => {
+    if (isLogMailModalOpen && contacts.length === 0 && !contactsLoading) {
+      const loadContacts = async () => {
+        setContactsLoading(true);
+        try {
+          const data = await api.contacts.getAll();
+          // Filter to only active contacts
+          const activeContacts = data.filter((c: Contact) => c.status === 'Active');
+          setContacts(activeContacts);
+        } catch (err) {
+          console.error('Error loading contacts:', err);
+          toast.error('Failed to load customers');
+        } finally {
+          setContactsLoading(false);
+        }
+      };
+      void loadContacts();
+    }
+  }, [isLogMailModalOpen, contacts.length, contactsLoading]);
 
   // Format phone number as user types: 917-822-5751
   const formatPhoneNumber = (value: string) => {
@@ -973,9 +995,10 @@ export default function DashboardPage() {
               value={logMailFormData.contact_id}
               onChange={handleLogMailFormChange}
               required
-              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500"
+              disabled={contactsLoading}
+              className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-green-500 disabled:bg-gray-100 disabled:cursor-wait"
             >
-              <option value="">Select a customer</option>
+              <option value="">{contactsLoading ? 'Loading customers...' : 'Select a customer'}</option>
               {contacts
                 .sort((a, b) => (a.mailbox_number || '').localeCompare(b.mailbox_number || ''))
                 .map(contact => (

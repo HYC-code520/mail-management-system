@@ -119,6 +119,23 @@ export default function ActionHistorySection({ actions, loading }: ActionHistory
     } else if (actionType.includes('updated') || actionType.includes('edited')) {
       return 'updated the record';
     } else if (actionType.includes('created')) {
+      // Use action_description if available (e.g., "Letter logged (qty: 8)")
+      if (action.action_description) {
+        // Parse the description to create user-friendly text
+        // Format from backend: "Letter logged (qty: 8)" or "Package logged (qty: 2) - Description"
+        const desc = action.action_description;
+        const qtyMatch = desc.match(/\(qty:\s*(\d+)\)/i);
+        const typeMatch = desc.match(/^(Letter|Package)/i);
+
+        if (qtyMatch && typeMatch) {
+          const qty = parseInt(qtyMatch[1], 10);
+          const itemType = typeMatch[1].toLowerCase();
+          const plural = qty > 1 ? 's' : '';
+          return `added ${qty} ${itemType}${plural}`;
+        }
+        // Fallback: just use the description as-is
+        return desc.toLowerCase().replace(' logged', '');
+      }
       return 'created the record';
     }
     return action.action_type || 'performed an action';
