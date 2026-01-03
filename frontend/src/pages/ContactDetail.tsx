@@ -898,7 +898,7 @@ export default function ContactDetailPage() {
                 <Mail className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
                 <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">No mail history yet</p>
                 <button
-                  onClick={() => navigate('/dashboard/intake')}
+                  onClick={() => navigate(`/dashboard/intake?contactId=${id}`)}
                   className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                 >
                   Add Mail Item
