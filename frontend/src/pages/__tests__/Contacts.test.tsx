@@ -44,7 +44,7 @@ describe('Contacts Page', () => {
     render(<Contacts />);
     
     // Wait for the title to appear after loading
-    expect(await screen.findByText('Customer Directory')).toBeInTheDocument();
+    expect(await screen.findByText('Customers')).toBeInTheDocument();
     
     // Wait for async loading to complete
     await waitFor(() => {
@@ -136,7 +136,7 @@ describe('Contacts Page', () => {
     
     await waitFor(() => {
       // Should show error state or message
-      expect(screen.getByText('Customer Directory')).toBeInTheDocument();
+      expect(screen.getByText('Customers')).toBeInTheDocument();
     });
   });
 

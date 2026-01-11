@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Check, Circle, Trash2, Calendar, Flag, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Check, Trash2, Calendar, Flag, Edit2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
 import Modal from '../components/Modal.tsx';
@@ -376,64 +376,63 @@ export default function TodoList() {
 
   return (
     <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
-      {/* Header with Filter Tabs */}
-      <div className="mb-8">
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <span className="px-4 py-2 bg-blue-100 text-blue-700 rounded-full text-sm font-semibold">
-              {todos.filter(t => !t.is_completed).length} tasks left
-            </span>
-          </div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">To-Do</h1>
+          <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+            {todos.filter(t => !t.is_completed).length} tasks left
+          </span>
+        </div>
       </div>
 
         {/* Filter Tabs */}
-        <div className="flex gap-2 mb-6">
-          <button
-            onClick={() => setFilter('all')}
-            className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
-              filter === 'all'
-                ? 'bg-blue-500 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            All
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-              filter === 'all' ? 'bg-white/30' : 'bg-gray-300'
-            }`}>
-              {todos.length}
-            </span>
-          </button>
-          <button
-            onClick={() => setFilter('active')}
-            className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
-              filter === 'active'
-                ? 'bg-pink-500 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Incompleted
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-              filter === 'active' ? 'bg-white/30' : 'bg-gray-300'
-            }`}>
-              {todos.filter(t => !t.is_completed).length}
-            </span>
-          </button>
-          <button
-            onClick={() => setFilter('completed')}
-            className={`px-5 py-2.5 rounded-xl font-semibold transition-all ${
-              filter === 'completed'
-                ? 'bg-teal-500 text-white shadow-md'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-          >
-            Completed
-            <span className={`ml-2 px-2 py-0.5 rounded-full text-xs ${
-              filter === 'completed' ? 'bg-white/30' : 'bg-gray-300'
-            }`}>
-              {todos.filter(t => t.is_completed).length}
-            </span>
-          </button>
-        </div>
+      <div className="flex items-center gap-2 mb-6">
+        <button
+          onClick={() => setFilter('all')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filter === 'all'
+              ? 'bg-blue-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          All
+          <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
+            filter === 'all' ? 'bg-white/20' : 'bg-gray-200'
+          }`}>
+            {todos.length}
+          </span>
+        </button>
+        <button
+          onClick={() => setFilter('active')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filter === 'active'
+              ? 'bg-pink-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Incompleted
+          <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
+            filter === 'active' ? 'bg-white/20' : 'bg-gray-200'
+          }`}>
+            {todos.filter(t => !t.is_completed).length}
+          </span>
+        </button>
+        <button
+          onClick={() => setFilter('completed')}
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+            filter === 'completed'
+              ? 'bg-teal-600 text-white'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+        >
+          Completed
+          <span className={`ml-1 px-1.5 py-0.5 rounded text-xs ${
+            filter === 'completed' ? 'bg-white/20' : 'bg-gray-200'
+          }`}>
+            {todos.filter(t => t.is_completed).length}
+          </span>
+        </button>
       </div>
 
       {/* Date Selector */}
@@ -617,7 +616,11 @@ export default function TodoList() {
 
         return filteredTodos.length === 0 ? (
         <div className="bg-white rounded-2xl shadow-md border border-gray-200 p-12 text-center">
-          <Circle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <img
+            src="/assets/images/to-do2.png"
+            alt="No tasks"
+            className="w-48 h-48 mx-auto mb-4"
+          />
           <p className="text-gray-500 text-lg font-medium mb-2">
             {filter === 'active' ? 'No incomplete tasks' : 'No tasks for this day'}
           </p>

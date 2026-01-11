@@ -234,11 +234,11 @@ export default function FeesPage() {
 
   return (
     <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
-      {/* Header Row */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Header */}
+      <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-semibold text-gray-900">Fee Collection</h1>
-          <span className="text-gray-400 text-lg">{feesData.length} customers</span>
+          <h1 className="text-2xl font-bold text-gray-900">Fee Collection</h1>
+          <span className="text-gray-400 text-sm">{feesData.length} customers</span>
         </div>
         
         {/* Total Outstanding Badge */}

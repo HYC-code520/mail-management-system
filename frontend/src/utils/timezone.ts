@@ -182,4 +182,3 @@ export function formatNYDateDisplay(date: Date | string, options?: Intl.DateTime
   const d = typeof date === 'string' ? new Date(date) : date;
   return d.toLocaleDateString('en-US', finalOptions);
 }
-

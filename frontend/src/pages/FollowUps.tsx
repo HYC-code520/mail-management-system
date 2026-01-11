@@ -232,11 +232,8 @@ export default function FollowUpsPage() {
     return (
       <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Needs Follow-up
-          </h1>
-          <p className="text-gray-600">Customers requiring attention for fees, notifications, or pickups</p>
+        <div className="flex items-center justify-between mb-8">
+          <h1 className="text-2xl font-bold text-gray-900">Follow-ups</h1>
         </div>
 
         {/* Loading Animation */}
@@ -268,43 +265,36 @@ export default function FollowUpsPage() {
   return (
     <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Needs Follow-up
-            </h1>
-            <p className="text-gray-600">Customers requiring attention for fees, notifications, or pickups</p>
-          </div>
-          
-          {/* Summary stats */}
-          {totalCustomers > 0 && (
-            <div className="flex items-center gap-6 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <span className="text-2xl font-semibold text-gray-900">{totalCustomers}</span>
-                <span>customers</span>
-              </div>
-              {totalFees > 0 && (
-                <>
-                  <div className="w-px h-6 bg-gray-300" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-semibold text-gray-900">${totalFees.toFixed(0)}</span>
-                    <span>in fees</span>
-                  </div>
-                </>
-              )}
-              {abandonedCount > 0 && (
-                <>
-                  <div className="w-px h-6 bg-gray-300" />
-                  <div className="flex items-center gap-2">
-                    <span className="text-2xl font-semibold text-red-600">{abandonedCount}</span>
-                    <span>30+ days</span>
-                  </div>
-                </>
-              )}
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Follow-ups</h1>
+
+        {/* Summary stats */}
+        {totalCustomers > 0 && (
+          <div className="flex items-center gap-6 text-sm text-gray-600">
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-semibold text-gray-900">{totalCustomers}</span>
+              <span>customers</span>
             </div>
-          )}
-        </div>
+            {totalFees > 0 && (
+              <>
+                <div className="w-px h-5 bg-gray-300" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-semibold text-gray-900">${totalFees.toFixed(0)}</span>
+                  <span>in fees</span>
+                </div>
+              </>
+            )}
+            {abandonedCount > 0 && (
+              <>
+                <div className="w-px h-5 bg-gray-300" />
+                <div className="flex items-center gap-2">
+                  <span className="text-xl font-semibold text-red-600">{abandonedCount}</span>
+                  <span>30+ days</span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Follow-up Cards */}

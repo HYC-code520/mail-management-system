@@ -341,10 +341,7 @@ export default function ContactsPage() {
     <div className="max-w-full mx-auto px-16 py-6">
       {/* Header */}
       <div className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Customer Directory</h1>
-          <p className="text-gray-600">Manage customer information</p>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Customers</h1>
         <div className="flex items-center gap-4">
           {/* Bulk Email Button */}
           <button

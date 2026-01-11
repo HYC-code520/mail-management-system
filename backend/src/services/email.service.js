@@ -130,7 +130,7 @@ async function sendEmail({ to, subject, htmlContent, textContent, userId }) {
 
     // Fall back to SMTP if Gmail API not available
     if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      throw new Error('Email service not configured. Please set SMTP credentials or connect Gmail via OAuth2.');
+      throw new Error('Gmail not connected. Please go to Settings and reconnect your Gmail account to send emails.');
     }
     
     console.log('📧 Using SMTP to send email');

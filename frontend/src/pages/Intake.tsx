@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Search, Save, Bell, Mail, Package, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { api } from '../lib/api-client.ts';
 import toast from 'react-hot-toast';
@@ -27,6 +28,9 @@ interface IntakePageProps {
 }
 
 export default function IntakePage({ embedded = false }: IntakePageProps) {
+  const [searchParams] = useSearchParams();
+  const preselectedContactId = searchParams.get('contactId');
+  
   const [date, setDate] = useState(getTodayNY());
   const [itemType, setItemType] = useState('Letter');
   const [quantity, setQuantity] = useState(1);
@@ -41,6 +45,24 @@ export default function IntakePage({ embedded = false }: IntakePageProps) {
   // Sorting states
   const [sortColumn, setSortColumn] = useState<'type' | 'customer' | 'status' | 'quantity'>('customer');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+
+  // Load preselected contact if contactId is in URL
+  useEffect(() => {
+    if (preselectedContactId) {
+      const loadPreselectedContact = async () => {
+        try {
+          const contact = await api.contacts.getById(preselectedContactId);
+          if (contact) {
+            setSelectedContact(contact);
+            setSearchQuery(contact.contact_person || contact.company_name || '');
+          }
+        } catch (err) {
+          console.error('Error loading preselected contact:', err);
+        }
+      };
+      loadPreselectedContact();
+    }
+  }, [preselectedContactId]);
 
   useEffect(() => {
     loadTodaysEntries();

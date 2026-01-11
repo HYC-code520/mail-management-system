@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Camera, CheckCircle, XCircle, Loader, Trash2, Edit, Send, ArrowLeft, Video, Zap, DollarSign, Info, Users, Activity } from 'lucide-react';
+import { Camera, CheckCircle, XCircle, X, Loader, Trash2, Edit, Send, ArrowLeft, Video, Zap, DollarSign, Info, Users, Activity } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import confetti from 'canvas-confetti';
@@ -60,6 +60,7 @@ export default function ScanSessionPage() {
   const [batchMode, setBatchMode] = useState(true); // Default ON for demos and efficiency
   const [batchQueue, setBatchQueue] = useState<Array<{ blob: Blob; previewUrl: string }>>([]);
   const [isProcessingBatch, setIsProcessingBatch] = useState(false);
+  const [previewImageUrl, setPreviewImageUrl] = useState<string | null>(null);
   const BATCH_SIZE = 10;
 
   // Load contacts and check for existing session on mount
@@ -180,27 +181,26 @@ export default function ScanSessionPage() {
 
   // Add photo to batch queue
   const addToBatchQueue = (photoBlob: Blob) => {
-    setBatchQueue(prev => {
-      if (prev.length >= BATCH_SIZE) {
-        toast.error(`Batch is full (${BATCH_SIZE} photos). Process current batch first.`);
-        return prev;
-      }
+    // Check if batch is full before adding
+    if (batchQueue.length >= BATCH_SIZE) {
+      toast.error(`Batch is full (${BATCH_SIZE} photos). Process current batch first.`);
+      return;
+    }
 
-      const previewUrl = URL.createObjectURL(photoBlob);
-      const newQueue = [...prev, { blob: photoBlob, previewUrl }];
-      const newCount = newQueue.length;
+    const previewUrl = URL.createObjectURL(photoBlob);
+    const newCount = batchQueue.length + 1;
 
-      toast.success(`📸 Added to batch (${newCount}/${BATCH_SIZE})`, { duration: 1500 });
+    setBatchQueue(prev => [...prev, { blob: photoBlob, previewUrl }]);
 
-      // Auto-process when batch is full
-      if (newCount === BATCH_SIZE) {
-        toast('Batch full! Processing automatically...', { icon: '🚀', duration: 2000 });
-        // Small delay to let state update, then process
-        setTimeout(() => processBatchQueue(), 500);
-      }
+    // Show toast outside state setter to avoid React StrictMode duplicate
+    toast.success(`Added to batch (${newCount}/${BATCH_SIZE})`, { duration: 1500 });
 
-      return newQueue;
-    });
+    // Auto-process when batch is full
+    if (newCount === BATCH_SIZE) {
+      toast('Batch full! Processing automatically...', { icon: '🚀', duration: 2000 });
+      // Small delay to let state update, then process
+      setTimeout(() => processBatchQueue(), 500);
+    }
   };
 
   // Queue for items that need manual review from batch processing
@@ -302,10 +302,22 @@ export default function ScanSessionPage() {
         setBatchReviewQueue(itemsNeedingReview);
         // Show first one for review
         setPendingItem(itemsNeedingReview[0]);
-        toast(`${itemsNeedingReview.length} items need manual review`, { icon: '⚠️', duration: 3000 });
+
+        // Count completely unrecognized items (empty extractedText = Gemini couldn't read it)
+        const unrecognizedCount = itemsNeedingReview.filter(item => !item.extractedText || item.extractedText.trim() === '').length;
+
+        if (unrecognizedCount > 0) {
+          // Prominent warning for completely failed items - stays until dismissed
+          toast.error(`${unrecognizedCount} image${unrecognizedCount > 1 ? 's' : ''} could not be read - please review manually`, {
+            duration: Infinity,
+          });
+        } else {
+          // Regular warning for low-confidence matches - long duration
+          toast(`${itemsNeedingReview.length} items need manual review`, { icon: '⚠️', duration: 15000 });
+        }
       }
 
-      toast.success(`✅ Batch complete! ${matchedCount}/${response.results.length} auto-matched`, {
+      toast.success(`Batch complete: ${matchedCount}/${response.results.length} auto-matched`, {
         duration: 3000,
       });
 
@@ -1200,9 +1212,9 @@ export default function ScanSessionPage() {
                   <button
                     onClick={handlePreviewEmail}
                     disabled={isSubmitting || grouped.length === 0 || !scannedBy}
-                    className="w-full py-2 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 text-sm font-medium rounded-lg border border-gray-300 transition-colors flex items-center justify-center gap-2"
+                    className="w-full py-3 bg-white hover:bg-gray-50 disabled:bg-gray-100 disabled:text-gray-400 text-gray-700 text-base font-medium rounded-xl border border-gray-300 transition-colors flex items-center justify-center gap-2"
                   >
-                    <Edit className="w-4 h-4" />
+                    <Edit className="w-5 h-5" />
                     Preview/Edit Email First (Optional)
                   </button>
                 </>
@@ -1230,14 +1242,14 @@ export default function ScanSessionPage() {
     <div className="min-h-screen bg-gray-50 pb-24">
       {/* Header */}
       <div className="sticky top-0 z-10">
-        <div className="max-w-full mx-auto px-16 py-6">
+        <div className="max-w-full mx-auto px-16 py-3">
           {/* Title */}
-          <div className="mb-4">
-            <h2 className="text-2xl font-bold text-gray-900">Scan Session</h2>
+          <div className="mb-2">
+            <h1 className="text-2xl font-bold text-gray-900">Scan Session</h1>
           </div>
           
           {/* Compact Configuration Panel - All in One Row */}
-          <div className="flex items-center gap-4 p-4">
+          <div className="flex items-center gap-4 p-3 bg-white/35 backdrop-blur-sm rounded-lg shadow-sm relative z-10">
             {/* Quick Scan Mode Toggle */}
             <div className="flex items-center gap-2">
               <input
@@ -1252,16 +1264,16 @@ export default function ScanSessionPage() {
                 <span className="text-sm font-medium text-gray-900">Quick Scan</span>
                 <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded">Recommended</span>
               </label>
-              <div className="group relative">
+              <div className="group relative hover:z-[100]">
                 <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
-                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-50">
+                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-[100]">
                   Auto-accept high confidence matches (≥70%) for faster bulk scanning. Uncheck if you want to review each scan manually.
                 </div>
               </div>
             </div>
-            
+
             <div className="w-px h-6 bg-gray-300"></div>
-            
+
             {/* Batch Mode Toggle */}
             <div className="flex items-center gap-2">
               <input
@@ -1283,9 +1295,9 @@ export default function ScanSessionPage() {
                 <span className="text-sm font-medium text-gray-900">Batch Mode</span>
                 <span className="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">10x Savings</span>
               </label>
-              <div className="group relative">
+              <div className="group relative hover:z-[100]">
                 <Info className="w-3.5 h-3.5 text-gray-400 cursor-help" />
-                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-50">
+                <div className="invisible group-hover:visible absolute left-0 top-6 w-72 bg-gray-900 text-white text-xs rounded-lg p-3 shadow-lg z-[100]">
                   Collect {BATCH_SIZE} photos, then process all at once. Uses 1 API call instead of 10 - saves cost AND avoids rate limits!
                 </div>
               </div>
@@ -1320,8 +1332,8 @@ export default function ScanSessionPage() {
 
           {/* Batch Queue Status */}
           {batchMode && (
-            <div className="mt-4 p-4">
-              <div className="flex items-center justify-between mb-3">
+            <div className="mt-2 p-3 bg-white/35 backdrop-blur-sm rounded-lg shadow-sm relative z-0">
+              <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center gap-2">
                   <Camera className="w-4 h-4 text-blue-600" />
                   <span className="text-sm font-medium text-blue-900">
@@ -1331,7 +1343,7 @@ export default function ScanSessionPage() {
                 {batchQueue.length > 0 && !isProcessingBatch && (
                   <button
                     onClick={processBatchQueue}
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
+                    className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors flex items-center gap-2"
                   >
                     Process {batchQueue.length} Photos
                   </button>
@@ -1340,17 +1352,30 @@ export default function ScanSessionPage() {
 
               {/* Batch Queue Thumbnails */}
               {batchQueue.length > 0 ? (
-                <div className="flex gap-2 flex-wrap">
+                <div className="flex gap-3 md:gap-4 flex-wrap">
                   {batchQueue.map((item, idx) => (
-                    <div key={idx} className="relative">
+                    <div key={idx} className="relative group">
                       <img
                         src={item.previewUrl}
                         alt={`Queue ${idx + 1}`}
-                        className="w-16 h-16 object-cover rounded-lg border-2 border-blue-300 shadow-sm"
+                        className="w-12 h-12 object-cover rounded-lg border-2 border-blue-300 shadow-sm cursor-pointer hover:border-blue-500 transition-colors"
+                        onClick={() => setPreviewImageUrl(item.previewUrl)}
+                        title="Click to preview"
                       />
-                      <span className="absolute -top-2 -right-2 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow">
+                      <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-semibold shadow">
                         {idx + 1}
                       </span>
+                      {/* Delete button - shows on hover */}
+                      <button
+                        onClick={() => {
+                          URL.revokeObjectURL(item.previewUrl);
+                          setBatchQueue(prev => prev.filter((_, i) => i !== idx));
+                        }}
+                        className="absolute -top-1 -left-1 w-4 h-4 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center shadow opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Remove from queue"
+                      >
+                        <X className="w-2.5 h-2.5" />
+                      </button>
                     </div>
                   ))}
                 </div>
@@ -1365,36 +1390,36 @@ export default function ScanSessionPage() {
       </div>
 
       {/* Camera Button - Fixed at bottom, aligned with main content */}
-      <div className="fixed bottom-0 left-0 lg:left-72 right-0 p-6 z-20">
+      <div className="fixed bottom-0 left-0 lg:left-72 right-0 p-4 z-20">
         <div className="max-w-4xl mx-auto">
-          {/* Counter and Status - Cleaner Design */}
+          {/* Counter and Status - Compact Design */}
           {quickScanMode && (session.items.length > 0 || processingQueue > 0) && (
-            <div className="mb-4 flex items-center justify-center gap-3 text-sm">
+            <div className="mb-2 flex items-center justify-center gap-2 text-sm">
               {session.items.length > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
-                  <span className="text-2xl font-bold text-gray-900">{session.items.length}</span>
-                  <span className="text-gray-600">scanned</span>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 border border-gray-200 rounded-md">
+                  <span className="text-lg font-bold text-gray-900">{session.items.length}</span>
+                  <span className="text-gray-600 text-xs">scanned</span>
                 </div>
               )}
               {processingQueue > 0 && (
-                <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 border border-blue-200 rounded-lg">
-                  <Loader className="w-4 h-4 text-blue-600 animate-spin" />
-                  <span className="text-blue-700">{processingQueue} processing</span>
+                <div className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 rounded-md">
+                  <Loader className="w-3.5 h-3.5 text-blue-600 animate-spin" />
+                  <span className="text-blue-700 text-xs">{processingQueue} processing</span>
                 </div>
               )}
             </div>
           )}
-          
-          {/* Camera Options - Simplified Design */}
-          <div className="relative grid grid-cols-2 gap-3">
+
+          {/* Camera Options - Compact Design */}
+          <div className="relative grid grid-cols-2 gap-2">
             {/* Webcam Button */}
             <button
               onClick={handleWebcamClick}
               disabled={isProcessing && !quickScanMode}
-              className="py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-base font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+              className="py-2.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
               title="Use computer webcam"
             >
-              <Video className="w-5 h-5" />
+              <Video className="w-4 h-4" />
               <span className="hidden sm:inline">Webcam</span>
             </button>
 
@@ -1402,37 +1427,37 @@ export default function ScanSessionPage() {
             <button
               onClick={handleCameraClick}
               disabled={isProcessing && !quickScanMode}
-              className="py-4 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-base font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
+              className="py-2.5 bg-gray-900 hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 text-white text-sm font-medium rounded-lg transition-all flex items-center justify-center gap-2 shadow-sm hover:shadow-md"
               title="Upload image or use phone camera"
             >
               {isProcessing && !quickScanMode ? (
                 <>
-                  <Loader className="w-5 h-5 animate-spin" />
+                  <Loader className="w-4 h-4 animate-spin" />
                   <span className="hidden sm:inline">Processing...</span>
                 </>
               ) : (
                 <>
-                  <Camera className="w-5 h-5" />
+                  <Camera className="w-4 h-4" />
                   <span className="hidden sm:inline">Upload/Camera</span>
                 </>
               )}
             </button>
           </div>
 
-          {/* End Session Button - Prominent Design */}
+          {/* End Session Button */}
           {session.items.length > 0 && (
             <button
               onClick={() => endSession()}
-              className="w-full mt-4 py-3.5 bg-blue-600 hover:bg-blue-700 text-white text-base font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
+              className="w-full mt-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2 shadow-sm"
             >
-              <XCircle className="w-5 h-5" />
+              <XCircle className="w-4 h-4" />
               End Session & Review
             </button>
           )}
-          
+
           {quickScanMode && processingQueue === 0 && session.items.length > 0 && (
-            <p className="text-center text-sm text-gray-500 mt-2">
-              ✅ All photos processed! Keep scanning or end session.
+            <p className="text-center text-xs text-gray-500 mt-1.5">
+              All photos processed. Keep scanning or end session.
             </p>
           )}
         </div>
@@ -1614,6 +1639,30 @@ export default function ScanSessionPage() {
           onConfirm={handleConfirmAndSend}
           sending={isSubmitting}
         />
+      )}
+
+      {/* Image Preview Modal */}
+      {previewImageUrl && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4"
+          onClick={() => setPreviewImageUrl(null)}
+        >
+          <div className="relative max-w-3xl max-h-[90vh]">
+            <img
+              src={previewImageUrl}
+              alt="Preview"
+              className="max-w-full max-h-[85vh] object-contain rounded-lg shadow-2xl"
+              onClick={(e) => e.stopPropagation()}
+            />
+            <button
+              onClick={() => setPreviewImageUrl(null)}
+              className="absolute -top-3 -right-3 w-8 h-8 bg-white hover:bg-gray-100 text-gray-800 rounded-full flex items-center justify-center shadow-lg transition-colors"
+              title="Close preview"
+            >
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

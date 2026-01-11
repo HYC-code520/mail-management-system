@@ -131,8 +131,8 @@ describe('SendEmailModal - Gmail Disconnection Error Handling', () => {
       const mockError = {
         response: {
           data: {
-            error: 'Email service not configured',
-            message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+            error: 'Gmail not connected',
+            message: 'Gmail is not connected. Please go to Settings and connect your Gmail account to send emails.',
             code: 'EMAIL_NOT_CONFIGURED',
             action: 'connect_gmail'
           }

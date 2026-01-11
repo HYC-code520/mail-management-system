@@ -232,10 +232,10 @@ async function sendNotificationEmail(req, res, next) {
     }
     
     // Check for email service not configured
-    if (error.message && error.message.includes('Email service not configured')) {
+    if (error.message && (error.message.includes('Email service not configured') || error.message.includes('Gmail not connected'))) {
       return res.status(503).json({
-        error: 'Email service not configured',
-        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+        error: 'Gmail not connected',
+        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account to send emails.',
         code: 'EMAIL_NOT_CONFIGURED',
         action: 'connect_gmail'
       });
@@ -384,10 +384,10 @@ async function sendCustomEmail(req, res, next) {
     }
     
     // Check for email service not configured
-    if (error.message && error.message.includes('Email service not configured')) {
+    if (error.message && (error.message.includes('Email service not configured') || error.message.includes('Gmail not connected'))) {
       return res.status(503).json({
-        error: 'Email service not configured',
-        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+        error: 'Gmail not connected',
+        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account to send emails.',
         code: 'EMAIL_NOT_CONFIGURED',
         action: 'connect_gmail'
       });
@@ -445,10 +445,10 @@ async function testEmailConfig(req, res, next) {
     }
     
     // Check for email service not configured
-    if (error.message && error.message.includes('Email service not configured')) {
+    if (error.message && (error.message.includes('Email service not configured') || error.message.includes('Gmail not connected'))) {
       return res.status(503).json({
-        error: 'Email service not configured',
-        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+        error: 'Gmail not connected',
+        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account to send emails.',
         code: 'EMAIL_NOT_CONFIGURED',
         action: 'connect_gmail'
       });

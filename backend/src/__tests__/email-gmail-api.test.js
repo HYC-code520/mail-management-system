@@ -127,7 +127,7 @@ describe('Email Service - Gmail API Integration', () => {
         subject: 'Test',
         htmlContent: '<p>Test</p>',
         userId: 'user-123'
-      })).rejects.toThrow('Email service not configured');
+      })).rejects.toThrow('Gmail not connected');
     });
 
     it('should return success with messageId when email sent via Gmail API', async () => {

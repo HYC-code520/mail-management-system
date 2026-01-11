@@ -273,11 +273,8 @@ export default function TemplatesPage() {
   return (
     <div className="max-w-full mx-auto px-4 md:px-8 lg:px-16 py-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Email Templates</h1>
-          <p className="text-sm md:text-base text-gray-600">Manage and use bilingual message templates</p>
-        </div>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-2xl font-bold text-gray-900">Email Templates</h1>
         <button
           onClick={openCreateModal}
           className="flex items-center gap-2 px-4 md:px-6 py-2 md:py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors text-sm md:text-base whitespace-nowrap"

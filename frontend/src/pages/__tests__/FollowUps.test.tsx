@@ -125,15 +125,16 @@ describe('FollowUpsPage', () => {
     render(<FollowUpsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Needs Follow-up')).toBeInTheDocument();
+      expect(screen.getByText('Follow-ups')).toBeInTheDocument();
     });
   });
 
-  it('renders the page description', async () => {
+  it('renders the page without subtitle (removed for consistency)', async () => {
     render(<FollowUpsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Customers requiring attention for fees, notifications, or pickups')).toBeInTheDocument();
+      // Page should render with just the title, no subtitle
+      expect(screen.getByText('Follow-ups')).toBeInTheDocument();
     });
   });
 
@@ -223,7 +224,7 @@ describe('FollowUpsPage', () => {
     render(<FollowUpsPage />);
 
     await waitFor(() => {
-      expect(screen.getByText('Needs Follow-up')).toBeInTheDocument();
+      expect(screen.getByText('Follow-ups')).toBeInTheDocument();
     });
 
     // The GroupedFollowUpSection should handle empty state
@@ -292,7 +293,7 @@ describe('FollowUpsPage', () => {
 
     // Page should still render without crashing
     await waitFor(() => {
-      expect(screen.getByText('Needs Follow-up')).toBeInTheDocument();
+      expect(screen.getByText('Follow-ups')).toBeInTheDocument();
     });
   });
 

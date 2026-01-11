@@ -211,7 +211,7 @@ export default function ContactDetailPage() {
   const [isBulkPickupModalOpen, setIsBulkPickupModalOpen] = useState(false);
   const [bulkPickupPerformedBy, setBulkPickupPerformedBy] = useState('');
   const [processingBulkPickup, setProcessingBulkPickup] = useState(false);
-
+  
   // Edit Contact Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -898,7 +898,7 @@ export default function ContactDetailPage() {
                 <Mail className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300 mx-auto mb-3 sm:mb-4" />
                 <p className="text-sm sm:text-base text-gray-600 mb-3 sm:mb-4">No mail history yet</p>
                 <button
-                  onClick={() => navigate('/dashboard/intake')}
+                  onClick={() => navigate(`/dashboard/intake?contactId=${id}`)}
                   className="w-full sm:w-auto px-4 sm:px-6 py-2 sm:py-2.5 bg-black hover:bg-gray-800 text-white rounded-lg font-medium transition-colors text-sm sm:text-base"
                 >
                   Add Mail Item
@@ -993,18 +993,18 @@ export default function ContactDetailPage() {
                               {openMenuGroupKey === group.groupKey && (
                                 <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-xl z-50 py-1">
                                   {/* Send Email - only for non-terminal statuses and if email exists */}
-                                  {group.latestStatus !== 'Picked Up' && group.latestStatus !== 'Abandoned Package' && contact?.email && (
-                                    <button
+                          {group.latestStatus !== 'Picked Up' && group.latestStatus !== 'Abandoned Package' && contact?.email && (
+                            <button
                                       onClick={() => {
                                         openSendEmailModal(group.items[0], group.items);
                                         setOpenMenuGroupKey(null);
                                       }}
                                       className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-blue-50 flex items-center gap-3"
-                                    >
+                            >
                                       <Send className="w-4 h-4 text-blue-600" />
                                       Send Email
-                                    </button>
-                                  )}
+                            </button>
+                          )}
 
                                   {/* Edit */}
                                   <button

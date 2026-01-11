@@ -116,7 +116,7 @@ describe('Email API - Error Handling', () => {
     });
 
     it('should return EMAIL_NOT_CONFIGURED error when email service not set up', async () => {
-      sendEmail.mockRejectedValue(new Error('Email service not configured. Please set SMTP credentials or connect Gmail via OAuth2.'));
+      sendEmail.mockRejectedValue(new Error('Gmail not connected. Please go to Settings and reconnect your Gmail account to send emails.'));
 
       const response = await request(app)
         .post('/api/emails/send-custom')
@@ -129,8 +129,8 @@ describe('Email API - Error Handling', () => {
 
       expect(response.status).toBe(503);
       expect(response.body).toEqual({
-        error: 'Email service not configured',
-        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account.',
+        error: 'Gmail not connected',
+        message: 'Gmail is not connected. Please go to Settings and connect your Gmail account to send emails.',
         code: 'EMAIL_NOT_CONFIGURED',
         action: 'connect_gmail'
       });

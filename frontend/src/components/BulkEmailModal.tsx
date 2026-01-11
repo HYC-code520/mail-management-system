@@ -108,6 +108,7 @@ export default function BulkEmailModal({ isOpen, onClose, contacts }: BulkEmailM
     try {
       let successCount = 0;
       let failCount = 0;
+      let gmailDisconnectedError = false;
 
       // Send emails one by one
       for (const contactId of Array.from(selectedContacts)) {
@@ -118,13 +119,39 @@ export default function BulkEmailModal({ isOpen, onClose, contacts }: BulkEmailM
             sent_by: sentBy
           });
           successCount++;
-        } catch (err) {
+        } catch (err: any) {
           console.error(`Failed to send email to contact ${contactId}:`, err);
           failCount++;
+          
+          // Check if it's a Gmail disconnected error
+          const errorResponse = err.response?.data;
+          if (errorResponse?.code === 'GMAIL_DISCONNECTED' || errorResponse?.code === 'EMAIL_NOT_CONFIGURED') {
+            gmailDisconnectedError = true;
+            // Stop sending more emails if Gmail is disconnected
+            break;
+          }
         }
       }
 
-      if (successCount > 0) {
+      // Show Gmail disconnected error with action button
+      if (gmailDisconnectedError) {
+        toast.error(
+          (t: { id: string }) => (
+            <div className="flex flex-col gap-2">
+              <div className="font-semibold">Gmail Not Connected</div>
+              <div className="text-sm">Please connect your Gmail account in Settings to send emails.</div>
+              <a
+                href="/dashboard/settings"
+                className="mt-2 px-3 py-1 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 text-center"
+                onClick={() => toast.dismiss(t.id)}
+              >
+                Go to Settings →
+              </a>
+            </div>
+          ),
+          { duration: 8000 }
+        );
+      } else if (successCount > 0) {
         toast.success(
           `✅ Sent ${successCount} email${successCount > 1 ? 's' : ''} successfully!` +
           (failCount > 0 ? ` (${failCount} failed)` : ''),
@@ -132,7 +159,7 @@ export default function BulkEmailModal({ isOpen, onClose, contacts }: BulkEmailM
         );
       }
 
-      if (failCount > 0 && successCount === 0) {
+      if (failCount > 0 && successCount === 0 && !gmailDisconnectedError) {
         toast.error(`❌ Failed to send all ${failCount} emails`);
       }
 

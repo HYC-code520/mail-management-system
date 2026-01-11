@@ -114,7 +114,7 @@ describe('Contacts Page - Avatar Feature', () => {
 
     await waitFor(() => {
       // The page should still render even without actual images
-      expect(screen.getByText('Customer Directory')).toBeInTheDocument();
+      expect(screen.getByText('Customers')).toBeInTheDocument();
       expect(screen.getByText('Alice Johnson')).toBeInTheDocument();
     });
   });
